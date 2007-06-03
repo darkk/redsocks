@@ -4,7 +4,7 @@ CFLAGS=-std=gnu99 -Wall -g
 redsocks: parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o base.o
 	$(CC) $+ -levent -o $@
 
-tags:
+tags: *.c *.h
 	ctags -R
 
 .PHONY: clean distclean
