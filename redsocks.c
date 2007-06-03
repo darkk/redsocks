@@ -199,8 +199,10 @@ void redsocks_drop_client(redsocks_client *client)
 {
 	close(EVENT_FD(&client->client->ev_write));
 	close(EVENT_FD(&client->relay->ev_write));
-	bufferevent_free(client->client);
-	bufferevent_free(client->relay);
+	if (client->client)
+		bufferevent_free(client->client);
+	if (client->relay)
+		bufferevent_free(client->relay);
 	list_del(&client->list);
 	free(client);
 }
@@ -340,30 +342,11 @@ fail:
 	redsocks_relay_error(buffev, EVBUFFER_WRITE | EVBUFFER_ERROR, _arg);
 }
 
-static void redsocks_accept_client(int fd, short what, void *_arg)
+void redsocks_connect_relay(redsocks_client *client)
 {
-	redsocks_instance *self = _arg;
-	redsocks_client   *client = NULL;
-	struct sockaddr_in clientaddr;
-	struct sockaddr_in destaddr;
-	socklen_t          addrlen = sizeof(clientaddr);
-	int client_fd = -1;
 	int relay_fd = -1;
 	int error;
-	
-	// working with client_fd
-	client_fd = accept(fd, (struct sockaddr*)&clientaddr, &addrlen);
-	if (client_fd == -1) {
-		log_errno("accept");
-		goto fail;
-	}
 
-	error = getdestaddr(client_fd, &clientaddr, &self->config.bindaddr, &destaddr);
-	if (error) {
-		goto fail;
-	}
-
-	// working with relay_fd
 	relay_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (relay_fd == -1) {
 		log_errno("socket");
@@ -376,9 +359,47 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		goto fail;
 	}
 
-	error = connect(relay_fd, (struct sockaddr*)&self->config.relayaddr, sizeof(self->config.relayaddr));
+	error = connect(relay_fd, (struct sockaddr*)&client->instance->config.relayaddr, sizeof(client->instance->config.relayaddr));
 	if (error && errno != EINPROGRESS) {
 		log_errno("connect");
+		goto fail;
+	}
+
+	client->relay = bufferevent_new(relay_fd, NULL, redsocks_relay_connected, redsocks_relay_error, client);
+	if (!client->relay) {
+		log_errno("bufferevent_new");
+		goto fail;
+	}
+
+	error = bufferevent_enable(client->relay, EV_WRITE); // we wait for connection...
+	if (error) {
+		log_errno("bufferevent_enable");
+		goto fail;
+	}
+
+fail:
+	redsocks_drop_client(client);
+}
+
+static void redsocks_accept_client(int fd, short what, void *_arg)
+{
+	redsocks_instance *self = _arg;
+	redsocks_client   *client = NULL;
+	struct sockaddr_in clientaddr;
+	struct sockaddr_in destaddr;
+	socklen_t          addrlen = sizeof(clientaddr);
+	int client_fd = -1;
+	int error;
+	
+	// working with client_fd
+	client_fd = accept(fd, (struct sockaddr*)&clientaddr, &addrlen);
+	if (client_fd == -1) {
+		log_errno("accept");
+		goto fail;
+	}
+
+	error = getdestaddr(client_fd, &clientaddr, &self->config.bindaddr, &destaddr);
+	if (error) {
 		goto fail;
 	}
 
@@ -400,31 +421,21 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		goto fail;
 	}
 
-	client->relay = bufferevent_new(relay_fd, NULL, redsocks_relay_connected, redsocks_relay_error, client);
-	if (!client->client) {
-		log_errno("bufferevent_new");
-		goto fail;
-	}
-
-	error = bufferevent_enable(client->relay, EV_WRITE); // we wait for connection...
-	if (error) {
-		log_errno("bufferevent_enable");
-		goto fail;
-	}
-
 	list_add(&client->list, &self->clients);
+	// now it's safe to redsocks_drop_client
+
+	if (self->relay_ss->connect_relay)
+		self->relay_ss->connect_relay(client);
+	else
+		redsocks_connect_relay(client);
 	return;
 
 fail:
 	if (client) {
 		if (client->client)
 			bufferevent_free(client->client);
-		if (client->relay)
-			bufferevent_free(client->relay);
 		free(client);
 	}
-	if (relay_fd != -1)
-		close(relay_fd);
 	if (client_fd != -1)
 		close(client_fd);
 }
