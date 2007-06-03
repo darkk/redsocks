@@ -7,12 +7,12 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <assert.h>
-#include <linux/netfilter_ipv4.h>
 #include <event.h>
 #include "list.h"
 #include "parser.h"
 #include "log.h"
 #include "main.h"
+#include "base.h"
 #include "redsocks.h"
 
 
@@ -358,7 +358,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		goto fail;
 	}
 
-	error = getdestaddr(client_fd, &destaddr);
+	error = getdestaddr(client_fd, &clientaddr, &self->config.bindaddr, &destaddr);
 	if (error) {
 		goto fail;
 	}
