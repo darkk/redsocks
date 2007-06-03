@@ -1,2 +1,4 @@
 libevent-*
 *.o
+tags
+redsocks
