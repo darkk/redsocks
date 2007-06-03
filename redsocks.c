@@ -58,6 +58,7 @@ static redsocks_instance instance =
 
 static parser_entry redsocks_entries[] = 
 {
+	{ .key = "local_ip",   .type = pt_uint16,  .addr = &instance.config.bindaddr.sin_addr },
 	{ .key = "local_port", .type = pt_uint16,  .addr = &instance.config.bindaddr.sin_port },
 	{ .key = "ip",         .type = pt_in_addr, .addr = &instance.config.relayaddr.sin_addr },
 	{ .key = "port",       .type = pt_uint16,  .addr = &instance.config.relayaddr.sin_port },
@@ -76,6 +77,7 @@ static int redsocks_onenter(parser_section *section)
 	instance.config.bindaddr.sin_family = AF_INET;
 	instance.config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	instance.config.relayaddr.sin_family = AF_INET;
+	instance.config.relayaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	return 0;
 }
 
