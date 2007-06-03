@@ -22,7 +22,7 @@ typedef enum http_state_t {
 
 
 
-void http_client_init(redsocks_client *client)
+static void http_client_init(redsocks_client *client)
 {
 	if (client->instance->config.login)
 		log_error("login is ignored for http-connect connections");
