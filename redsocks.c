@@ -244,7 +244,7 @@ int redsocks_read_expected(redsocks_client *client, struct evbuffer *input, void
 		return 0;
 	}
 	else {
-		log_error("Socks server has gone away...");
+		log_error("Can't get expected amount of data, dropping client...");
 		redsocks_drop_client(client);
 		return -1;
 	}
