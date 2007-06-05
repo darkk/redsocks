@@ -9,20 +9,20 @@
 #include "log.h"
 #include "redsocks.h"
 
-typedef enum http_state_t {
-	http_new,
-	http_request_sent,
-	http_reply_came,
-	http_headers_skipped,
-	http_MAX,
-} http_state;
+typedef enum httpc_state_t {
+	httpc_new,
+	httpc_request_sent,
+	httpc_reply_came,
+	httpc_headers_skipped,
+	httpc_MAX,
+} httpc_state;
 
 
 #define HTTP_HEAD_WM_HIGH 4096  // that should be enough for one HTTP line.
 
 
 
-static void http_client_init(redsocks_client *client)
+static void httpc_client_init(redsocks_client *client)
 {
 	if (client->instance->config.login)
 		log_error("login is ignored for http-connect connections");
@@ -30,25 +30,25 @@ static void http_client_init(redsocks_client *client)
 	if (client->instance->config.password)
 		log_error("password is ignored for http-connect connections");
 	
-	client->state = http_new;
+	client->state = httpc_new;
 }
 
 
-static void http_read_cb(struct bufferevent *buffev, void *_arg)
+static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 	int dropped = 0;
 
-	assert(client->state >= http_request_sent);
+	assert(client->state >= httpc_request_sent);
 
-	if (client->state == http_request_sent) {
+	if (client->state == httpc_request_sent) {
 		size_t len = EVBUFFER_LENGTH(buffev->input);
 		char *line = evbuffer_readline(buffev->input);
 		if (line) {
 			unsigned int code;
 			if (sscanf(line, "HTTP/%*u.%*u %u", &code) == 1) { // 1 == one _assigned_ match
 				if (200 <= code && code <= 299) {
-					client->state = http_reply_came;
+					client->state = httpc_reply_came;
 				}
 				else {
 					log_error(line);
@@ -67,11 +67,11 @@ static void http_read_cb(struct bufferevent *buffev, void *_arg)
 	if (dropped)
 		return;
 	
-	while (client->state == http_reply_came) {
+	while (client->state == httpc_reply_came) {
 		char *line = evbuffer_readline(buffev->input);
 		if (line) {
 			if (strlen(line) == 0) {
-				client->state = http_headers_skipped;
+				client->state = httpc_headers_skipped;
 			}
 			free(line);
 		}
@@ -80,12 +80,12 @@ static void http_read_cb(struct bufferevent *buffev, void *_arg)
 		}
 	}
 
-	if (client->state == http_headers_skipped) {
+	if (client->state == httpc_headers_skipped) {
 		redsocks_start_relay(client);
 	}
 }
 
-static struct evbuffer *http_mkconnect(redsocks_client *client)
+static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 {
 	struct evbuffer *buff = NULL, *retval = NULL;
 	int len;
@@ -116,17 +116,17 @@ fail:
 }
 
 
-static void http_write_cb(struct bufferevent *buffev, void *_arg)
+static void httpc_write_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 
-	if (client->state == http_new) {
+	if (client->state == httpc_new) {
 		redsocks_write_helper_ex(
 			buffev, client,
-			http_mkconnect, http_request_sent, 1, HTTP_HEAD_WM_HIGH
+			httpc_mkconnect, httpc_request_sent, 1, HTTP_HEAD_WM_HIGH
 			);
 	}
-	else if (client->state >= http_request_sent) {
+	else if (client->state >= httpc_request_sent) {
 		bufferevent_disable(buffev, EV_WRITE);
 	}
 }
@@ -136,9 +136,9 @@ relay_subsys http_connect_subsys =
 {
 	.name        = "http-connect",
 	.payload_len = 0,
-	.readcb      = http_read_cb,
-	.writecb     = http_write_cb,
-	.init        = http_client_init,
+	.readcb      = httpc_read_cb,
+	.writecb     = httpc_write_cb,
+	.init        = httpc_client_init,
 };
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
