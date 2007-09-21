@@ -197,12 +197,16 @@ void redsocks_start_relay(redsocks_client *client)
 
 void redsocks_drop_client(redsocks_client *client)
 {
-	close(EVENT_FD(&client->client->ev_write));
-	close(EVENT_FD(&client->relay->ev_write));
-	if (client->client)
+	if (client->client) {
+		close(EVENT_FD(&client->client->ev_write));
 		bufferevent_free(client->client);
-	if (client->relay)
+	}
+
+	if (client->relay) {
+		close(EVENT_FD(&client->relay->ev_write));
 		bufferevent_free(client->relay);
+	}
+	
 	list_del(&client->list);
 	free(client);
 }
