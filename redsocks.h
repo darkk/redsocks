@@ -55,6 +55,7 @@ typedef struct redsocks_client_t {
 
 
 void redsocks_drop_client(redsocks_client *client);
+void redsocks_connect_relay(redsocks_client *client);
 void redsocks_start_relay(redsocks_client *client);
 
 typedef int (*size_comparator)(size_t a, size_t b);
