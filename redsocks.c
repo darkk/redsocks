@@ -377,6 +377,8 @@ void redsocks_connect_relay(redsocks_client *client)
 		goto fail;
 	}
 
+	return; // OK
+
 fail:
 	redsocks_drop_client(client);
 }
