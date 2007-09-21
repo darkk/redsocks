@@ -317,10 +317,12 @@ static int base_init()
 		}
 	}
 
+#if 0
 	if (daemon(0, 0) < 0) {
 		log_errno("daemon()");
 		goto fail;
 	}
+#endif
 	return 0;
 fail:
 	if (instance.redirector->fini)
