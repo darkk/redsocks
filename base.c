@@ -27,7 +27,7 @@ typedef struct redirector_subsys_t {
 } redirector_subsys;
 
 typedef struct base_instance_t {
-	int initialized;
+	int configured;
 	char *chroot;
 	char *user;
 	char *group;
@@ -35,7 +35,9 @@ typedef struct base_instance_t {
 	redirector_subsys *redirector;
 } base_instance;
 
-static base_instance instance = { };
+static base_instance instance = {
+	.configured = 0,
+};
 
 #if defined __FreeBSD__ || defined __OpenBSD__
 static int redir_open_private(const char *fname, int flags)
@@ -209,16 +211,17 @@ static parser_entry base_entries[] =
 	{ .key = "chroot",     .type = pt_pchar,   .addr = &instance.chroot },
 	{ .key = "user",       .type = pt_pchar,   .addr = &instance.user },
 	{ .key = "group",      .type = pt_pchar,   .addr = &instance.group },
-	{ .key = "redirector", .type = pt_pchar,   .addr = &instance.redirector },
+	{ .key = "redirector", .type = pt_pchar,   .addr = &instance.redirector_name },
 	{ }
 };
 
 static int base_onenter(parser_section *section)
 {
-	if (instance.redirector) {
+	if (instance.configured) {
 		parser_error(section->context, "only one instance of base is valid");
 		return -1;
 	}
+	memset(&instance, 0, sizeof(instance));
 	return 0;
 }
 
@@ -245,6 +248,9 @@ static int base_onexit(parser_section *section)
 	if (err)
 		parser_error(section->context, err);
 
+	if (!err)
+		instance.configured = 1;
+
 	return err ? -1 : 0;
 }
 
@@ -263,6 +269,12 @@ static int base_init()
 {
 	uid_t uid;
 	gid_t gid;
+
+	if (!instance.configured) {
+		log_error("there is no configured instance of `base`, check config file");
+		return -1;
+	}
+	
 	if (instance.redirector->init && instance.redirector->init() < 0)
 		return -1;
 
