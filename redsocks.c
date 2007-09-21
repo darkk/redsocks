@@ -172,6 +172,9 @@ void redsocks_start_relay(redsocks_client *client)
 {
 	int error;
 	
+	if (client->instance->relay_ss->fini)
+		client->instance->relay_ss->fini(client);
+
 	client->relay->wm_read.low = 0;
 	client->relay->wm_write.low = 0;
 	client->client->wm_read.low = 0;
@@ -197,6 +200,9 @@ void redsocks_start_relay(redsocks_client *client)
 
 void redsocks_drop_client(redsocks_client *client)
 {
+	if (client->instance->relay_ss->fini)
+		client->instance->relay_ss->fini(client);
+
 	if (client->client) {
 		close(EVENT_FD(&client->client->ev_write));
 		bufferevent_free(client->client);
