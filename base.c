@@ -7,6 +7,11 @@
 #include <string.h>
 #include <pwd.h>
 #include <grp.h>
+#include "config.h"
+#if defined USE_IPTABLES
+# include <limits.h>
+# include <linux/netfilter_ipv4.h>
+#endif
 #include "log.h"
 #include "main.h"
 #include "parser.h"
@@ -149,7 +154,7 @@ static int getdestaddr_pf(int fd, const struct sockaddr_in *client, const struct
 }
 #endif
 
-#ifdef __LINUX__
+#ifdef USE_IPTABLES
 static int getdestaddr_iptables(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
 {
 	socklen_t socklen = sizeof(*destaddr);
@@ -190,7 +195,7 @@ static redirector_subsys redirector_subsystems[] =
 #ifdef __OpenBSD__
 	{ .name = "pf",  .init = redir_init_pf,  .fini = redir_close_private, .getdestaddr = getdestaddr_pf },
 #endif
-#ifdef __LINUX__
+#ifdef USE_IPTABLES
 	{ .name = "iptables", .getdestaddr = getdestaddr_iptables },
 #endif
 	{ .name = "generic",  .getdestaddr = getdestaddr_generic  },

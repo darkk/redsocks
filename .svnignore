@@ -1,4 +1,5 @@
 libevent-*
 *.o
+config.h
 tags
 redsocks
