@@ -1,7 +1,12 @@
 CFLAGS=-std=gnu99 -Wall -g -O0
 
 .PHONY: all
-redsocks: parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o base.o
+all: redsocks
+
+obj = parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o base.o
+src = $(patsubst %.o,%.c,$(obj))
+
+redsocks: $(obj)
 	$(CC) $+ -levent -o $@
 
 tags: *.c *.h
@@ -9,10 +14,10 @@ tags: *.c *.h
 
 .PHONY: clean distclean
 clean:
-	rm -f redsocks config.h *.o
+	rm -f redsocks config.h $(obj)
 
 distclean: clean
-	rm -f tags
+	rm -f tags .depend
 
 base.c: config.h
 
@@ -30,4 +35,8 @@ config.h:
 %.o: %.c
 	$(CC) $(CFLAGS) -c $*.c -o $*.o
 
+.depend: $(src)
+	gcc -MM -MP $(src) $(CFLAGS) > .depend
+
+include .depend
 
