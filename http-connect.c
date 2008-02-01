@@ -25,10 +25,10 @@ typedef enum httpc_state_t {
 static void httpc_client_init(redsocks_client *client)
 {
 	if (client->instance->config.login)
-		log_error("login is ignored for http-connect connections");
+		redsocks_log_error(client, "login is ignored for http-connect connections");
 	
 	if (client->instance->config.password)
-		log_error("password is ignored for http-connect connections");
+		redsocks_log_error(client, "password is ignored for http-connect connections");
 	
 	client->state = httpc_new;
 }
@@ -51,7 +51,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 					client->state = httpc_reply_came;
 				}
 				else {
-					log_error(line);
+					redsocks_log_error(client, "%s", line);
 					redsocks_drop_client(client);
 					dropped = 1;
 				}
@@ -92,7 +92,7 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 
 	buff = evbuffer_new();
 	if (!buff) {
-		log_errno("evbuffer_new");
+		redsocks_log_errno(client, "evbuffer_new");
 		goto fail;
 	}
 
@@ -102,7 +102,7 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 		ntohs(client->destaddr.sin_port)
 	);
 	if (len < 0) {
-		log_errno("evbufer_add_printf");
+		redsocks_log_errno(client, "evbufer_add_printf");
 		goto fail;
 	}
 	

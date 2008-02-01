@@ -74,6 +74,11 @@ void redsocks_write_helper(
 	struct bufferevent *buffev, redsocks_client *client,
 	redsocks_message_maker mkmessage, int state, size_t wm_only);
 
+
+#define redsocks_log_error(client, msg...) redsocks_log_write(__FILE__, __LINE__, __func__, 0, client, ## msg)
+#define redsocks_log_errno(client, msg...) redsocks_log_write(__FILE__, __LINE__, __func__, 1, client, ## msg)
+void redsocks_log_write(const char *file, int line, const char *func, int do_errno, redsocks_client *client, const char *fmt, ...);
+
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */
 #endif /* REDSOCKS_H_WED_JAN_24_22_17_11_2007 */

@@ -9,17 +9,14 @@
 
 static const char *lowmem = "<Can't print error, not enough memory>";
 
-void _log_write(const char *file, int line, const char *func, int do_errno, const char *fmt, ...)
+void _log_vwrite(const char *file, int line, const char *func, int do_errno, const char *fmt, va_list ap)
 {
 	int saved_errno = errno;
 	struct evbuffer *buff = evbuffer_new();
-	va_list ap;
 	const char *message;
 
 	if (buff) {
-		va_start(ap, fmt);
 		evbuffer_add_vprintf(buff, fmt, ap);
-		va_end(ap);
 		message = buff->buffer;
 	}
 	else 
@@ -32,6 +29,15 @@ void _log_write(const char *file, int line, const char *func, int do_errno, cons
 
 	if (buff)
 		evbuffer_free(buff);
+}
+
+void _log_write(const char *file, int line, const char *func, int do_errno, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	_log_vwrite(file, line, func, do_errno, fmt, ap);
+	va_end(ap);
 }
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

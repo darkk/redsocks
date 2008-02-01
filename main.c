@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <event.h>
 #include "main.h"
+#include "utils.h"
 
 extern app_subsys redsocks_subsys;
 extern app_subsys base_subsys;
