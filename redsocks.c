@@ -437,10 +437,16 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		log_errno("bufferevent_new");
 		goto fail;
 	}
+	client_fd = -1;
 
 	list_add(&client->list, &self->clients);
-	// now it's safe to redsocks_drop_client
 
+	// enable reading to handle EOF from client
+	if (bufferevent_enable(client->client, EV_READ) != 0) {
+		log_errno("bufferevent_enable");
+		goto fail;
+	}
+	
 	if (self->relay_ss->connect_relay)
 		self->relay_ss->connect_relay(client);
 	else
@@ -449,9 +455,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
 fail:
 	if (client) {
-		if (client->client)
-			bufferevent_free(client->client);
-		free(client);
+		redsocks_drop_client(client);
 	}
 	if (client_fd != -1)
 		close(client_fd);
