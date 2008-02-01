@@ -374,6 +374,7 @@ void redsocks_connect_relay(redsocks_client *client)
 		log_errno("bufferevent_new");
 		goto fail;
 	}
+	relay_fd = -1;
 
 	error = bufferevent_enable(client->relay, EV_WRITE); // we wait for connection...
 	if (error) {
@@ -384,6 +385,8 @@ void redsocks_connect_relay(redsocks_client *client)
 	return; // OK
 
 fail:
+	if (relay_fd != -1)
+		close(relay_fd);
 	redsocks_drop_client(client);
 }
 
