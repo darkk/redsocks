@@ -51,6 +51,8 @@ typedef struct redsocks_client_t {
 	struct sockaddr_in  clientaddr;
 	struct sockaddr_in  destaddr;
 	int                 state;
+	unsigned short      client_evshut;
+	unsigned short      relay_evshut;
 } redsocks_client;
 
 
