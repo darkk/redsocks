@@ -276,7 +276,7 @@ static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *clien
 	}
 	else {
 		redsocks_log_error(client, "Socks5 server status: %s (%i)",
-				0 <= reply.status && reply.status < SIZEOF_ARRAY(socks5_strstatus) 
+				/* 0 <= reply.status && */ reply.status < SIZEOF_ARRAY(socks5_strstatus)
 				? socks5_strstatus[reply.status] : "?", reply.status);
 		redsocks_drop_client(client);
 	}
