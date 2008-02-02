@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <event.h>
 #include "log.h"
@@ -22,10 +23,13 @@ void _log_vwrite(const char *file, int line, const char *func, int do_errno, con
 	else 
 		message = lowmem;
 
+	struct timeval tv = { };
+	gettimeofday(&tv, 0);
+
 	if (do_errno)
-		fprintf(stderr, "%s:%u %s(...) %s: %s\n", file, line, func, message, strerror(saved_errno));
+		fprintf(stderr, "%lu.%6.6lu %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message, strerror(saved_errno));
 	else
-		fprintf(stderr, "%s:%u %s(...) %s\n", file, line, func, message);
+		fprintf(stderr, "%lu.%6.6lu %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message);
 
 	if (buff)
 		evbuffer_free(buff);
