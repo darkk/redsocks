@@ -64,7 +64,7 @@ static redsocks_instance instance =
 
 static parser_entry redsocks_entries[] = 
 {
-	{ .key = "local_ip",   .type = pt_uint16,  .addr = &instance.config.bindaddr.sin_addr },
+	{ .key = "local_ip",   .type = pt_in_addr, .addr = &instance.config.bindaddr.sin_addr },
 	{ .key = "local_port", .type = pt_uint16,  .addr = &instance.config.bindaddr.sin_port },
 	{ .key = "ip",         .type = pt_in_addr, .addr = &instance.config.relayaddr.sin_addr },
 	{ .key = "port",       .type = pt_uint16,  .addr = &instance.config.relayaddr.sin_port },
