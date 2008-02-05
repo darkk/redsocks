@@ -311,6 +311,23 @@ static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffe
 	}
 }
 
+// I assume that -1 is invalid errno value
+static int redsocks_socket_geterrno(redsocks_client *client, struct bufferevent *buffev)
+{
+	int error;
+	int pseudo_errno;
+	size_t optlen = sizeof(pseudo_errno);
+
+	assert(EVENT_FD(&buffev->ev_read) == EVENT_FD(&buffev->ev_write));
+
+	error = getsockopt(EVENT_FD(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
+	if (error) {
+		redsocks_log_errno(client, "getsockopt");
+		return -1;
+	}
+	return pseudo_errno;
+}
+
 static void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg)
 {
 	redsocks_client *client = _arg;
@@ -329,7 +346,8 @@ static void redsocks_event_error(struct bufferevent *buffev, short what, void *_
 			redsocks_shutdown(client, antiev, SHUT_WR);
 	}
 	else {
-		redsocks_log_error(client, "%s error, code %s|%s|%s|%s|%s == %X",
+		errno = redsocks_socket_geterrno(client, buffev);
+		redsocks_log_errno(client, "%s error, code %s|%s|%s|%s|%s == %X",
 				buffev == client->relay ? "relay" : "client",
 				what & EVBUFFER_READ ? "EVBUFFER_READ" : "0",
 				what & EVBUFFER_WRITE ? "EVBUFFER_WRITE" : "0",
@@ -433,17 +451,13 @@ void redsocks_write_helper(
 static void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
-	int error;
 	int pseudo_errno;
-	socklen_t optlen = sizeof(pseudo_errno);
 
 	assert(buffev == client->relay);
 
-	error = getsockopt(EVENT_FD(&buffev->ev_write), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
-	if (error) {
-		redsocks_log_errno(client, "getsockopt");
+	pseudo_errno = redsocks_socket_geterrno(client, buffev);
+	if (pseudo_errno == -1)
 		goto fail;
-	}
 
 	if (pseudo_errno) {
 		errno = pseudo_errno;
