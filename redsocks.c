@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <errno.h>
 #include <assert.h>
 #include <event.h>
@@ -589,11 +590,19 @@ static int redsocks_init()
 	int error;
 	int on = 1;
 	int fd = -1;
+	struct sigaction sa = { }, sa_old = { };
+
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_RESTART;
+	if (sigaction(SIGPIPE, &sa, &sa_old) == -1) {
+		log_errno("sigaction");
+		return -1;
+	}
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd == -1) {
 		log_errno("socket");
-		return -1;
+		goto fail;
 	}
 
 	error = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -637,6 +646,9 @@ fail:
 	if (fd != -1) {
 		close(fd);
 	}
+
+	// that was the first resource allocation, it return's on failure, not goto-fail's
+	sigaction(SIGPIPE, &sa_old, NULL);
 	return -1;
 }
 
