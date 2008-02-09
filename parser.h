@@ -6,6 +6,7 @@
 #include <stdbool.h>
 
 typedef enum {
+	pt_bool,      // "bool" from stdbool.h, not "_Bool" or anything else
 	pt_pchar,
 	pt_uint16,
 	pt_in_addr,

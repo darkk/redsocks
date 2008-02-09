@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
+#include "utils.h"
 #include "parser.h"
 
 #define FREE(ptr) do { free(ptr); ptr = NULL; } while (0)
@@ -216,6 +216,28 @@ static void context_filled_set(parser_context *context, size_t val)
 	context->buffer.data[context->buffer.filled] = 0;
 }
 
+static int vp_pbool(parser_context *context, void *addr, const char *token)
+{
+	char *strtrue[] = { "ok", "on", "yes", "true" };
+	char *strfalse[] = { "off", "no", "false" };
+	char **tpl;
+
+	FOREACH(tpl, strtrue)
+		if (strcmp(token, *tpl) == 0) {
+			*(bool*)addr = true;
+			return 0;
+		}
+	
+	FOREACH(tpl, strfalse)
+		if (strcmp(token, *tpl) == 0) {
+			*(bool*)addr = false;
+			return 0;
+		}
+	
+	parser_error(context, "boolean is not parsed");
+	return -1;
+}
+
 static int vp_pchar(parser_context *context, void *addr, const char *token)
 {
 	char *p = strdup(token);
@@ -309,6 +331,7 @@ static int vp_in_addr2(parser_context *context, void *addr, const char *token)
 
 static value_parser value_parser_by_type[] = 
 {
+	[pt_bool] = vp_pbool,
 	[pt_pchar] = vp_pchar,
 	[pt_uint16] = vp_uint16,
 	[pt_in_addr] = vp_in_addr,
