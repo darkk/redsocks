@@ -179,8 +179,10 @@ static char *gettoken(parser_context *context, char **iter)
 		char *p = ret;
 		(*iter)++;
 		while ( 1 ) {
-			if (**iter == '\"')
+			if (**iter == '\"') {
+				(*iter)++;
 				break;
+			}
 			if (**iter == '\\') {
 				*p = unescape(*(*iter + 1));
 				(*iter)++;
