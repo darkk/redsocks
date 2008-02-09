@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <event.h>
 #include "log.h"
 #include "main.h"
@@ -18,11 +19,34 @@ app_subsys *subsystems[] = {
 //	&reddns_subsys,
 };
 
+static const char *confname = "redsocks.conf";
+
 int main(int argc, char **argv)
 {
 	int error;
 	app_subsys **ss;
-	FILE *f = fopen("redsocks.conf", "r");
+	bool conftest = false;
+	int opt;
+
+	while ((opt = getopt(argc, argv, "tc:")) != -1) {
+		switch (opt) {
+		case 't':
+			conftest = true;
+			break;
+		case 'c':
+			confname = optarg;
+			break;
+		default:
+			printf(
+				"Usage: %s [-t] [-c config]\n"
+				"  -t           test config syntax\n",
+				argv[0]);
+			return EXIT_FAILURE;
+		}
+	}
+	
+
+	FILE *f = fopen(confname, "r");
 	if (!f) {
 		perror("Unable to open config file");
 		return EXIT_FAILURE;
@@ -42,6 +66,9 @@ int main(int argc, char **argv)
 	fclose(f);
 	if (error)
 		return EXIT_FAILURE;
+
+	if (conftest)
+		return EXIT_SUCCESS;
 
 	event_init();
 
