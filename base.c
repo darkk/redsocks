@@ -35,11 +35,15 @@ typedef struct base_instance_t {
 	char *redirector_name;
 	redirector_subsys *redirector;
 	char *log_name;
+	bool log_debug;
+	bool log_info;
 	bool daemon;
 } base_instance;
 
 static base_instance instance = {
 	.configured = 0,
+	.log_debug = false,
+	.log_info = false,
 };
 
 #if defined __FreeBSD__ || defined __OpenBSD__
@@ -47,7 +51,7 @@ static int redir_open_private(const char *fname, int flags)
 {
 	int fd = open(fname, flags);
 	if (fd < 0) {
-		log_errno("open(%s)", fname);
+		log_errno(LOG_ERR, "open(%s)", fname);
 		return -1;
 	}
 	instance.redirector->private = fd;
@@ -115,7 +119,7 @@ static int getdestaddr_ipf(int fd, const struct sockaddr_in *client, const struc
 #endif
 	if (x < 0) {
 		if (errno != ESRCH) 
-			log_errno("ioctl(SIOCGNATL)\n");
+			log_errno(LOG_WARNING, "ioctl(SIOCGNATL)\n");
 		return -1;
 	} else {
 		destaddr->sin_family = AF_INET;
@@ -153,7 +157,7 @@ static int getdestaddr_pf(int fd, const struct sockaddr_in *client, const struct
 		return 0;
 	} else {
 		if (errno != ENOENT)
-			log_errno("ioctl(DIOCNATLOOK)");
+			log_errno(LOG_WARNING, "ioctl(DIOCNATLOOK)");
 		return -1;
 	}
 }
@@ -167,7 +171,7 @@ static int getdestaddr_iptables(int fd, const struct sockaddr_in *client, const 
 
 	error = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, destaddr, &socklen);
 	if (error) {
-		log_errno("getsockopt");
+		log_errno(LOG_WARNING, "getsockopt");
 		return -1;
 	}
 	return 0;
@@ -181,7 +185,7 @@ static int getdestaddr_generic(int fd, const struct sockaddr_in *client, const s
 
 	error = getsockname(fd, (struct sockaddr*)destaddr, &socklen);
 	if (error) {
-		log_errno("getsockopt");
+		log_errno(LOG_WARNING, "getsockopt");
 		return -1;
 	}
 	return 0;
@@ -216,6 +220,8 @@ static parser_entry base_entries[] =
 	{ .key = "group",      .type = pt_pchar,   .addr = &instance.group },
 	{ .key = "redirector", .type = pt_pchar,   .addr = &instance.redirector_name },
 	{ .key = "log",        .type = pt_pchar,   .addr = &instance.log_name },
+	{ .key = "log_debug",  .type = pt_bool,    .addr = &instance.log_debug },
+	{ .key = "log_info",   .type = pt_bool,    .addr = &instance.log_info },
 	{ .key = "daemon",     .type = pt_bool,    .addr = &instance.daemon },
 	{ }
 };
@@ -277,7 +283,7 @@ static int base_init()
 	int devnull = -1;
 
 	if (!instance.configured) {
-		log_error("there is no configured instance of `base`, check config file");
+		log_error(LOG_ERR, "there is no configured instance of `base`, check config file");
 		return -1;
 	}
 	
@@ -287,7 +293,7 @@ static int base_init()
 	if (instance.user) {
 		struct passwd *pw = getpwnam(instance.user);
 		if (pw == NULL) {
-			log_errno("getpwnam(%s)", instance.user);
+			log_errno(LOG_ERR, "getpwnam(%s)", instance.user);
 			goto fail;
 		}
 		uid = pw->pw_uid;
@@ -296,14 +302,16 @@ static int base_init()
 	if (instance.group) {
 		struct group *gr = getgrnam(instance.group);
 		if (gr == NULL) {
-			log_errno("getgrnam(%s)", instance.group);
+			log_errno(LOG_ERR, "getgrnam(%s)", instance.group);
 			goto fail;
 		}
 		gid = gr->gr_gid;
 	}
 
 	if (log_preopen(
-			instance.log_name ? instance.log_name : instance.daemon ? "syslog:daemon" : "stderr"
+			instance.log_name ? instance.log_name : instance.daemon ? "syslog:daemon" : "stderr", 
+			instance.log_debug, 
+			instance.log_info
 	) < 0 ) {
 		goto fail;
 	}
@@ -311,35 +319,35 @@ static int base_init()
 	if (instance.daemon) {
 		devnull = open("/dev/null", O_RDWR);
 		if (devnull == -1) {
-			log_errno("open(\"/dev/null\", O_RDWR");
+			log_errno(LOG_ERR, "open(\"/dev/null\", O_RDWR");
 			goto fail;
 		}
 	}
 
 	if (instance.chroot) {
 		if (chroot(instance.chroot) < 0) {
-			log_errno("chroot(%s)", instance.chroot);
+			log_errno(LOG_ERR, "chroot(%s)", instance.chroot);
 			goto fail;
 		}
 	}
 
 	if (instance.daemon || instance.chroot) {
 		if (chdir("/") < 0) {
-			log_errno("chdir(\"/\")");
+			log_errno(LOG_ERR, "chdir(\"/\")");
 			goto fail;
 		}
 	}
 
 	if (instance.group) {
 		if (setgid(gid) < 0) {
-			log_errno("setgid(%i)", gid);
+			log_errno(LOG_ERR, "setgid(%i)", gid);
 			goto fail;
 		}
 	}
 
 	if (instance.user) {
 		if (setuid(uid) < 0) {
-			log_errno("setuid(%i)", uid);
+			log_errno(LOG_ERR, "setuid(%i)", uid);
 			goto fail;
 		}
 	}
@@ -347,7 +355,7 @@ static int base_init()
 	if (instance.daemon) {
 		switch (fork()) {
 		case -1: // error
-			log_errno("fork()");
+			log_errno(LOG_ERR, "fork()");
 			goto fail;
 		case 0:  // child
 			break;
@@ -360,7 +368,7 @@ static int base_init()
 
 	if (instance.daemon) {
 		if (setsid() < 0) {
-			log_errno("setsid()");
+			log_errno(LOG_ERR, "setsid()");
 			goto fail;
 		}
 
@@ -368,7 +376,7 @@ static int base_init()
 		int *pfd;
 		FOREACH(pfd, fds)
 			if (dup2(devnull, *pfd) < 0) {
-				log_errno("dup2(devnull, %i)", *pfd);
+				log_errno(LOG_ERR, "dup2(devnull, %i)", *pfd);
 				goto fail;
 			}
 

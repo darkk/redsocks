@@ -26,10 +26,10 @@ static void httpr_client_init(redsocks_client *client)
 	httpr_client *httpr = (void*)(client +1);
 
 	if (client->instance->config.login)
-		redsocks_log_error(client, "login is ignored for http-relay connections");
+		redsocks_log_error(client, LOG_WARNING, "login is ignored for http-relay connections");
 	
 	if (client->instance->config.password)
-		redsocks_log_error(client, "password is ignored for http-relay connections");
+		redsocks_log_error(client, LOG_WARNING, "password is ignored for http-relay connections");
 	
 	client->state = httpr_new;
 	memset(httpr, 0, sizeof(*httpr));
@@ -60,7 +60,7 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 		redsocks_start_relay(client);
 	}
 	else {
-		redsocks_log_errno(client, "bufferevent_write_buffer");
+		redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
 		redsocks_drop_client(client);
 	}
 }
@@ -75,7 +75,7 @@ static int httpr_append_header(redsocks_client *client, char *line)
 	if (!error)
 		evbuffer_add(httpr->buff, "\x0d\x0a", 2);
 	if (error) {
-		redsocks_log_errno(client, "evbuffer_add");
+		redsocks_log_errno(client, LOG_ERR, "evbuffer_add");
 	}
 	return error;
 }
@@ -109,13 +109,13 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 	if (uri) 
 		uri += 1; // one char further
 	else {
-		redsocks_log_error(client, "malformed request came");
+		redsocks_log_error(client, LOG_NOTICE, "malformed request came");
 		goto fail;
 	}
 
 	buff = evbuffer_new();
 	if (!buff) {
-		redsocks_log_error(client, "evbuffer_new");
+		redsocks_log_error(client, LOG_ERR, "evbuffer_new");
 		goto fail;
 	}
 
@@ -137,7 +137,7 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 	return 0;
 	
 addition_fail:
-	redsocks_log_error(client, "evbuffer_add");
+	redsocks_log_error(client, LOG_ERR, "evbuffer_add");
 fail:
 	if (buff)
 		evbuffer_free(buff);
@@ -220,14 +220,14 @@ static void httpr_connect_relay(redsocks_client *client)
 
 	httpr->buff = evbuffer_new();
 	if (!httpr->buff) {
-		redsocks_log_errno(client, "evbuffer_new");
+		redsocks_log_errno(client, LOG_ERR, "evbuffer_new");
 		redsocks_drop_client(client);
 	}
 	
 	client->client->readcb = httpr_client_read_cb;
 	error = bufferevent_enable(client->client, EV_READ);
 	if (error) {
-		redsocks_log_errno(client, "bufferevent_enable");
+		redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
 		redsocks_drop_client(client);
 	}
 }

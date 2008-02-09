@@ -41,7 +41,7 @@ const int socks4_status_fake_ident = 93;
 void socks4_client_init(redsocks_client *client)
 {
 	if (client->instance->config.password)
-		redsocks_log_error(client, "password is ignored for socks4 connections");
+		redsocks_log_error(client, LOG_WARNING, "password is ignored for socks4 connections");
 	
 	client->state = socks4_new;
 }
@@ -61,13 +61,13 @@ static void socks4_read_cb(struct bufferevent *buffev, void *_arg)
 
 		client->state = socks4_reply_came;
 		if (reply.ver != 0) {
-			redsocks_log_error(client, "Socks4 server reported unexpected reply version...");
+			redsocks_log_error(client, LOG_NOTICE, "Socks4 server reported unexpected reply version...");
 			redsocks_drop_client(client);
 		}
 		else if (reply.status == socks4_status_ok)
 			redsocks_start_relay(client);
 		else {
-			redsocks_log_error(client, "Socks4 server status: %s (%i)",
+			redsocks_log_error(client, LOG_NOTICE, "Socks4 server status: %s (%i)",
 				reply.status == socks4_status_fail ? "fail" :
 				reply.status == socks4_status_no_ident ? "no ident" :
 				reply.status == socks4_status_fake_ident ? "fake ident" : "?",

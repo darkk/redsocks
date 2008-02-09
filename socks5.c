@@ -119,9 +119,9 @@ void socks5_client_init(redsocks_client *client)
 	socks5->do_password = 0;
 	if (config->login && config->password) {
 		if (strlen(config->login) > 255)
-			redsocks_log_error(client, "Socks5 login can't be more than 255 chars");
+			redsocks_log_error(client, LOG_WARNING, "Socks5 login can't be more than 255 chars");
 		else if (strlen(config->password) > 255)
-			redsocks_log_error(client, "Socks5 password can't be more than 255 chars");
+			redsocks_log_error(client, LOG_WARNING, "Socks5 password can't be more than 255 chars");
 		else
 			socks5->do_password = 1;
 	}
@@ -198,7 +198,7 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client
 		return;
 		
 	if (reply.ver != socks5_ver) {
-		redsocks_log_error(client, "Socks5 server reported unexpected auth methods reply version...");
+		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected auth methods reply version...");
 		redsocks_drop_client(client);
 	}
 	else if (reply.method == socks5_auth_none) {
@@ -215,7 +215,7 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client
 	}
 	else {
 		if (reply.method != socks5_auth_invalid)
-			redsocks_log_error(client, "Socks5 server requested unexpected auth method...");
+			redsocks_log_error(client, LOG_NOTICE, "Socks5 server requested unexpected auth method...");
 		redsocks_drop_client(client);
 	}
 }
@@ -228,7 +228,7 @@ static void socks5_read_auth_reply(struct bufferevent *buffev, redsocks_client *
 		return;
 
 	if (reply.ver != socks5_password_ver) {
-		redsocks_log_error(client, "Socks5 server reported unexpected auth reply version...");
+		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected auth reply version...");
 		redsocks_drop_client(client);
 	}
 	else if (reply.status == socks5_password_passed)
@@ -248,7 +248,7 @@ static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *clien
 		return;
 
 	if (reply.ver != socks5_ver) {
-		redsocks_log_error(client, "Socks5 server reported unexpected reply version...");
+		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected reply version...");
 		redsocks_drop_client(client);
 	}
 	else if (reply.status == socks5_status_succeeded) {
@@ -275,7 +275,7 @@ static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *clien
 			);
 	}
 	else {
-		redsocks_log_error(client, "Socks5 server status: %s (%i)",
+		redsocks_log_error(client, LOG_NOTICE, "Socks5 server status: %s (%i)",
 				/* 0 <= reply.status && */ reply.status < SIZEOF_ARRAY(socks5_strstatus)
 				? socks5_strstatus[reply.status] : "?", reply.status);
 		redsocks_drop_client(client);

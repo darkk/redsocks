@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <event.h>
+#include "log.h"
 #include "main.h"
 #include "utils.h"
 
@@ -55,6 +56,8 @@ int main(int argc, char **argv)
 		}
 	}
 		
+	log_error(LOG_NOTICE, "redsocks started");
+
 	event_dispatch();
 
 	FOREACH_REV(ss, subsystems)
