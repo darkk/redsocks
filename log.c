@@ -6,9 +6,82 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <event.h>
+#include "utils.h"
 #include "log.h"
 
 static const char *lowmem = "<Can't print error, not enough memory>";
+
+typedef void (*log_func)(const char *file, int line, const char *func, const char *message, const char *appendix);
+
+static void stderr_msg(const char *file, int line, const char *func, const char *message, const char *appendix)
+{
+	struct timeval tv = { };
+	gettimeofday(&tv, 0);
+
+	if (appendix)
+		fprintf(stderr, "%lu.%6.6lu %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message, appendix);
+	else
+		fprintf(stderr, "%lu.%6.6lu %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message);
+}
+
+static void syslog_msg(const char *file, int line, const char *func, const char *message, const char *appendix)
+{
+	if (appendix)
+		syslog(LOG_INFO, "%s: %s\n", message, appendix);
+	else
+		syslog(LOG_INFO, "%s\n", message);
+}
+
+static log_func log_msg = stderr_msg;
+static log_func log_msg_next = NULL;
+
+int log_preopen(const char *dst)
+{
+	const char *syslog_prefix = "syslog:";
+	if (strcmp(dst, "stderr") == 0) {
+		log_msg_next = stderr_msg;
+	}
+	else if (strncmp(dst, syslog_prefix, strlen(syslog_prefix)) == 0) {
+		const char *facility_name = dst + strlen(syslog_prefix);
+		int facility = -1;
+		struct {
+			char *name; int value;
+		} *ptpl, tpl[] = {
+			{ "daemon", LOG_DAEMON },
+			{ "local0", LOG_LOCAL0 },
+			{ "local1", LOG_LOCAL1 },
+			{ "local2", LOG_LOCAL2 },
+			{ "local3", LOG_LOCAL3 },
+			{ "local4", LOG_LOCAL4 },
+			{ "local5", LOG_LOCAL5 },
+			{ "local6", LOG_LOCAL6 },
+			{ "local7", LOG_LOCAL7 },
+		};
+		FOREACH(ptpl, tpl) 
+			if (strcmp(facility_name, ptpl->name) == 0) {
+				facility = ptpl->value;
+				break;
+			}
+		if (facility == -1) {
+			log_error("log_preopen(%s, ...): unknown syslog facility");
+			return -1;
+		}
+
+		openlog("redsocks", LOG_NDELAY | LOG_PID, facility);
+		log_msg_next = syslog_msg;
+	}
+	else {
+		log_error("log_preopen(%s, ...): unknown destination", dst);
+		return -1;
+	}
+	return 0;
+}
+
+void log_open()
+{
+	log_msg = log_msg_next;
+	log_msg_next = NULL;
+}
 
 void _log_vwrite(const char *file, int line, const char *func, int do_errno, const char *fmt, va_list ap)
 {
@@ -23,13 +96,7 @@ void _log_vwrite(const char *file, int line, const char *func, int do_errno, con
 	else 
 		message = lowmem;
 
-	struct timeval tv = { };
-	gettimeofday(&tv, 0);
-
-	if (do_errno)
-		fprintf(stderr, "%lu.%6.6lu %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message, strerror(saved_errno));
-	else
-		fprintf(stderr, "%lu.%6.6lu %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message);
+	log_msg(file, line, func, message, do_errno ? strerror(saved_errno) : NULL);
 
 	if (buff)
 		evbuffer_free(buff);

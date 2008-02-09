@@ -7,6 +7,7 @@
 #include <string.h>
 #include <pwd.h>
 #include <grp.h>
+#include <stdlib.h>
 #include "config.h"
 #if defined USE_IPTABLES
 # include <limits.h>
@@ -33,6 +34,8 @@ typedef struct base_instance_t {
 	char *group;
 	char *redirector_name;
 	redirector_subsys *redirector;
+	char *log_name;
+	bool daemon;
 } base_instance;
 
 static base_instance instance = {
@@ -212,6 +215,8 @@ static parser_entry base_entries[] =
 	{ .key = "user",       .type = pt_pchar,   .addr = &instance.user },
 	{ .key = "group",      .type = pt_pchar,   .addr = &instance.group },
 	{ .key = "redirector", .type = pt_pchar,   .addr = &instance.redirector_name },
+	{ .key = "log",        .type = pt_pchar,   .addr = &instance.log_name },
+	{ .key = "daemon",     .type = pt_bool,    .addr = &instance.daemon },
 	{ }
 };
 
@@ -269,6 +274,7 @@ static int base_init()
 {
 	uid_t uid;
 	gid_t gid;
+	int devnull = -1;
 
 	if (!instance.configured) {
 		log_error("there is no configured instance of `base`, check config file");
@@ -296,9 +302,30 @@ static int base_init()
 		gid = gr->gr_gid;
 	}
 
+	if (log_preopen(
+			instance.log_name ? instance.log_name : instance.daemon ? "syslog:daemon" : "stderr"
+	) < 0 ) {
+		goto fail;
+	}
+
+	if (instance.daemon) {
+		devnull = open("/dev/null", O_RDWR);
+		if (devnull == -1) {
+			log_errno("open(\"/dev/null\", O_RDWR");
+			goto fail;
+		}
+	}
+
 	if (instance.chroot) {
 		if (chroot(instance.chroot) < 0) {
 			log_errno("chroot(%s)", instance.chroot);
+			goto fail;
+		}
+	}
+
+	if (instance.daemon || instance.chroot) {
+		if (chdir("/") < 0) {
+			log_errno("chdir(\"/\")");
 			goto fail;
 		}
 	}
@@ -317,14 +344,41 @@ static int base_init()
 		}
 	}
 
-#if 0
-	if (daemon(0, 0) < 0) {
-		log_errno("daemon()");
-		goto fail;
+	if (instance.daemon) {
+		switch (fork()) {
+		case -1: // error
+			log_errno("fork()");
+			goto fail;
+		case 0:  // child
+			break;
+		default: // parent, pid is returned
+			exit(EXIT_SUCCESS);
+		}
 	}
-#endif
+
+	log_open(); // child has nothing to do with TTY
+
+	if (instance.daemon) {
+		if (setsid() < 0) {
+			log_errno("setsid()");
+			goto fail;
+		}
+
+		int fds[] = { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO };
+		int *pfd;
+		FOREACH(pfd, fds)
+			if (dup2(devnull, *pfd) < 0) {
+				log_errno("dup2(devnull, %i)", *pfd);
+				goto fail;
+			}
+
+		close(devnull);
+		devnull = -1;
+	}
 	return 0;
 fail:
+	if (devnull != -1)
+		close(devnull);
 	if (instance.redirector->fini)
 		instance.redirector->fini();
 	return -1;
