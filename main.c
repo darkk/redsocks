@@ -2,6 +2,7 @@
 
 #include <sys/time.h>
 #include <sys/types.h>
+#include <stdlib.h>
 #include <event.h>
 #include "log.h"
 #include "main.h"
@@ -24,13 +25,13 @@ int main(int argc, char **argv)
 	FILE *f = fopen("redsocks.conf", "r");
 	if (!f) {
 		perror("Unable to open config file");
-		return 1;
+		return EXIT_FAILURE;
 	}
 	
 	parser_context* parser = parser_start(f, NULL);
 	if (!parser) {
 		perror("Not enough memory for parser");
-		return 1;
+		return EXIT_FAILURE;
 	}
 
 	FOREACH(ss, subsystems)
@@ -40,7 +41,7 @@ int main(int argc, char **argv)
 	parser_stop(parser);
 	fclose(f);
 	if (error)
-		return 1;
+		return EXIT_FAILURE;
 
 	event_init();
 
@@ -52,7 +53,7 @@ int main(int argc, char **argv)
 			for (--ss; ss >= subsystems; ss--)
 				if ((*ss)->fini)
 					(*ss)->fini();
-			return 1;
+			return EXIT_FAILURE;
 		}
 	}
 		
@@ -63,7 +64,7 @@ int main(int argc, char **argv)
 	FOREACH_REV(ss, subsystems)
 		if ((*ss)->fini)
 			(*ss)->fini();
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
