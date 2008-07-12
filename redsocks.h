@@ -51,7 +51,7 @@ typedef struct redsocks_client_t {
 	struct bufferevent *relay;
 	struct sockaddr_in  clientaddr;
 	struct sockaddr_in  destaddr;
-	int                 state;
+	int                 state;         // it's used by bottom layer
 	unsigned short      client_evshut;
 	unsigned short      relay_evshut;
 } redsocks_client;
