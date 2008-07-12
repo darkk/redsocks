@@ -585,6 +585,33 @@ fail:
 		close(client_fd);
 }
 
+static const char *redsocks_evshut_str(unsigned short evshut)
+{
+	return 
+		evshut == EV_READ ? "SHUT_RD" : 
+		evshut == EV_WRITE ? "SHUT_WR" :
+		evshut == (EV_READ|EV_WRITE) ? "SHUT_RDWR" :
+		evshut == 0 ? "" :
+		"???";
+}
+
+static void redsocks_debug_dump(int sig, short what, void *_arg)
+{
+	redsocks_instance *self = _arg;
+	redsocks_client *client = NULL;
+	
+	log_error(LOG_DEBUG, "Dumping client list:");
+	list_for_each_entry(client, &self->clients, list) {
+		const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
+		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
+
+		redsocks_log_error(client, LOG_DEBUG, "client: %i%s%s, relay: %i%s%s",
+			EVENT_FD(&client->client->ev_write), s_client_evshut[0] ? " " : "", s_client_evshut,
+			EVENT_FD(&client->relay->ev_write), s_relay_evshut[0] ? " " : "", s_relay_evshut);
+	}
+	log_error(LOG_DEBUG, "End of client list.");
+}
+
 static int redsocks_init()
 {
 	int error;
@@ -629,6 +656,13 @@ static int redsocks_init()
 		goto fail;
 	}
 
+	signal_set(&instance.debug_dumper, SIGUSR1, redsocks_debug_dump, &instance);
+	error = signal_add(&instance.debug_dumper, NULL);
+	if (error) {
+		log_errno(LOG_ERR, "signal_add");
+		goto fail;
+	}
+
 	event_set(&instance.listener, fd, EV_READ | EV_PERSIST, redsocks_accept_client, &instance);
 	error = event_add(&instance.listener, NULL);
 	if (error) {
@@ -638,6 +672,11 @@ static int redsocks_init()
 	
 	return 0;
 fail:
+	if (signal_initialized(&instance.debug_dumper)) {
+		signal_del(&instance.debug_dumper);
+		memset(&instance.debug_dumper, 0, sizeof(instance.debug_dumper));
+	}
+
 	if (event_initialized(&instance.listener)) {
 		event_del(&instance.listener);
 		memset(&instance.listener, 0, sizeof(instance.listener));

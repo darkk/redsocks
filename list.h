@@ -4,6 +4,7 @@
  * I don't know what copyright to place here but that's GPLv2 code so 
  * I assume I'm free to reuse it.
  */
+#include "utils.h" // container_of
 
 
 /*

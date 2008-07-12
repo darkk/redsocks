@@ -39,6 +39,7 @@ typedef struct redsocks_config_t {
 typedef struct redsocks_instance_t {
 	redsocks_config config;
 	struct event    listener;
+	struct event    debug_dumper;
 	list_head       clients;
 	relay_subsys   *relay_ss;
 } redsocks_instance;
