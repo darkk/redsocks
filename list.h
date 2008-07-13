@@ -1,7 +1,7 @@
 #ifndef _LINUX_LIST_H
 #define _LINUX_LIST_H
 /** That's taken from linux-2.6.18.2 source tree with light modifications
- * I don't know what copyright to place here but that's GPLv2 code so 
+ * I don't know what copyright to place here but that's GPLv2 code so
  * I assume I'm free to reuse it.
  */
 #include "utils.h" // container_of

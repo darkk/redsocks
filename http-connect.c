@@ -1,5 +1,4 @@
 /** http-connect upstream module for redsocks
- * $Id$ 
  */
 
 #include <assert.h>
@@ -26,10 +25,10 @@ static void httpc_client_init(redsocks_client *client)
 {
 	if (client->instance->config.login)
 		redsocks_log_error(client, LOG_WARNING, "login is ignored for http-connect connections");
-	
+
 	if (client->instance->config.password)
 		redsocks_log_error(client, LOG_WARNING, "password is ignored for http-connect connections");
-	
+
 	client->state = httpc_new;
 }
 
@@ -40,6 +39,8 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 	int dropped = 0;
 
 	assert(client->state >= httpc_request_sent);
+
+	redsocks_touch_client(client);
 
 	if (client->state == httpc_request_sent) {
 		size_t len = EVBUFFER_LENGTH(buffev->input);
@@ -66,7 +67,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 
 	if (dropped)
 		return;
-	
+
 	while (client->state == httpc_reply_came) {
 		char *line = evbuffer_readline(buffev->input);
 		if (line) {
@@ -96,8 +97,8 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 		goto fail;
 	}
 
-	len = evbuffer_add_printf(buff, 
-		"CONNECT %s:%u HTTP/1.0\r\n\r\n", 
+	len = evbuffer_add_printf(buff,
+		"CONNECT %s:%u HTTP/1.0\r\n\r\n",
 		inet_ntoa(client->destaddr.sin_addr),
 		ntohs(client->destaddr.sin_port)
 	);
@@ -105,7 +106,7 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 		redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
 		goto fail;
 	}
-	
+
 	retval = buff;
 	buff = NULL;
 
@@ -120,6 +121,8 @@ static void httpc_write_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 
+	redsocks_touch_client(client);
+
 	if (client->state == httpc_new) {
 		redsocks_write_helper_ex(
 			buffev, client,
@@ -132,7 +135,7 @@ static void httpc_write_cb(struct bufferevent *buffev, void *_arg)
 }
 
 
-relay_subsys http_connect_subsys = 
+relay_subsys http_connect_subsys =
 {
 	.name        = "http-connect",
 	.payload_len = 0,

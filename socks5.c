@@ -1,5 +1,3 @@
-/* $Id$ */
-
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -99,7 +97,7 @@ const int socks5_status_Command_not_supported = 7;
 const int socks5_status_Address_type_not_supported = 8;
 
 const char *socks5_strstatus[] = {
-	"ok", 
+	"ok",
 	"server failure",
 	"connection not allowed by ruleset",
 	"network unreachable",
@@ -153,7 +151,7 @@ static struct evbuffer *socks5_mkpassword(redsocks_client *client)
 	size_t plen = strlen(password);
 	size_t length =  1 /* version */ + 1 + ulen + 1 + plen;
 	uint8_t req[length];
-	
+
 	req[0] = socks5_password_ver; // RFC 1929 says so
 	req[1] = ulen;
 	memcpy(&req[2], login, ulen);
@@ -182,6 +180,8 @@ static void socks5_write_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 
+	redsocks_touch_client(client);
+
 	if (client->state == socks5_new) {
 		redsocks_write_helper(
 			buffev, client,
@@ -196,7 +196,7 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client
 
 	if (redsocks_read_expected(client, buffev->input, &reply, sizes_equal, sizeof(reply)) < 0)
 		return;
-		
+
 	if (reply.ver != socks5_ver) {
 		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected auth methods reply version...");
 		redsocks_drop_client(client);
@@ -287,6 +287,8 @@ static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 	redsocks_client *client = _arg;
 	socks5_client *socks5 = (void*)(client + 1);
 
+	redsocks_touch_client(client);
+
 	if (client->state == socks5_method_sent) {
 		socks5_read_auth_methods(buffev, client, socks5);
 	}
@@ -318,7 +320,7 @@ static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 	}
 }
 
-relay_subsys socks5_subsys = 
+relay_subsys socks5_subsys =
 {
 	.name        = "socks5",
 	.payload_len = sizeof(socks5_client),

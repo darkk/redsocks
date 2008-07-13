@@ -1,5 +1,3 @@
-/* $Id$ */
-
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,13 +28,13 @@ int reddns_onenter(parser_section *section)
 int reddns_onexit(parser_section *section)
 {
 	reddns_config *conf = section->data;
-	fprintf(stderr, 
+	fprintf(stderr,
 			"%s {\n"
 			"local_port = %u;\n"
 			"fakeip_net = %s/%s;\n"
 			"ip = %s;\n"
 			"port = %u;\n"
-			"}\n", 
+			"}\n",
 			__FUNCTION__,
 			conf->bindaddr.sin_port,
 			strdup(inet_ntoa(conf->fakenet)),
@@ -64,7 +62,7 @@ parser_section reddns_conf_section = {
 };
 
 int reddns_init() {
-	return 0;	
+	return 0;
 }
 
 int reddns_fini() {

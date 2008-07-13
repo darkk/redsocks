@@ -1,6 +1,5 @@
 #ifndef MAIN_H_TUE_JAN_23_15_38_25_2007
 #define MAIN_H_TUE_JAN_23_15_38_25_2007
-/* $Id$ */
 
 #include "parser.h"
 

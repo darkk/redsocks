@@ -1,5 +1,3 @@
-/* $Id$ */
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -118,7 +116,7 @@ static int getdestaddr_ipf(int fd, const struct sockaddr_in *client, const struc
 	}
 #endif
 	if (x < 0) {
-		if (errno != ESRCH) 
+		if (errno != ESRCH)
 			log_errno(LOG_WARNING, "ioctl(SIOCGNATL)\n");
 		return -1;
 	} else {
@@ -196,7 +194,7 @@ int getdestaddr(int fd, const struct sockaddr_in *client, const struct sockaddr_
 	return instance.redirector->getdestaddr(fd, client, bindaddr, destaddr);
 }
 
-static redirector_subsys redirector_subsystems[] = 
+static redirector_subsys redirector_subsystems[] =
 {
 #ifdef __FreeBSD__
 	{ .name = "ipf", .init = redir_init_ipf, .fini = redir_close_private, .getdestaddr = getdestaddr_ipf },
@@ -213,7 +211,7 @@ static redirector_subsys redirector_subsystems[] =
 /***********************************************************************
  * `base` config parsing
  */
-static parser_entry base_entries[] = 
+static parser_entry base_entries[] =
 {
 	{ .key = "chroot",     .type = pt_pchar,   .addr = &instance.chroot },
 	{ .key = "user",       .type = pt_pchar,   .addr = &instance.user },
@@ -239,7 +237,7 @@ static int base_onenter(parser_section *section)
 static int base_onexit(parser_section *section)
 {
 	const char *err = NULL;
-	
+
 	if (instance.redirector_name) {
 		redirector_subsys *ss;
 		FOREACH(ss, redirector_subsystems) {
@@ -255,7 +253,7 @@ static int base_onexit(parser_section *section)
 	else {
 		err = "no `redirector` set";
 	}
-	
+
 	if (err)
 		parser_error(section->context, err);
 
@@ -265,11 +263,11 @@ static int base_onexit(parser_section *section)
 	return err ? -1 : 0;
 }
 
-static parser_section base_conf_section = 
-{ 
-	.name    = "base", 
-	.entries = base_entries, 
-	.onenter = base_onenter, 
+static parser_section base_conf_section =
+{
+	.name    = "base",
+	.entries = base_entries,
+	.onenter = base_onenter,
 	.onexit  = base_onexit
 };
 
@@ -286,7 +284,7 @@ static int base_init()
 		log_error(LOG_ERR, "there is no configured instance of `base`, check config file");
 		return -1;
 	}
-	
+
 	if (instance.redirector->init && instance.redirector->init() < 0)
 		return -1;
 
@@ -309,8 +307,8 @@ static int base_init()
 	}
 
 	if (log_preopen(
-			instance.log_name ? instance.log_name : instance.daemon ? "syslog:daemon" : "stderr", 
-			instance.log_debug, 
+			instance.log_name ? instance.log_name : instance.daemon ? "syslog:daemon" : "stderr",
+			instance.log_debug,
 			instance.log_info
 	) < 0 ) {
 		goto fail;
@@ -392,7 +390,7 @@ fail:
 	return -1;
 }
 
-app_subsys base_subsys = 
+app_subsys base_subsys =
 {
 	.init = base_init,
 	.conf_section = &base_conf_section,

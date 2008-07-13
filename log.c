@@ -1,5 +1,3 @@
-/* $Id$ */
-
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -60,7 +58,7 @@ int log_preopen(const char *dst, bool log_debug, bool log_info)
 			{ "local7", LOG_LOCAL7 },
 		};
 
-		FOREACH(ptpl, tpl) 
+		FOREACH(ptpl, tpl)
 			if (strcmp(facility_name, ptpl->name) == 0) {
 				facility = ptpl->value;
 				break;
@@ -71,7 +69,7 @@ int log_preopen(const char *dst, bool log_debug, bool log_info)
 		}
 
 		openlog("redsocks", LOG_NDELAY | LOG_PID, facility);
-		
+
 		logmask = setlogmask(0);
 		if (!log_debug)
 			logmask &= ~(LOG_MASK(LOG_DEBUG));
@@ -104,7 +102,7 @@ void _log_vwrite(const char *file, int line, const char *func, int do_errno, int
 		evbuffer_add_vprintf(buff, fmt, ap);
 		message = buff->buffer;
 	}
-	else 
+	else
 		message = lowmem;
 
 	log_msg(file, line, func, priority, message, do_errno ? strerror(saved_errno) : NULL);

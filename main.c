@@ -1,5 +1,3 @@
-/* $Id$ */
-
 #include <sys/time.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -44,14 +42,14 @@ int main(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 	}
-	
+
 
 	FILE *f = fopen(confname, "r");
 	if (!f) {
 		perror("Unable to open config file");
 		return EXIT_FAILURE;
 	}
-	
+
 	parser_context* parser = parser_start(f, NULL);
 	if (!parser) {
 		perror("Not enough memory for parser");
@@ -83,7 +81,7 @@ int main(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 	}
-		
+
 	log_error(LOG_NOTICE, "redsocks started");
 
 	event_dispatch();

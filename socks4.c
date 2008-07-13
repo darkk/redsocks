@@ -1,5 +1,3 @@
-/* $Id$ */
-
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -42,7 +40,7 @@ void socks4_client_init(redsocks_client *client)
 {
 	if (client->instance->config.password)
 		redsocks_log_error(client, LOG_WARNING, "password is ignored for socks4 connections");
-	
+
 	client->state = socks4_new;
 }
 
@@ -52,6 +50,8 @@ static void socks4_read_cb(struct bufferevent *buffev, void *_arg)
 	redsocks_client *client = _arg;
 
 	assert(client->state >= socks4_request_sent);
+
+	redsocks_touch_client(client);
 
 	if (client->state == socks4_request_sent) {
 		socks4_reply reply;
@@ -100,6 +100,8 @@ static void socks4_write_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 
+	redsocks_touch_client(client);
+
 	if (client->state == socks4_new) {
 		redsocks_write_helper(
 			buffev, client,
@@ -112,7 +114,7 @@ static void socks4_write_cb(struct bufferevent *buffev, void *_arg)
 }
 
 
-relay_subsys socks4_subsys = 
+relay_subsys socks4_subsys =
 {
 	.name        = "socks4",
 	.payload_len = 0,

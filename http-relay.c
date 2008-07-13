@@ -1,5 +1,4 @@
 /** http-relay upstream module for redsocks
- * $Id$ 
  */
 
 #include <assert.h>
@@ -27,10 +26,10 @@ static void httpr_client_init(redsocks_client *client)
 
 	if (client->instance->config.login)
 		redsocks_log_error(client, LOG_WARNING, "login is ignored for http-relay connections");
-	
+
 	if (client->instance->config.password)
 		redsocks_log_error(client, LOG_WARNING, "password is ignored for http-relay connections");
-	
+
 	client->state = httpr_new;
 	memset(httpr, 0, sizeof(*httpr));
 }
@@ -52,6 +51,8 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 	int len;
 
 	assert(httpr->buff);
+
+	redsocks_touch_client(client);
 
 	len = bufferevent_write_buffer(client->relay, httpr->buff);
 	// free is done either at _start_relay or at _drop_client
@@ -87,7 +88,7 @@ static char *fmt_http_host(struct sockaddr_in addr)
 	if (ntohs(addr.sin_port) == 80)
 		return inet_ntoa(addr.sin_addr);
 	else {
-		snprintf(host, sizeof(host), 
+		snprintf(host, sizeof(host),
 				"%s:%u",
 				inet_ntoa(addr.sin_addr),
 				ntohs(addr.sin_port)
@@ -102,11 +103,11 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 	char *uri = NULL;
 	struct evbuffer *buff = NULL;
 	char *host = fmt_http_host(client->destaddr);
-	
+
 	assert(httpr->firstline);
-	
+
 	uri = strchr(httpr->firstline, ' ');
-	if (uri) 
+	if (uri)
 		uri += 1; // one char further
 	else {
 		redsocks_log_error(client, LOG_NOTICE, "malformed request came");
@@ -135,7 +136,7 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 	evbuffer_free(httpr->buff);
 	httpr->buff = buff;
 	return 0;
-	
+
 addition_fail:
 	redsocks_log_error(client, LOG_ERR, "evbuffer_add");
 fail:
@@ -150,7 +151,9 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 	httpr_client *httpr = (void*)(client +1);
 	char *line = NULL;
 	int connect_relay = 0;
-	
+
+	redsocks_touch_client(client);
+
 	while ( (line = evbuffer_readline(buffev->input)) && !connect_relay) {
 		int skip_line = 0;
 		int do_drop = 0;
@@ -200,7 +203,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 		if (line && !skip_line)
 			if (httpr_append_header(client, line) < 0)
 				do_drop = 1;
-		
+
 		free(line);
 
 		if (do_drop) {
@@ -208,7 +211,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 			return;
 		}
 	}
-	
+
 	if (connect_relay)
 		redsocks_connect_relay(client);
 }
@@ -223,7 +226,7 @@ static void httpr_connect_relay(redsocks_client *client)
 		redsocks_log_errno(client, LOG_ERR, "evbuffer_new");
 		redsocks_drop_client(client);
 	}
-	
+
 	client->client->readcb = httpr_client_read_cb;
 	error = bufferevent_enable(client->client, EV_READ);
 	if (error) {
@@ -232,7 +235,7 @@ static void httpr_connect_relay(redsocks_client *client)
 	}
 }
 
-relay_subsys http_relay_subsys = 
+relay_subsys http_relay_subsys =
 {
 	.name          = "http-relay",
 	.payload_len   = sizeof(httpr_client),

@@ -1,7 +1,5 @@
 #ifndef REDSOCKS_H_WED_JAN_24_22_17_11_2007
 #define REDSOCKS_H_WED_JAN_24_22_17_11_2007
-/* $Id$ */
-
 #include <sys/time.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
@@ -54,17 +52,20 @@ typedef struct redsocks_client_t {
 	int                 state;         // it's used by bottom layer
 	unsigned short      client_evshut;
 	unsigned short      relay_evshut;
+	time_t              first_event;
+	time_t              last_event;
 } redsocks_client;
 
 
 void redsocks_drop_client(redsocks_client *client);
+void redsocks_touch_client(redsocks_client *client);
 void redsocks_connect_relay(redsocks_client *client);
 void redsocks_start_relay(redsocks_client *client);
 
 typedef int (*size_comparator)(size_t a, size_t b);
 int sizes_equal(size_t a, size_t b);
 int sizes_greater_equal(size_t a, size_t b);
-/** helper for functions when we expect ONLY reply of some size and anything else is error 
+/** helper for functions when we expect ONLY reply of some size and anything else is error
  */
 int redsocks_read_expected(redsocks_client *client, struct evbuffer *input, void *data, size_comparator comparator, size_t expected);
 

@@ -1,6 +1,5 @@
 #ifndef PARSER_H_THU_JAN_11_04_49_38_2007
 #define PARSER_H_THU_JAN_11_04_49_38_2007
-/* $Id$ */
 
 #include <stdio.h>
 #include <stdbool.h>

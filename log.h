@@ -1,6 +1,6 @@
 #ifndef LOG_H_WED_JAN_24_18_21_27_2007
 #define LOG_H_WED_JAN_24_18_21_27_2007
-/* $Id$ */
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <syslog.h>

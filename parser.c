@@ -1,5 +1,3 @@
-/* $Id$ */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -88,7 +86,7 @@ static char *gettoken(parser_context *context, char **iter)
 {
 	char *ret = NULL;
 	size_t len = 0;
-	enum { 
+	enum {
 		gt_cstr,
 		gt_plainstr
 	} copytype;
@@ -139,10 +137,10 @@ static char *gettoken(parser_context *context, char **iter)
 					p++;
 				else if (p[1] == '/' || p[1] == '*') // comment token is coming!
 					break;
-				else 
+				else
 					return NULL;
 			}
-			else 
+			else
 				break;
 		}
 		len = p - *iter;
@@ -168,7 +166,7 @@ static char *gettoken(parser_context *context, char **iter)
 		copytype = gt_plainstr;
 		len = 2;
 	}
-	
+
 	ret = malloc(len + 1);
 	if (!ret) {
 		parser_error(context, "malloc failed");
@@ -200,7 +198,7 @@ static char *gettoken(parser_context *context, char **iter)
 		*iter += len;
 		ret[len] = 0;
 	}
-			
+
 	return ret;
 }
 
@@ -227,13 +225,13 @@ static int vp_pbool(parser_context *context, void *addr, const char *token)
 			*(bool*)addr = true;
 			return 0;
 		}
-	
+
 	FOREACH(tpl, strfalse)
 		if (strcmp(token, *tpl) == 0) {
 			*(bool*)addr = false;
 			return 0;
 		}
-	
+
 	parser_error(context, "boolean is not parsed");
 	return -1;
 }
@@ -294,7 +292,7 @@ static int vp_in_addr2(parser_context *context, void *addr, const char *token)
 		*mask = '\0';
 		mask++;
 	}
-	
+
 	if (inet_aton(host, &ia)) {
 		memcpy(addr, &ia, sizeof(ia));
 	}
@@ -329,7 +327,7 @@ static int vp_in_addr2(parser_context *context, void *addr, const char *token)
 	return retval;
 }
 
-static value_parser value_parser_by_type[] = 
+static value_parser value_parser_by_type[] =
 {
 	[pt_bool] = vp_pbool,
 	[pt_pchar] = vp_pchar,
@@ -347,7 +345,7 @@ int parser_run(parser_context *context)
 	bool need_more_data  = true;
 	while ( !context->error && !feof(context->fd) ) {
 		assert(context->buffer.filled < context->buffer.size); // ``<`` and not ``<=``
-		
+
 		if (need_more_space) {
 			char *new = realloc(context->buffer.data, context->buffer.size * 2);
 			if (!new) {
@@ -358,7 +356,7 @@ int parser_run(parser_context *context)
 			context->buffer.size *= 2;
 			need_more_space = false;
 		}
-		
+
 		if (need_more_data) { // read one line per call
 			char *sbegin = context->buffer.data + context->buffer.filled;
 			int len;
@@ -367,7 +365,7 @@ int parser_run(parser_context *context)
 					parser_error(context, "file read failure");
 					return -1;
 				}
-				else 
+				else
 					continue;
 			}
 			len = strlen(sbegin);
