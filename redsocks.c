@@ -624,6 +624,16 @@ static const char *redsocks_evshut_str(unsigned short evshut)
 		"???";
 }
 
+static const char *redsocks_event_str(unsigned short what)
+{
+	return
+		what == EV_READ ? "R/-" :
+		what == EV_WRITE ? "-/W" :
+		what == (EV_READ|EV_WRITE) ? "R/W" :
+		what == 0 ? "-/-" :
+		"???";
+}
+
 static void redsocks_debug_dump(int sig, short what, void *_arg)
 {
 	redsocks_instance *self = _arg;
@@ -635,9 +645,13 @@ static void redsocks_debug_dump(int sig, short what, void *_arg)
 		const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
 		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
-		redsocks_log_error(client, LOG_DEBUG, "client: %i%s%s, relay: %i%s%s, age: %i sec, idle: %i sec.",
-			EVENT_FD(&client->client->ev_write), s_client_evshut[0] ? " " : "", s_client_evshut,
-			EVENT_FD(&client->relay->ev_write), s_relay_evshut[0] ? " " : "", s_relay_evshut,
+		redsocks_log_error(client, LOG_DEBUG, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %i sec, idle: %i sec.",
+			EVENT_FD(&client->client->ev_write),
+				redsocks_event_str(client->client->enabled),
+				s_client_evshut[0] ? " " : "", s_client_evshut,
+			EVENT_FD(&client->relay->ev_write),
+				redsocks_event_str(client->relay->enabled),
+				s_relay_evshut[0] ? " " : "", s_relay_evshut,
 			now - client->first_event,
 			now - client->last_event);
 	}
