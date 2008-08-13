@@ -501,6 +501,7 @@ fail:
 
 void redsocks_connect_relay(redsocks_client *client)
 {
+	int on = 1;
 	int relay_fd = -1;
 	int error;
 
@@ -513,6 +514,12 @@ void redsocks_connect_relay(redsocks_client *client)
 	error = fcntl_nonblock(relay_fd);
 	if (error) {
 		redsocks_log_errno(client, LOG_ERR, "fcntl");
+		goto fail;
+	}
+
+	error = setsockopt(relay_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
+	if (error) {
+		redsocks_log_errno(client, LOG_WARNING, "setsockopt");
 		goto fail;
 	}
 
@@ -550,6 +557,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 	struct sockaddr_in clientaddr;
 	struct sockaddr_in destaddr;
 	socklen_t          addrlen = sizeof(clientaddr);
+	int on = 1;
 	int client_fd = -1;
 	int error;
 
@@ -562,6 +570,12 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
 	error = getdestaddr(client_fd, &clientaddr, &self->config.bindaddr, &destaddr);
 	if (error) {
+		goto fail;
+	}
+
+	error = setsockopt(client_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
+	if (error) {
+		log_errno(LOG_WARNING, "setsockopt");
 		goto fail;
 	}
 
