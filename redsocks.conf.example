@@ -1,0 +1,56 @@
+base {
+	// debug: connection progress & client list on SIGUSR1
+	log_debug = on;
+
+	// info: start and end of client session
+	log_info = on;
+
+	/* possible `log' values are:
+	 *   stderr
+	 *   /path/to/file
+	 *   syslog:FACILITY  facility is any of "daemon", "local0"..."local7"
+	 */
+	log = stderr;
+
+	// detach from console
+	daemon = off;
+
+	/* Change uid, gid and root directory, these options require root
+	 * privilegies on startup.
+	 * Note, your chroot may requre /etc/localtime if you write log to syslog.
+	 * Log is opened before chroot & uid changing.
+	 */
+	// user = nobody;
+	// group = nobody;
+	// chroot = "/var/chroot";
+
+	/* possible `redirector' values are:
+	 *   iptables   - for Linux
+	 *   ipf        - for FreeBSD
+	 *   pw         - for OpenBSD
+	 *   generic    - some generic redirector that MAY work
+	 */
+	redirector = iptables;
+}
+
+redsocks {
+	/* `local_ip' defaults to 127.0.0.1 for security reasons,
+	 * use 0.0.0.0 if you want to listen on every interface.
+	 * `local_*' are used as port to redirect to.
+	 */
+	local_ip = 127.0.0.1;
+	local_port = 12345;
+
+	// `ip' and `port' are IP and tcp-port of proxy-server
+	ip = 127.0.0.1;
+	port = 1080;
+
+
+	// known types: socks4, socks5, http-connect, http-relay
+	type = socks5;
+
+	// login = "foobar";
+	// password = "baz";
+}
+
+// you can add one more `redsocks' section if you need.

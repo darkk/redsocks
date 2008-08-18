@@ -1,0 +1,116 @@
+This tool allows you to redirect any TCP connection to SOCKS or HTTPS
+proxy using your firewall, so redirection is system-wide.
+
+Why is that useful? I can suggest following reasons:
+* you use tor[1] and don't want any TCP connection to leak.
+* you use DVB ISP and this ISP provides internet connectivity with some
+  special daemon that may be also called "Internet accelerator" and this
+  accelerator acts as proxy. Globax[2] is example of such an accelerator.
+
+Linux/iptables, OpenBSD/pf and FreeBSD/ipfw are supported.
+Linux/iptables is well-tested, other implementations may have bugs,
+your bugreports are welcome.
+
+Transocks[3] is alike project but it has noticable performance penality.
+
+[1] http://www.torproject.org
+[2] http://www.globax.biz
+[3] http://transocks.sourceforge.net/
+
+
+Features
+========
+
+Redirect any TCP connection to SOCKS4, SOCKS5 or HTTPS (HTTP/CONNECT)
+proxy server.
+
+Login/password authentication is supported for SOCKS5 connections.
+SOCKS4 supports only username, password is ignored.
+
+Redirect any HTTP connection to proxy that does not support transparent
+proxying (e.g. old SQUID had broken `acl myport' for such connections).
+
+
+License
+=======
+
+All source code is licensed under GPLv3 or later. Contact the author
+if you want to use the code and GPLv3 (or later) does not permit you to
+do so.
+
+Text of GPLv3 is included in file `COPYING'.
+
+
+Compilation
+===========
+
+libevent[4] is required.
+
+gcc is only supported compiler right now, other compilers can be used
+but may require some code changes.
+
+Compilation is as easy as running `make', there is no `./configure' magic.
+
+GNU Make works, other implementations of make were not tested.
+
+[4] http://www.monkey.org/~provos/libevent/
+
+
+Running
+=======
+
+Program has only two command-line options:
+ -c   sets proper path to config file ("./redsocks.conf" is default one)
+ -t   tests config file syntax
+
+Following signals are understood:
+SIGUSR1 dumps list of connected clients to log
+SIGTERM and SIGINT terminates daemon, all active connections are closed
+
+You can see configuration file example in redsocks.conf.example
+
+
+iptables example
+================
+
+You have to build iptables with connection tracking and REDIRECT target.
+
+# Create new chain
+iptables -t nat -N REDSOCKS
+
+# Ignore LANs and some other reserved addresses.
+iptables -t nat -A REDSOCKS -d 0.0.0.0/8 -j RETURN
+iptables -t nat -A REDSOCKS -d 10.0.0.0/8 -j RETURN
+iptables -t nat -A REDSOCKS -d 127.0.0.0/8 -j RETURN
+iptables -t nat -A REDSOCKS -d 169.254.0.0/16 -j RETURN
+iptables -t nat -A REDSOCKS -d 172.16.0.0/12 -j RETURN
+iptables -t nat -A REDSOCKS -d 192.168.0.0/16 -j RETURN
+iptables -t nat -A REDSOCKS -d 224.0.0.0/4 -j RETURN
+iptables -t nat -A REDSOCKS -d 240.0.0.0/4 -j RETURN
+
+# Anything else should be redirected to port 12345
+iptables -t nat -A REDSOCKS -p tcp -j REDIRECT --to-ports 12345
+
+# Any tcp connection made by `darkk' should be redirected.
+iptables -t nat -A OUTPUT -p tcp -m owner --uid-owner darkk -j REDSOCKS
+
+
+Homepage
+========
+
+http://darkk.net.ru/redsocks/
+
+
+TODO
+====
+
+Test OpenBSD (pf) and FreeBSD (ipfw) and write setup examples for those
+firewall types.
+
+Allow redirecting of UDP and/or DNS packets.
+
+
+Author
+======
+This program was written by Leonid Evdokimov <leon@darkk.net.ru>
+
