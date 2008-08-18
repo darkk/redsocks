@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <time.h>
 #include <errno.h>
 #include <assert.h>
 #include <event.h>
