@@ -73,12 +73,8 @@ int main(int argc, char **argv)
 	FOREACH(ss, subsystems) {
 		if ((*ss)->init) {
 			error = (*ss)->init();
-			if (!error)
-				continue; // goto next subsystem
-			for (--ss; ss >= subsystems; ss--)
-				if ((*ss)->fini)
-					(*ss)->fini();
-			return EXIT_FAILURE;
+			if (error)
+				goto shutdown;
 		}
 	}
 
@@ -86,10 +82,14 @@ int main(int argc, char **argv)
 
 	event_dispatch();
 
-	FOREACH_REV(ss, subsystems)
+shutdown:
+	for (--ss; ss >= subsystems; ss--)
 		if ((*ss)->fini)
 			(*ss)->fini();
-	return EXIT_SUCCESS;
+
+	event_base_free(NULL);
+
+	return !error ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

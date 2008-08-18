@@ -274,6 +274,8 @@ static parser_section base_conf_section =
 /***********************************************************************
  * `base` initialization
  */
+static int base_fini();
+
 static int base_init()
 {
 	uid_t uid;
@@ -385,14 +387,32 @@ static int base_init()
 fail:
 	if (devnull != -1)
 		close(devnull);
+
+	base_fini();
+
+	return -1;
+}
+
+static int base_fini()
+{
 	if (instance.redirector->fini)
 		instance.redirector->fini();
-	return -1;
+
+	free(instance.chroot);
+	free(instance.user);
+	free(instance.group);
+	free(instance.redirector_name);
+	free(instance.log_name);
+
+	memset(&instance, 0, sizeof(instance));
+
+	return 0;
 }
 
 app_subsys base_subsys =
 {
 	.init = base_init,
+	.fini = base_fini,
 	.conf_section = &base_conf_section,
 };
 
