@@ -2,6 +2,9 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include <string.h>
+#include <assert.h>
 #include <event.h>
 #include "log.h"
 #include "main.h"
@@ -19,12 +22,21 @@ app_subsys *subsystems[] = {
 
 static const char *confname = "redsocks.conf";
 
+static void terminate(int sig, short what, void *_arg)
+{
+	if (event_loopbreak() != 0)
+		log_error(LOG_WARNING, "event_loopbreak");
+}
+
 int main(int argc, char **argv)
 {
 	int error;
 	app_subsys **ss;
+	int exit_signals[2] = {SIGTERM, SIGINT};
+	struct event terminators[2];
 	bool conftest = false;
 	int opt;
+	int i;
 
 	while ((opt = getopt(argc, argv, "tc:")) != -1) {
 		switch (opt) {
@@ -78,11 +90,29 @@ int main(int argc, char **argv)
 		}
 	}
 
+	assert(SIZEOF_ARRAY(exit_signals) == SIZEOF_ARRAY(terminators));
+	memset(terminators, 0, sizeof(terminators));
+	for (i = 0; i < SIZEOF_ARRAY(exit_signals); i++) {
+		signal_set(&terminators[i], exit_signals[i], terminate, NULL);
+		if (signal_add(&terminators[i], NULL) != 0) {
+			log_errno(LOG_ERR, "signal_add");
+			goto shutdown;
+		}
+	}
+
 	log_error(LOG_NOTICE, "redsocks started");
 
 	event_dispatch();
 
 shutdown:
+	for (i = 0; i < SIZEOF_ARRAY(exit_signals); i++) {
+		if (signal_initialized(&terminators[i])) {
+			if (signal_del(&terminators[i]) != 0)
+				log_errno(LOG_WARNING, "signal_del");
+			memset(&terminators[i], 0, sizeof(terminators[i]));
+		}
+	}
+
 	for (--ss; ss >= subsystems; ss--)
 		if ((*ss)->fini)
 			(*ss)->fini();
