@@ -104,6 +104,8 @@ int main(int argc, char **argv)
 
 	event_dispatch();
 
+	log_error(LOG_NOTICE, "redsocks goes down");
+
 shutdown:
 	for (i = 0; i < SIZEOF_ARRAY(exit_signals); i++) {
 		if (signal_initialized(&terminators[i])) {
