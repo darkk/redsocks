@@ -55,51 +55,75 @@ static relay_subsys *relay_subsystems[] =
 	&socks5_subsys,
 };
 
-static redsocks_instance instance =
-{ // almost NULL-initializer
-	.clients = LIST_HEAD_INIT(instance.clients)
-};
+list_head instances = LIST_HEAD_INIT(instances);
 
 static parser_entry redsocks_entries[] =
 {
-	{ .key = "local_ip",   .type = pt_in_addr, .addr = &instance.config.bindaddr.sin_addr },
-	{ .key = "local_port", .type = pt_uint16,  .addr = &instance.config.bindaddr.sin_port },
-	{ .key = "ip",         .type = pt_in_addr, .addr = &instance.config.relayaddr.sin_addr },
-	{ .key = "port",       .type = pt_uint16,  .addr = &instance.config.relayaddr.sin_port },
-	{ .key = "type",       .type = pt_pchar,   .addr = &instance.config.type },
-	{ .key = "login",      .type = pt_pchar,   .addr = &instance.config.login },
-	{ .key = "password",   .type = pt_pchar,   .addr = &instance.config.password },
+	{ .key = "local_ip",   .type = pt_in_addr },
+	{ .key = "local_port", .type = pt_uint16 },
+	{ .key = "ip",         .type = pt_in_addr },
+	{ .key = "port",       .type = pt_uint16 },
+	{ .key = "type",       .type = pt_pchar },
+	{ .key = "login",      .type = pt_pchar },
+	{ .key = "password",   .type = pt_pchar },
 	{ }
 };
 
 static int redsocks_onenter(parser_section *section)
 {
-	if (instance.config.type) {
-		parser_error(section->context, "only one instance of redsocks is valid");
+	redsocks_instance *instance = calloc(1, sizeof(*instance));
+	if (!instance) {
+		parser_error(section->context, "Not enough memory");
 		return -1;
 	}
-	instance.config.bindaddr.sin_family = AF_INET;
-	instance.config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	instance.config.relayaddr.sin_family = AF_INET;
-	instance.config.relayaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+	INIT_LIST_HEAD(&instance->list);
+	INIT_LIST_HEAD(&instance->clients);
+	instance->config.bindaddr.sin_family = AF_INET;
+	instance->config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	instance->config.relayaddr.sin_family = AF_INET;
+	instance->config.relayaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+		entry->addr =
+			(strcmp(entry->key, "local_ip") == 0)   ? &instance->config.bindaddr.sin_addr :
+			(strcmp(entry->key, "local_port") == 0) ? &instance->config.bindaddr.sin_port :
+			(strcmp(entry->key, "ip") == 0)         ? &instance->config.relayaddr.sin_addr :
+			(strcmp(entry->key, "port") == 0)       ? &instance->config.relayaddr.sin_port :
+			(strcmp(entry->key, "type") == 0)       ? &instance->config.type :
+			(strcmp(entry->key, "login") == 0)      ? &instance->config.login :
+			(strcmp(entry->key, "password") == 0)   ? &instance->config.password :
+			NULL;
+	section->data = instance;
 	return 0;
 }
 
 static int redsocks_onexit(parser_section *section)
 {
+	/* FIXME: Rewrite in bullet-proof style. There are memory leaks if config
+	 *        file is not correct, so correct on-the-fly config reloading is
+	 *        currently impossible.
+	 */
 	const char *err = NULL;
-	instance.config.bindaddr.sin_port = htons(instance.config.bindaddr.sin_port);
-	instance.config.relayaddr.sin_port = htons(instance.config.relayaddr.sin_port);
+	redsocks_instance *instance = section->data;
 
-	if (instance.config.type) {
+	section->data = NULL;
+	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+		entry->addr = NULL;
+
+	instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);
+	instance->config.relayaddr.sin_port = htons(instance->config.relayaddr.sin_port);
+
+	if (instance->config.type) {
 		relay_subsys **ss;
 		FOREACH(ss, relay_subsystems) {
-			if (!strcmp((*ss)->name, instance.config.type)) {
-				instance.relay_ss = *ss;
+			if (!strcmp((*ss)->name, instance->config.type)) {
+				instance->relay_ss = *ss;
+				list_add(&instance->list, &instances);
 				break;
 			}
 		}
-		if (!instance.relay_ss)
+		if (!instance->relay_ss)
 			err = "invalid `type` for redsocks";
 	}
 	else {
@@ -648,14 +672,12 @@ static const char *redsocks_event_str(unsigned short what)
 		"???";
 }
 
-static void redsocks_debug_dump(int sig, short what, void *_arg)
+static void redsocks_debug_dump_instance(redsocks_instance *instance, time_t now)
 {
-	redsocks_instance *self = _arg;
 	redsocks_client *client = NULL;
-	time_t now = redsocks_time(NULL);
 
-	log_error(LOG_DEBUG, "Dumping client list:");
-	list_for_each_entry(client, &self->clients, list) {
+	log_error(LOG_DEBUG, "Dumping client list for instance %p:", instance);
+	list_for_each_entry(client, &instance->clients, list) {
 		const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
 		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
@@ -672,19 +694,26 @@ static void redsocks_debug_dump(int sig, short what, void *_arg)
 	log_error(LOG_DEBUG, "End of client list.");
 }
 
-static int redsocks_init()
+static void redsocks_debug_dump(int sig, short what, void *_arg)
 {
+	redsocks_instance *instance = NULL;
+	time_t now = redsocks_time(NULL);
+
+	list_for_each_entry(instance, &instances, list)
+		redsocks_debug_dump_instance(instance, now);
+}
+
+static void redsocks_fini_instance(redsocks_instance *instance);
+
+static int redsocks_init_instance(redsocks_instance *instance)
+{
+	/* FIXME: redsocks_fini_instance is called in case of failure, this
+	 *        function will remove instance from instances list - result
+	 *        looks ugly.
+	 */
 	int error;
 	int on = 1;
 	int fd = -1;
-	struct sigaction sa = { }, sa_old = { };
-
-	sa.sa_handler = SIG_IGN;
-	sa.sa_flags = SA_RESTART;
-	if (sigaction(SIGPIPE, &sa, &sa_old) == -1) {
-		log_errno(LOG_ERR, "sigaction");
-		return -1;
-	}
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd == -1) {
@@ -698,7 +727,7 @@ static int redsocks_init()
 		goto fail;
 	}
 
-	error = bind(fd, (struct sockaddr*)&instance.config.bindaddr, sizeof(instance.config.bindaddr));
+	error = bind(fd, (struct sockaddr*)&instance->config.bindaddr, sizeof(instance->config.bindaddr));
 	if (error) {
 		log_errno(LOG_ERR, "bind");
 		goto fail;
@@ -716,48 +745,108 @@ static int redsocks_init()
 		goto fail;
 	}
 
-	signal_set(&instance.debug_dumper, SIGUSR1, redsocks_debug_dump, &instance);
-	error = signal_add(&instance.debug_dumper, NULL);
-	if (error) {
-		log_errno(LOG_ERR, "signal_add");
-		goto fail;
-	}
-
-	event_set(&instance.listener, fd, EV_READ | EV_PERSIST, redsocks_accept_client, &instance);
-	error = event_add(&instance.listener, NULL);
+	event_set(&instance->listener, fd, EV_READ | EV_PERSIST, redsocks_accept_client, instance);
+	error = event_add(&instance->listener, NULL);
 	if (error) {
 		log_errno(LOG_ERR, "event_add");
 		goto fail;
 	}
+	fd = -1;
 
 	return 0;
-fail:
-	if (signal_initialized(&instance.debug_dumper)) {
-		signal_del(&instance.debug_dumper);
-		memset(&instance.debug_dumper, 0, sizeof(instance.debug_dumper));
-	}
 
-	if (event_initialized(&instance.listener)) {
-		event_del(&instance.listener);
-		memset(&instance.listener, 0, sizeof(instance.listener));
-	}
+fail:
+	redsocks_fini_instance(instance);
 
 	if (fd != -1) {
-		close(fd);
+		if (close(fd) != 0)
+			log_errno(LOG_WARNING, "close");
 	}
 
+	return -1;
+}
+
+/* Drops instance completely, freeing its memory and removing from
+ * instances list.
+ */
+static void redsocks_fini_instance(redsocks_instance *instance) {
+	if (!list_empty(&instance->clients)) {
+		redsocks_client *tmp, *client = NULL;
+
+		log_error(LOG_WARNING, "There are connected clients during shutdown! Disconnecting them.");
+		list_for_each_entry_safe(client, tmp, &instance->clients, list) {
+			redsocks_drop_client(client);
+		}
+	}
+
+	if (event_initialized(&instance->listener)) {
+		if (event_del(&instance->listener) != 0)
+			log_errno(LOG_WARNING, "event_del");
+		if (close(EVENT_FD(&instance->listener)) != 0)
+			log_errno(LOG_WARNING, "close");
+		memset(&instance->listener, 0, sizeof(instance->listener));
+	}
+
+	list_del(&instance->list);
+
+	free(instance->config.type);
+	free(instance->config.login);
+	free(instance->config.password);
+
+	memset(instance, 0, sizeof(*instance));
+	free(instance);
+}
+
+static int redsocks_fini();
+
+static struct event debug_dumper;
+
+static int redsocks_init() {
+	struct sigaction sa = { }, sa_old = { };
+	redsocks_instance *tmp, *instance = NULL;
+
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_RESTART;
+	if (sigaction(SIGPIPE, &sa, &sa_old) == -1) {
+		log_errno(LOG_ERR, "sigaction");
+		return -1;
+	}
+
+	signal_set(&debug_dumper, SIGUSR1, redsocks_debug_dump, NULL);
+	if (signal_add(&debug_dumper, NULL) != 0) {
+		log_errno(LOG_ERR, "signal_add");
+		goto fail;
+	}
+
+	list_for_each_entry_safe(instance, tmp, &instances, list) {
+		if (redsocks_init_instance(instance) != 0)
+			goto fail;
+	}
+
+	return 0;
+
+fail:
 	// that was the first resource allocation, it return's on failure, not goto-fail's
 	sigaction(SIGPIPE, &sa_old, NULL);
+
+	redsocks_fini();
+
 	return -1;
 }
 
 static int redsocks_fini()
 {
-	if (event_initialized(&instance.listener)) {
-		event_del(&instance.listener);
-		close(EVENT_FD(&instance.listener));
-		memset(&instance.listener, 0, sizeof(instance.listener));
+	redsocks_instance *tmp, *instance = NULL;
+
+	list_for_each_entry_safe(instance, tmp, &instances, list)
+		redsocks_fini_instance(instance);
+
+	if (signal_initialized(&debug_dumper)) {
+		if (signal_del(&debug_dumper) != 0)
+			log_errno(LOG_WARNING, "signal_del");
+		memset(&debug_dumper, 0, sizeof(debug_dumper));
 	}
+
 	return 0;
 }
 

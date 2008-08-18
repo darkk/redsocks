@@ -33,7 +33,7 @@ struct parser_section_t {
 	parser_section_onenter  onenter; // is called on entry to section
 	parser_section_onexit   onexit;  // is called on exit from section
 	parser_entry           *entries;
-	//void                   *data;
+	void                   *data;
 };
 
 
