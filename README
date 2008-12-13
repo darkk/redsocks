@@ -13,9 +13,13 @@ your bugreports are welcome.
 
 Transocks[3] is alike project but it has noticable performance penality.
 
+Transsocks_ev[4] is alike project too, but it has no HTTPS-proxy support
+and does not support authentication.
+
 [1] http://www.torproject.org
 [2] http://www.globax.biz
 [3] http://transocks.sourceforge.net/
+[4] http://oss.tiggerswelt.net/transocks_ev/
 
 
 Features
@@ -44,7 +48,7 @@ Text of GPLv3 is included in file `COPYING'.
 Compilation
 ===========
 
-libevent[4] is required.
+libevent[5] is required.
 
 gcc is only supported compiler right now, other compilers can be used
 but may require some code changes.
@@ -53,7 +57,7 @@ Compilation is as easy as running `make', there is no `./configure' magic.
 
 GNU Make works, other implementations of make were not tested.
 
-[4] http://www.monkey.org/~provos/libevent/
+[5] http://www.monkey.org/~provos/libevent/
 
 
 Running
