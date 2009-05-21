@@ -81,7 +81,7 @@ int log_preopen(const char *dst, bool log_debug, bool log_info)
 				break;
 			}
 		if (facility == -1) {
-			log_error(LOG_ERR, "log_preopen(%s, ...): unknown syslog facility");
+			log_error(LOG_ERR, "log_preopen(%s, ...): unknown syslog facility", dst);
 			return -1;
 		}
 
