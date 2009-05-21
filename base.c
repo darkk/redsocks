@@ -26,6 +26,7 @@
 #include "config.h"
 #if defined USE_IPTABLES
 # include <limits.h>
+# include <netinet/in.h>
 # include <linux/netfilter_ipv4.h>
 #endif
 #include "log.h"
