@@ -28,15 +28,32 @@ static const char *lowmem = "<Can't print error, not enough memory>";
 
 typedef void (*log_func)(const char *file, int line, const char *func, int priority, const char *message, const char *appendix);
 
-static void stderr_msg(const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
+static void fprint_timestamp(
+		FILE* fd,
+		const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
 {
 	struct timeval tv = { };
 	gettimeofday(&tv, 0);
 
+	/* XXX: there is no error-checking, IMHO it's better to lose messages
+	 *      then to die and stop service */
 	if (appendix)
-		fprintf(stderr, "%lu.%6.6lu %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message, appendix);
+		fprintf(fd, "%lu.%6.6lu %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message, appendix);
 	else
-		fprintf(stderr, "%lu.%6.6lu %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message);
+		fprintf(fd, "%lu.%6.6lu %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message);
+}
+
+static void stderr_msg(const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
+{
+	fprint_timestamp(stderr, file, line, func, priority, message, appendix);
+}
+
+static FILE *logfile = NULL;
+
+static void logfile_msg(const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
+{
+	fprint_timestamp(logfile, file, line, func, priority, message, appendix);
+	fflush(logfile);
 }
 
 static void syslog_msg(const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
@@ -54,6 +71,7 @@ static log_func log_msg_next = NULL;
 int log_preopen(const char *dst, bool log_debug, bool log_info)
 {
 	const char *syslog_prefix = "syslog:";
+	const char *file_prefix = "file:";
 	if (strcmp(dst, "stderr") == 0) {
 		log_msg_next = stderr_msg;
 	}
@@ -95,6 +113,15 @@ int log_preopen(const char *dst, bool log_debug, bool log_info)
 		setlogmask(logmask);
 
 		log_msg_next = syslog_msg;
+	}
+	else if (strncmp(dst, file_prefix, strlen(file_prefix)) == 0) {
+		const char *filename = dst + strlen(file_prefix);
+		if ((logfile = fopen(filename, "a")) == NULL) {
+			log_error(LOG_ERR, "log_preopen(%s, ...): %s", dst, strerror(errno));
+			return -1;
+		}
+		log_msg_next = logfile_msg;
+		/* TODO: add log rotation */
 	}
 	else {
 		log_error(LOG_ERR, "log_preopen(%s, ...): unknown destination", dst);

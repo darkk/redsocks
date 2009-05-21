@@ -7,7 +7,7 @@ base {
 
 	/* possible `log' values are:
 	 *   stderr
-	 *   /path/to/file
+	 *   file:/path/to/file
 	 *   syslog:FACILITY  facility is any of "daemon", "local0"..."local7"
 	 */
 	log = stderr;
