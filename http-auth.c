@@ -162,7 +162,8 @@ static int extract_param(const char **source, param_token *name, param_token *va
 
 }
 
-char* digest_authentication_encode(const char *line, const char *user, const char *passwd, const char *method, const char *path, int count, const char *cnonce)
+char* digest_authentication_encode(const char *line, const char *user, const char *passwd, 
+		const char *method, const char *path, int count, const char *cnonce)
 {
 	char *realm = NULL, *opaque = NULL, *nonce = NULL, *qop = NULL;
 	char nc[9];
@@ -175,14 +176,22 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 		int namelen = name.e - name.b;
 		int valuelen = value.e - value.b;
 		
-		if (strncmp_nocase(name.b, "realm" , namelen) == 0) 
+		if (strncmp_nocase(name.b, "realm" , namelen) == 0) {
 			strncpy(realm  = (char *)malloc(valuelen + 1), value.b, valuelen);
-		if (strncmp_nocase(name.b, "opaque", namelen) == 0) 
+			realm[valuelen] = '\0';
+		}
+		if (strncmp_nocase(name.b, "opaque", namelen) == 0) {
 			strncpy(opaque = (char *)malloc(valuelen + 1), value.b, valuelen);
-		if (strncmp_nocase(name.b, "nonce" , namelen) == 0) 
+			opaque[valuelen] = '\0';
+		}
+		if (strncmp_nocase(name.b, "nonce" , namelen) == 0) {
 			strncpy(nonce  = (char *)malloc(valuelen + 1), value.b, valuelen);
-		if (strncmp_nocase(name.b, "qop"   , namelen) == 0) 
+			nonce[valuelen] = '\0';
+		}
+		if (strncmp_nocase(name.b, "qop"   , namelen) == 0) {
 			strncpy(qop    = (char *)malloc(valuelen + 1), value.b, valuelen);
+			qop[valuelen] = '\0';
+		}
 	}
 
 	if (!realm || !nonce || !user || !passwd || !path || !method) {

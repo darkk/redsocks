@@ -19,6 +19,7 @@ char* basic_authentication_encode(const char *user, const char *passwd);
  * only md5 method is available, see RFC 2617 for detail.
  *
  */
-char* digest_authentication_encode(const char *line, const char *user, const char *passwd, const char *method, const char *path, int count, const char *cnonce);
+char* digest_authentication_encode(const char *line, const char *user, const char *passwd, 
+		const char *method, const char *path, int count, const char *cnonce);
 
 #endif /* HTTP_AUTH_H */

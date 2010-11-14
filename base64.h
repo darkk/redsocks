@@ -40,7 +40,7 @@ int base64_decode(uint8_t *out, const char *in, int out_size);
  *
  * @param out      buffer for encoded data
  * @param out_size size in bytes of the output buffer, must be at
- *                 least AV_BASE64_SIZE(in_size)
+ *                 least BASE64_SIZE(in_size)
  * @param in_size  size in bytes of the 'in' buffer
  * @return         'out' or NULL in case of error
  */
