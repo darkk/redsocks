@@ -59,7 +59,7 @@ static char *get_auth_request_header(struct evbuffer *buf)
 		line = evbuffer_readline(buf);
 		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL)
 			return NULL;
-		if (strcasecmp(line, auth_request_header) == 0)
+		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
 			return line;
 	}
 }
@@ -186,10 +186,10 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 		redsocks_log_error(client, LOG_NOTICE, "find previous challange %s, apply it", auth->last_auth_query);
 
 
-		if (strcasecmp(auth->last_auth_query, "Basic") == 0) {
+		if (strncasecmp(auth->last_auth_query, "Basic", 5) == 0) {
 			auth_string = basic_authentication_encode(client->instance->config.login, client->instance->config.password);
 			auth_scheme = "Basic";
-		} else if (strcasecmp(auth->last_auth_query, "Digest") == 0) {
+		} else if (strncasecmp(auth->last_auth_query, "Digest", 6) == 0) {
 			/* calculate uri */
 			char uri[128];
 			snprintf(uri, 128, "%s:%u", inet_ntoa(client->destaddr.sin_addr), ntohs(client->destaddr.sin_port));

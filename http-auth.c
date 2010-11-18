@@ -235,7 +235,6 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 
 	/* prepare the final string */
 	int len = 256;
-	//if (!realm || !nonce || !user || !passwd || !path || !method) 
 	len += strlen(user);
 	len += strlen(realm);
 	len += strlen(nonce);
