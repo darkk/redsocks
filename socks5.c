@@ -339,11 +339,12 @@ static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 
 relay_subsys socks5_subsys =
 {
-	.name        = "socks5",
-	.payload_len = sizeof(socks5_client),
-	.readcb      = socks5_read_cb,
-	.writecb     = socks5_write_cb,
-	.init        = socks5_client_init,
+	.name                 = "socks5",
+	.payload_len          = sizeof(socks5_client),
+	.instance_payload_len = 0,
+	.readcb               = socks5_read_cb,
+	.writecb              = socks5_write_cb,
+	.init                 = socks5_client_init,
 };
 
 

@@ -133,11 +133,12 @@ static void socks4_write_cb(struct bufferevent *buffev, void *_arg)
 
 relay_subsys socks4_subsys =
 {
-	.name        = "socks4",
-	.payload_len = 0,
-	.readcb      = socks4_read_cb,
-	.writecb     = socks4_write_cb,
-	.init        = socks4_client_init,
+	.name                 = "socks4",
+	.payload_len          = 0,
+	.instance_payload_len = 0,
+	.readcb               = socks4_read_cb,
+	.writecb              = socks4_write_cb,
+	.init                 = socks4_client_init,
 };
 
 

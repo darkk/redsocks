@@ -22,8 +22,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <ctype.h>
 #include "log.h"
 #include "redsocks.h"
+#include "http-auth.h"
 
 typedef enum httpc_state_t {
 	httpc_new,
@@ -37,18 +40,28 @@ typedef enum httpc_state_t {
 #define HTTP_HEAD_WM_HIGH 4096  // that should be enough for one HTTP line.
 
 
-
 static void httpc_client_init(redsocks_client *client)
 {
-	if (client->instance->config.login)
-		redsocks_log_error(client, LOG_WARNING, "login is ignored for http-connect connections");
-
-	if (client->instance->config.password)
-		redsocks_log_error(client, LOG_WARNING, "password is ignored for http-connect connections");
-
 	client->state = httpc_new;
 }
 
+static struct evbuffer *httpc_mkconnect(redsocks_client *client);
+
+static const char *auth_request_header = "Proxy-Authenticate:";
+static const char *auth_response_header = "Proxy-Authorization:";
+static const time_t auth_error_gap = 60; // quit after connsective auth fail in a time interval, in secs
+
+static char *get_auth_request_header(struct evbuffer *buf)
+{
+	char *line;
+	for (;;) {
+		line = evbuffer_readline(buf);
+		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL)
+			return NULL;
+		if (strncmp_nocase(line, auth_request_header, strlen(auth_request_header)) == 0)
+			return line;
+	}
+}
 
 static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 {
@@ -65,10 +78,53 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 		if (line) {
 			unsigned int code;
 			if (sscanf(line, "HTTP/%*u.%*u %u", &code) == 1) { // 1 == one _assigned_ match
-				if (200 <= code && code <= 299) {
+				if (code == 407) { // auth failed
+					http_auth *auth = (void*)(client->instance + 1);
+
+					time_t now_time = time(NULL);
+					if (auth->last_auth_query != NULL && now_time - auth->last_auth_time < auth_error_gap) {
+
+						redsocks_log_error(client, LOG_NOTICE, "consective auth failure");
+						redsocks_drop_client(client);
+
+						dropped = 1;
+					} else {
+						free_null(auth->last_auth_query);
+
+						char *auth_request = get_auth_request_header(buffev->input);
+						char *ptr = auth_request;
+
+						ptr += strlen(auth_request_header);
+						while (isspace(*ptr))
+							ptr++;
+
+						auth->last_auth_query = calloc(strlen(ptr) + 1, 1);
+						strcpy(auth->last_auth_query, ptr);
+						auth->last_auth_time = now_time;
+						auth->last_auth_count = 0;
+
+						free(auth_request);
+						redsocks_log_error(client, LOG_NOTICE, "got challenge %s, restarting now", auth->last_auth_query);
+
+						if (bufferevent_disable(client->relay, EV_WRITE)) {
+							redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
+							return;
+						}
+
+						/* close relay tunnel */
+						close(EVENT_FD(&client->relay->ev_write));
+						bufferevent_free(client->relay);
+
+						/* set to initial state*/
+						client->state = httpc_new;
+
+						/* and reconnect */
+						redsocks_connect_relay(client);
+						return;
+					}
+				} else if (200 <= code && code <= 299) {
 					client->state = httpc_reply_came;
-				}
-				else {
+				} else {
 					redsocks_log_error(client, LOG_NOTICE, "%s", line);
 					redsocks_drop_client(client);
 					dropped = 1;
@@ -114,11 +170,57 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 		goto fail;
 	}
 
-	len = evbuffer_add_printf(buff,
-		"CONNECT %s:%u HTTP/1.0\r\n\r\n",
-		inet_ntoa(client->destaddr.sin_addr),
-		ntohs(client->destaddr.sin_port)
-	);
+	http_auth *auth = (void*)(client->instance + 1);
+
+	const char *auth_scheme = NULL, *auth_string = NULL;
+
+	if (auth->last_auth_query != NULL) {
+		++auth->last_auth_count;
+		/* find previous auth challange */
+		redsocks_log_error(client, LOG_NOTICE, "find previous challange %s, apply it", auth->last_auth_query);
+
+
+		if (strncmp_nocase(auth->last_auth_query, "Basic", 5) == 0) {
+			auth_string = basic_authentication_encode(client->instance->config.login, client->instance->config.password);
+			auth_scheme = "Basic";
+		} else if (strncmp_nocase(auth->last_auth_query, "Digest", 6) == 0) {
+			/* calculate uri */
+			char uri[128];
+			snprintf(uri, 128, "%s:%u", inet_ntoa(client->destaddr.sin_addr), ntohs(client->destaddr.sin_port));
+
+			/* prepare an random string for cnounce */
+
+			char cnounce[17];
+			srand(time(0));
+			for (int i = 0; i < 16; i += 4)
+				sprintf(cnounce + i, "%02x", rand() & 65535);
+
+			auth_string = digest_authentication_encode(auth->last_auth_query + 7, //line
+					client->instance->config.login, client->instance->config.password, //user, pass
+					"CONNECT", uri, auth->last_auth_count, cnounce); // method, path, nc, cnounce
+			auth_scheme = "Digest";
+		}
+		if (auth_string != NULL) {
+			redsocks_log_error(client, LOG_NOTICE, "prepared answer %s", auth_string);
+		}
+	}
+
+	if (auth_string == NULL) {
+		len = evbuffer_add_printf(buff,
+			"CONNECT %s:%u HTTP/1.0\r\n\r\n",
+			inet_ntoa(client->destaddr.sin_addr),
+			ntohs(client->destaddr.sin_port)
+		);
+	} else {
+		len = evbuffer_add_printf(buff,
+			"CONNECT %s:%u HTTP/1.0\r\n%s %s %s\r\n\r\n",
+			inet_ntoa(client->destaddr.sin_addr),
+			ntohs(client->destaddr.sin_port),
+			auth_response_header,
+			auth_scheme,
+			auth_string
+		);
+	}
 	if (len < 0) {
 		redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
 		goto fail;
@@ -154,11 +256,12 @@ static void httpc_write_cb(struct bufferevent *buffev, void *_arg)
 
 relay_subsys http_connect_subsys =
 {
-	.name        = "http-connect",
-	.payload_len = 0,
-	.readcb      = httpc_read_cb,
-	.writecb     = httpc_write_cb,
-	.init        = httpc_client_init,
+	.name                 = "http-connect",
+	.payload_len          = 0,
+	.instance_payload_len = sizeof(http_auth),
+	.readcb               = httpc_read_cb,
+	.writecb              = httpc_write_cb,
+	.init                 = httpc_client_init,
 };
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

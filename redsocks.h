@@ -18,6 +18,7 @@ struct redsocks_client_t;
 typedef struct relay_subsys_t {
 	char   *name;
 	size_t  payload_len; // size of relay-specific data in client section
+	size_t  instance_payload_len; // size of relay-specify data in instance section
 	evbuffercb readcb;
 	evbuffercb writecb;
 	void       (*init)(struct redsocks_client_t *client);

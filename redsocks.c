@@ -89,7 +89,13 @@ static parser_entry redsocks_entries[] =
 
 static int redsocks_onenter(parser_section *section)
 {
-	redsocks_instance *instance = calloc(1, sizeof(*instance));
+	// FIXME: find proper way to calulate instance_payload_len
+	int instance_payload_len = 0;
+	for (relay_subsys **ss = relay_subsystems; *ss; ++ss)
+		if (instance_payload_len < (*ss)->instance_payload_len)
+			instance_payload_len = (*ss)->instance_payload_len;
+
+	redsocks_instance *instance = calloc(1, sizeof(*instance) + instance_payload_len);
 	if (!instance) {
 		parser_error(section->context, "Not enough memory");
 		return -1;

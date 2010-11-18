@@ -57,13 +57,13 @@ char* basic_authentication_encode(const char *user, const char *passwd)
 {
 	/* prepare the user:pass key pair */
 	int pair_len = strlen(user) + 1 + strlen(passwd);
-	char *pair_ptr = (char*)malloc(pair_len + 1);
+	char *pair_ptr = calloc(pair_len + 1, 1);
 
 	sprintf(pair_ptr, "%s:%s", user, passwd);
 
 	/* calculate the final string length */
 	int basic_len = 6 + BASE64_SIZE(pair_len);
-	char *basic_ptr = (char*)malloc(basic_len + 1);
+	char *basic_ptr = calloc(basic_len + 1, 1);
 
 	strcpy(basic_ptr, "Basic ");
 
@@ -177,19 +177,19 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 		int valuelen = value.e - value.b;
 		
 		if (strncmp_nocase(name.b, "realm" , namelen) == 0) {
-			strncpy(realm  = (char *)malloc(valuelen + 1), value.b, valuelen);
+			strncpy(realm  = calloc(valuelen + 1, 1), value.b, valuelen);
 			realm[valuelen] = '\0';
 		}
 		if (strncmp_nocase(name.b, "opaque", namelen) == 0) {
-			strncpy(opaque = (char *)malloc(valuelen + 1), value.b, valuelen);
+			strncpy(opaque = calloc(valuelen + 1, 1), value.b, valuelen);
 			opaque[valuelen] = '\0';
 		}
 		if (strncmp_nocase(name.b, "nonce" , namelen) == 0) {
-			strncpy(nonce  = (char *)malloc(valuelen + 1), value.b, valuelen);
+			strncpy(nonce  = calloc(valuelen + 1, 1), value.b, valuelen);
 			nonce[valuelen] = '\0';
 		}
 		if (strncmp_nocase(name.b, "qop"   , namelen) == 0) {
-			strncpy(qop    = (char *)malloc(valuelen + 1), value.b, valuelen);
+			strncpy(qop    = calloc(valuelen + 1, 1), value.b, valuelen);
 			qop[valuelen] = '\0';
 		}
 	}
@@ -204,6 +204,9 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 
 	if (!qop && strncmp_nocase(qop, "auth", 4) != 0) { 
 		/* FIXME: currently don't support auth-int */
+		free_null(realm);
+		free_null(opaque);
+		free_null(nonce);
 		free_null(qop);
 		return NULL;
 	}

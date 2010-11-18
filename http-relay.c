@@ -254,12 +254,13 @@ static void httpr_connect_relay(redsocks_client *client)
 
 relay_subsys http_relay_subsys =
 {
-	.name          = "http-relay",
-	.payload_len   = sizeof(httpr_client),
-	.init          = httpr_client_init,
-	.fini          = httpr_client_fini,
-	.connect_relay = httpr_connect_relay,
-	.writecb       = httpr_relay_write_cb,
+	.name                 = "http-relay",
+	.payload_len          = sizeof(httpr_client),
+	.instance_payload_len = 0,
+	.init                 = httpr_client_init,
+	.fini                 = httpr_client_fini,
+	.connect_relay        = httpr_connect_relay,
+	.writecb              = httpr_relay_write_cb,
 };
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
