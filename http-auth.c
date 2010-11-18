@@ -32,27 +32,6 @@
 
 #include "http-auth.h"
 
-int strncmp_nocase(const char *a, const char *b, int num)
-{
-	if (!a || !b) {
-		if (!a && !b)
-			return 0;
-		return !a ? 1 : -1;
-	}
-	while (num --) {
-		if (!*a || !*b) {
-			if (!*a && !*b)
-				return 0;
-			return !*a ? 1 : -1;
-		}
-		if (tolower(*a) != tolower(*b))
-			return (int)tolower(*a) - (int)tolower(*b);
-		a ++;
-		b ++;
-	}
-	return 0;
-}
-
 char* basic_authentication_encode(const char *user, const char *passwd)
 {
 	/* prepare the user:pass key pair */
@@ -176,19 +155,19 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 		int namelen = name.e - name.b;
 		int valuelen = value.e - value.b;
 		
-		if (strncmp_nocase(name.b, "realm" , namelen) == 0) {
+		if (strncasecmp(name.b, "realm" , namelen) == 0) {
 			strncpy(realm  = calloc(valuelen + 1, 1), value.b, valuelen);
 			realm[valuelen] = '\0';
 		}
-		if (strncmp_nocase(name.b, "opaque", namelen) == 0) {
+		if (strncasecmp(name.b, "opaque", namelen) == 0) {
 			strncpy(opaque = calloc(valuelen + 1, 1), value.b, valuelen);
 			opaque[valuelen] = '\0';
 		}
-		if (strncmp_nocase(name.b, "nonce" , namelen) == 0) {
+		if (strncasecmp(name.b, "nonce" , namelen) == 0) {
 			strncpy(nonce  = calloc(valuelen + 1, 1), value.b, valuelen);
 			nonce[valuelen] = '\0';
 		}
-		if (strncmp_nocase(name.b, "qop"   , namelen) == 0) {
+		if (strncasecmp(name.b, "qop"   , namelen) == 0) {
 			strncpy(qop    = calloc(valuelen + 1, 1), value.b, valuelen);
 			qop[valuelen] = '\0';
 		}
@@ -202,7 +181,7 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 		return NULL;
 	}
 
-	if (!qop && strncmp_nocase(qop, "auth", 4) != 0) { 
+	if (!qop && strncasecmp(qop, "auth", 4) != 0) { 
 		/* FIXME: currently don't support auth-int */
 		free_null(realm);
 		free_null(opaque);

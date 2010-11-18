@@ -24,6 +24,7 @@
 #include <string.h>
 #include "log.h"
 #include "redsocks.h"
+#include "http-auth.h"
 
 typedef enum httpr_state_t {
 	httpr_new,
@@ -36,16 +37,13 @@ typedef struct httpr_client_t {
 	int has_host;
 } httpr_client;
 
+extern const char *auth_request_header;
+extern const char *auth_response_header;
+extern const time_t auth_error_gap; // quit after connsective auth fail in a time interval, in secs
 
 static void httpr_client_init(redsocks_client *client)
 {
 	httpr_client *httpr = (void*)(client +1);
-
-	if (client->instance->config.login)
-		redsocks_log_error(client, LOG_WARNING, "login is ignored for http-relay connections");
-
-	if (client->instance->config.password)
-		redsocks_log_error(client, LOG_WARNING, "password is ignored for http-relay connections");
 
 	client->state = httpr_new;
 	memset(httpr, 0, sizeof(*httpr));
@@ -256,7 +254,7 @@ relay_subsys http_relay_subsys =
 {
 	.name                 = "http-relay",
 	.payload_len          = sizeof(httpr_client),
-	.instance_payload_len = 0,
+	.instance_payload_len = sizeof(http_auth),
 	.init                 = httpr_client_init,
 	.fini                 = httpr_client_fini,
 	.connect_relay        = httpr_connect_relay,

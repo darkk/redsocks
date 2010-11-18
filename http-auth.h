@@ -7,8 +7,6 @@ typedef struct http_auth_t {
 	int last_auth_count;
 } http_auth;
 
-int strncmp_nocase(const char *a, const char *b, int num);
-
 /*
  * Create the authentication header contents for the `Basic' scheme.
  * This is done by encoding the string "USER:PASS" to base64 and
