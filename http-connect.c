@@ -50,7 +50,6 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client);
 
 extern const char *auth_request_header;
 extern const char *auth_response_header;
-extern const time_t auth_error_gap; // quit after connsective auth fail in a time interval, in secs
 
 static char *get_auth_request_header(struct evbuffer *buf)
 {
@@ -82,9 +81,8 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 				if (code == 407) { // auth failed
 					http_auth *auth = (void*)(client->instance + 1);
 
-					time_t now_time = time(NULL);
-					if (auth->last_auth_query != NULL && now_time - auth->last_auth_time < auth_error_gap && auth->last_auth_count == 1) {
-						redsocks_log_error(client, LOG_NOTICE, "consective auth failure");
+					if (auth->last_auth_query != NULL && auth->last_auth_count == 1) {
+						redsocks_log_error(client, LOG_NOTICE, "proxy auth failed");
 						redsocks_drop_client(client);
 
 						dropped = 1;
@@ -105,7 +103,6 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 
 						auth->last_auth_query = calloc(strlen(ptr) + 1, 1);
 						strcpy(auth->last_auth_query, ptr);
-						auth->last_auth_time = now_time;
 						auth->last_auth_count = 0;
 
 						free(auth_request);

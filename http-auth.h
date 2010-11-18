@@ -3,7 +3,6 @@
 
 typedef struct http_auth_t {
 	char *last_auth_query;
-	time_t last_auth_time;
 	int last_auth_count;
 } http_auth;
 
