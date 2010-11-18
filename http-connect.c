@@ -24,6 +24,7 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+#include <unistd.h>
 #include "log.h"
 #include "redsocks.h"
 #include "http-auth.h"
@@ -172,7 +173,8 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 
 	http_auth *auth = (void*)(client->instance + 1);
 
-	const char *auth_scheme = NULL, *auth_string = NULL;
+	const char *auth_scheme = NULL;
+	char *auth_string = NULL;
 
 	if (auth->last_auth_query != NULL) {
 		++auth->last_auth_count;
@@ -221,6 +223,9 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 			auth_string
 		);
 	}
+
+	free_null(auth_string);
+
 	if (len < 0) {
 		redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
 		goto fail;
