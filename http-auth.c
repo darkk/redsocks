@@ -295,3 +295,7 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 	free_null(qop);
 	return res;
 }
+
+const char *auth_request_header = "Proxy-Authenticate:";
+const char *auth_response_header = "Proxy-Authorization:";
+const time_t auth_error_gap = 60;
