@@ -430,12 +430,14 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 
 	redsocks_touch_client(client);
 
+	int line_count = 0;
+
 	while ( (line = evbuffer_readline(buffev->input)) && !connect_relay) {
 		int skip_line = 0;
 		int do_drop = 0;
 
 		if (strlen(line) > 0) {
-			if (httpr->client_buffer.len == 0) { // FOO uri HTTP/3.14
+			if (line_count ++ == 0) { // FOO uri HTTP/3.14
 				char *space = strchr(line, ' ');
 
 				if (space)
