@@ -91,7 +91,8 @@ static int redsocks_onenter(parser_section *section)
 {
 	// FIXME: find proper way to calulate instance_payload_len
 	int instance_payload_len = 0;
-	for (relay_subsys **ss = relay_subsystems; *ss; ++ss)
+	relay_subsys **ss;
+	FOREACH(ss, relay_subsystems)
 		if (instance_payload_len < (*ss)->instance_payload_len)
 			instance_payload_len = (*ss)->instance_payload_len;
 
