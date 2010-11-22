@@ -92,37 +92,43 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 
 						dropped = 1;
 					} else {
-						free_null(auth->last_auth_query);
-
 						char *auth_request = get_auth_request_header(buffev->input);
-						char *ptr = auth_request;
 
-						ptr += strlen(auth_request_header);
-						while (isspace(*ptr))
-							ptr++;
+						if (!auth_request) {
+							redsocks_log_error(client, LOG_NOTICE, "403 found, but no proxy auth challenge");
+							redsocks_drop_client(client);
+							dropped = 1;
+						} else {
+							free_null(auth->last_auth_query);
+							char *ptr = auth_request;
 
-						auth->last_auth_query = calloc(strlen(ptr) + 1, 1);
-						strcpy(auth->last_auth_query, ptr);
-						auth->last_auth_count = 0;
+							ptr += strlen(auth_request_header);
+							while (isspace(*ptr))
+								ptr++;
 
-						free(auth_request);
-						redsocks_log_error(client, LOG_NOTICE, "got challenge %s, restarting now", auth->last_auth_query);
+							auth->last_auth_query = calloc(strlen(ptr) + 1, 1);
+							strcpy(auth->last_auth_query, ptr);
+							auth->last_auth_count = 0;
 
-						if (bufferevent_disable(client->relay, EV_WRITE)) {
-							redsocks_log_errno(client, LOG_ERR, "bufferevent_disable");
+							free(auth_request);
+							redsocks_log_error(client, LOG_NOTICE, "got challenge %s, restarting now", auth->last_auth_query);
+
+							if (bufferevent_disable(client->relay, EV_WRITE)) {
+								redsocks_log_errno(client, LOG_ERR, "bufferevent_disable");
+								return;
+							}
+
+							/* close relay tunnel */
+							close(EVENT_FD(&client->relay->ev_write));
+							bufferevent_free(client->relay);
+
+							/* set to initial state*/
+							client->state = httpc_new;
+
+							/* and reconnect */
+							redsocks_connect_relay(client);
 							return;
 						}
-
-						/* close relay tunnel */
-						close(EVENT_FD(&client->relay->ev_write));
-						bufferevent_free(client->relay);
-
-						/* set to initial state*/
-						client->state = httpc_new;
-
-						/* and reconnect */
-						redsocks_connect_relay(client);
-						return;
 					}
 				} else if (200 <= code && code <= 299) {
 					client->state = httpc_reply_came;
