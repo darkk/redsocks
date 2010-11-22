@@ -248,8 +248,15 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 	redsocks_touch_client(client);
 
 	if (client->state == httpr_new) {
-		if (httpr->firstline)
+		if (httpr->firstline) {
 			len = bufferevent_write(client->relay, httpr->firstline, strlen(httpr->firstline));
+			if (len < 0) {
+				redsocks_log_errno(client, LOG_ERR, "bufferevent_write");
+				redsocks_drop_client(client);
+				return;
+			}
+		}
+
 
 		http_auth *auth = (void*)(client->instance + 1);
 		++auth->last_auth_count;
@@ -301,21 +308,7 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 			}
 		}
 
-		if (len < 0) {
-			redsocks_log_errno(client, LOG_ERR, "bufferevent_write");
-			redsocks_drop_client(client);
-			return;
-		}
-
-		len = bufferevent_write(client->relay, httpr->client_buffer.buff, httpr->client_buffer.len);
-		if (len < 0) {
-			redsocks_log_errno(client, LOG_ERR, "bufferevent_write");
-			redsocks_drop_client(client);
-			return;
-		}
-
 		if (auth_string != NULL) {
-
 			len = 0;
 			len |= bufferevent_write(client->relay, auth_response_header, strlen(auth_response_header));
 			len |= bufferevent_write(client->relay, " ", 1);
@@ -330,13 +323,14 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 			}
 		}
 
-		if (bufferevent_write(client->relay, "\r\n", 2)) {
+		free_null(auth_string);
+
+		len = bufferevent_write(client->relay, httpr->client_buffer.buff, httpr->client_buffer.len);
+		if (len < 0) {
 			redsocks_log_errno(client, LOG_ERR, "bufferevent_write");
 			redsocks_drop_client(client);
 			return;
 		}
-
-		free_null(auth_string);
 
 		client->state = httpr_request_sent;
 
@@ -351,7 +345,7 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 // drops client on failure
 static int httpr_append_header(redsocks_client *client, char *line)
 {
-	httpr_client *httpr = (void*)(client +1);
+	httpr_client *httpr = (void*)(client + 1);
 
 	if (httpr_buffer_append(&httpr->client_buffer, line, strlen(line)) != 0)
 		return -1;
@@ -431,6 +425,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 	redsocks_touch_client(client);
 
 	int line_count = 0;
+	int content_len = -1; // Content Length for POST Method, -1 if not set
 
 	while ( (line = evbuffer_readline(buffev->input)) && !connect_relay) {
 		int skip_line = 0;
@@ -459,6 +454,10 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 				skip_line = 1;
 			else if (strncasecmp(line, "Connection", 10) == 0)
 				skip_line = 1;
+			else if (strncasecmp(line, "Content-Length", 14) == 0) {
+				if (sscanf(line + 15, "%d", &content_len) != 1 || content_len < 0) 
+					content_len = -1;
+			}
 		}
 		else { // last line of request
 			if (httpr->firstline) {
@@ -483,7 +482,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 			connect_relay = 1;
 		}
 
-		if (line && !skip_line && strlen(line))
+		if (line && !skip_line)
 			if (httpr_append_header(client, line) < 0)
 				do_drop = 1;
 
@@ -495,8 +494,22 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 		}
 	}
 
-	if (connect_relay)
+	if (connect_relay) {
+		if (content_len != -1) { // POST Data detected
+			int to_read = content_len, now_to_read, read_bytes;
+			static int post_buffer_len = 256 * 1024;
+			unsigned char post_buffer[post_buffer_len];
+			while (to_read > 0) {
+				now_to_read = to_read > 256 * 1024 ? 256 * 1024 : to_read;
+				read_bytes = evbuffer_remove(buffev->input, post_buffer, now_to_read);
+				if (read_bytes <= 0)
+					break;
+				to_read -= read_bytes;
+				httpr_buffer_append(&httpr->client_buffer, post_buffer, read_bytes);
+			}
+		}
 		redsocks_connect_relay(client);
+	}
 }
 
 static void httpr_connect_relay(redsocks_client *client)
