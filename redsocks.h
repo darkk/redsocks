@@ -25,6 +25,8 @@ typedef struct relay_subsys_t {
 	void       (*fini)(struct redsocks_client_t *client);
 	// connect_relay (if any) is called instead of redsocks_connect_relay after client connection acceptance
 	void       (*connect_relay)(struct redsocks_client_t *client);
+	// client_eof is called while relay is not set up but EOF from client is received
+	void       (*client_eof)(struct redsocks_client_t *client);
 } relay_subsys;
 
 typedef struct redsocks_config_t {

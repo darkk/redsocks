@@ -412,6 +412,8 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 	if (httpr_buffer_append(&nbuff, "\x0d\x0a", 2) != 0)
 		goto addition_fail;
 
+	free_null(httpr->firstline);
+
 	httpr->firstline = calloc(nbuff.len + 1, 1);
 	strcpy(httpr->firstline, nbuff.buff);
 	httpr_buffer_fini(&nbuff);
@@ -458,6 +460,12 @@ static void httpr_client_read_content(struct bufferevent *buffev, redsocks_clien
 		client->state = httpr_recv_request;
 		redsocks_connect_relay(client);
 	}
+}
+
+static void httpr_client_eof(redsocks_client *client)
+{
+	client->state = httpr_recv_request;
+	redsocks_connect_relay(client);
 }
 
 static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
@@ -575,6 +583,7 @@ relay_subsys http_relay_subsys =
 	.connect_relay        = httpr_connect_relay,
 	.readcb               = httpr_relay_read_cb,
 	.writecb              = httpr_relay_write_cb,
+	.client_eof           = httpr_client_eof,
 };
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
