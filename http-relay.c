@@ -98,7 +98,7 @@ static int httpr_buffer_append(httpr_buffer *buff, const char *data, int len)
 
 static void httpr_client_init(redsocks_client *client)
 {
-	httpr_client *httpr = (void*)(client +1);
+	httpr_client *httpr = (void*)(client + 1);
 
 	client->state = httpr_new;
 	memset(httpr, 0, sizeof(*httpr));
@@ -108,10 +108,21 @@ static void httpr_client_init(redsocks_client *client)
 
 static void httpr_client_fini(redsocks_client *client)
 {
-	httpr_client *httpr = (void*)(client +1);
+	httpr_client *httpr = (void*)(client + 1);
 
+	free_null(httpr->firstline);
+	httpr->firstline = NULL;
+	free_null(httpr->host);
+	httpr->host = NULL;
 	httpr_buffer_fini(&httpr->client_buffer);
 	httpr_buffer_fini(&httpr->relay_buffer);
+}
+
+static void httpr_instance_fini(redsocks_instance *instance)
+{
+	http_auth *auth = (void*)(instance + 1);
+	free_null(auth->last_auth_query);
+	auth->last_auth_query = NULL;
 }
 
 static char *get_auth_request_header(struct evbuffer *buf)
@@ -119,10 +130,13 @@ static char *get_auth_request_header(struct evbuffer *buf)
 	char *line;
 	for (;;) {
 		line = evbuffer_readline(buf);
-		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL)
+		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
+			free_null(line);
 			return NULL;
+		}
 		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
 			return line;
+		free(line);
 	}
 }
 
@@ -136,6 +150,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 
 	redsocks_touch_client(client);
 
+	httpr_buffer_fini(&httpr->relay_buffer);
 	httpr_buffer_init(&httpr->relay_buffer);
 
 	if (client->state == httpr_request_sent) {
@@ -160,6 +175,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 
 						dropped = 1;
 					} else {
+						free(line);
 						char *auth_request = get_auth_request_header(buffev->input);
 
 						if (!auth_request) {
@@ -584,6 +600,7 @@ relay_subsys http_relay_subsys =
 	.readcb               = httpr_relay_read_cb,
 	.writecb              = httpr_relay_write_cb,
 	.client_eof           = httpr_client_eof,
+	.instance_fini        = httpr_instance_fini,
 };
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

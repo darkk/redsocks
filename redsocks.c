@@ -807,6 +807,9 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 		}
 	}
 
+	if (instance->relay_ss->instance_fini)
+		instance->relay_ss->instance_fini(instance);
+
 	if (event_initialized(&instance->listener)) {
 		if (event_del(&instance->listener) != 0)
 			log_errno(LOG_WARNING, "event_del");

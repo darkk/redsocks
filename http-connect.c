@@ -46,6 +46,13 @@ static void httpc_client_init(redsocks_client *client)
 	client->state = httpc_new;
 }
 
+static void httpc_instance_fini(redsocks_instance *instance)
+{
+	http_auth *auth = (void*)(instance + 1);
+	free_null(auth->last_auth_query);
+	auth->last_auth_query = NULL;
+}
+
 static struct evbuffer *httpc_mkconnect(redsocks_client *client);
 
 extern const char *auth_request_header;
@@ -56,10 +63,13 @@ static char *get_auth_request_header(struct evbuffer *buf)
 	char *line;
 	for (;;) {
 		line = evbuffer_readline(buf);
-		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL)
+		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
+			free_null(line);
 			return NULL;
+		}
 		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
 			return line;
+		free(line);
 	}
 }
 
@@ -99,6 +109,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 							redsocks_drop_client(client);
 							dropped = 1;
 						} else {
+							free(line);
 							free_null(auth->last_auth_query);
 							char *ptr = auth_request;
 
@@ -272,6 +283,7 @@ relay_subsys http_connect_subsys =
 	.readcb               = httpc_read_cb,
 	.writecb              = httpc_write_cb,
 	.init                 = httpc_client_init,
+	.instance_fini        = httpc_instance_fini,
 };
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
