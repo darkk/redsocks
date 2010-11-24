@@ -38,6 +38,7 @@ app_subsys *subsystems[] = {
 };
 
 static const char *confname = "redsocks.conf";
+static const char *pidfile = NULL;
 
 static void terminate(int sig, short what, void *_arg)
 {
@@ -55,7 +56,7 @@ int main(int argc, char **argv)
 	int opt;
 	int i;
 
-	while ((opt = getopt(argc, argv, "tc:")) != -1) {
+	while ((opt = getopt(argc, argv, "tc:p:")) != -1) {
 		switch (opt) {
 		case 't':
 			conftest = true;
@@ -63,10 +64,14 @@ int main(int argc, char **argv)
 		case 'c':
 			confname = optarg;
 			break;
+		case 'p':
+			pidfile = optarg;
+			break;
 		default:
 			printf(
-				"Usage: %s [-t] [-c config]\n"
-				"  -t           test config syntax\n",
+				"Usage: %s [-t] [-c config] [-p pidfile]\n"
+				"  -t           test config syntax\n"
+				"  -p           write pid to pidfile\n",
 				argv[0]);
 			return EXIT_FAILURE;
 		}
@@ -91,6 +96,7 @@ int main(int argc, char **argv)
 	error = parser_run(parser);
 	parser_stop(parser);
 	fclose(f);
+
 	if (error)
 		return EXIT_FAILURE;
 
@@ -105,6 +111,16 @@ int main(int argc, char **argv)
 			if (error)
 				goto shutdown;
 		}
+	}
+
+	if (pidfile) {
+		f = fopen(pidfile, "w");
+		if (!f) {
+			perror("Unable to open pidfile for write");
+			return EXIT_FAILURE;
+		}
+		fprintf(f, "%d\n", getpid());
+		fclose(f);
 	}
 
 	assert(SIZEOF_ARRAY(exit_signals) == SIZEOF_ARRAY(terminators));

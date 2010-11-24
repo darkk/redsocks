@@ -267,7 +267,6 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 	httpr_client *httpr = (void*)(client + 1);
 	int len = 0;
 
-	assert(httpr->client_buffer.len);
 	assert(client->state >= httpr_recv_request);
 
 	redsocks_touch_client(client);
