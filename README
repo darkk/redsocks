@@ -28,8 +28,9 @@ Features
 Redirect any TCP connection to SOCKS4, SOCKS5 or HTTPS (HTTP/CONNECT)
 proxy server.
 
-Login/password authentication is supported for SOCKS5 connections.
-SOCKS4 supports only username, password is ignored.
+Login/password authentication is supported for SOCKS5/HTTPS connections.
+SOCKS4 supports only username, password is ignored. for HTTPS, currently
+only Basic and Digest scheme is supported.
 
 Redirect any HTTP connection to proxy that does not support transparent
 proxying (e.g. old SQUID had broken `acl myport' for such connections).
@@ -50,7 +51,7 @@ Compilation
 
 libevent[5] is required.
 
-gcc is only supported compiler right now, other compilers can be used
+gcc and clang are supported right now, other compilers can be used
 but may require some code changes.
 
 Compilation is as easy as running `make', there is no `./configure' magic.
@@ -66,6 +67,7 @@ Running
 Program has only two command-line options:
  -c   sets proper path to config file ("./redsocks.conf" is default one)
  -t   tests config file syntax
+ -p   set a file to write the getpid() into
 
 Following signals are understood:
 SIGUSR1 dumps list of connected clients to log
