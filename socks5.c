@@ -146,18 +146,17 @@ static struct evbuffer *socks5_mkmethods(redsocks_client *client)
 {
 	socks5_client *socks5 = (void*)(client + 1);
 	int len = sizeof(socks5_method_req) + socks5->do_password;
-	union {
-		socks5_method_req req;
-		uint8_t raw[len];
-	} u;
+	socks5_method_req *req = calloc(1, len);
 
-	u.req.ver = socks5_ver;
-	u.req.num_methods = 1 + socks5->do_password;
-	u.req.methods[0] = socks5_auth_none;
+	req->ver = socks5_ver;
+	req->num_methods = 1 + socks5->do_password;
+	req->methods[0] = socks5_auth_none;
 	if (socks5->do_password)
-		u.req.methods[1] = socks5_auth_password;
+		req->methods[1] = socks5_auth_password;
 
-	return mkevbuffer(&u.req, len);
+	struct evbuffer *ret = mkevbuffer(req, len);
+	free(req);
+	return ret;
 }
 
 static struct evbuffer *socks5_mkpassword(redsocks_client *client)

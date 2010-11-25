@@ -111,13 +111,13 @@ static int redsocks_onenter(parser_section *section)
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
-			(strcmp(entry->key, "local_ip") == 0)   ? &instance->config.bindaddr.sin_addr :
-			(strcmp(entry->key, "local_port") == 0) ? &instance->config.bindaddr.sin_port :
-			(strcmp(entry->key, "ip") == 0)         ? &instance->config.relayaddr.sin_addr :
-			(strcmp(entry->key, "port") == 0)       ? &instance->config.relayaddr.sin_port :
-			(strcmp(entry->key, "type") == 0)       ? &instance->config.type :
-			(strcmp(entry->key, "login") == 0)      ? &instance->config.login :
-			(strcmp(entry->key, "password") == 0)   ? &instance->config.password :
+			(strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
+			(strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
+			(strcmp(entry->key, "ip") == 0)         ? (void*)&instance->config.relayaddr.sin_addr :
+			(strcmp(entry->key, "port") == 0)       ? (void*)&instance->config.relayaddr.sin_port :
+			(strcmp(entry->key, "type") == 0)       ? (void*)&instance->config.type :
+			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
+			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
 			NULL;
 	section->data = instance;
 	return 0;
@@ -198,7 +198,7 @@ void redsocks_log_write(
 	va_start(ap, orig_fmt);
 	if (fmt) {
 		errno = saved_errno;
-		_log_vwrite(file, line, func, do_errno, priority, fmt->buffer, ap);
+		_log_vwrite(file, line, func, do_errno, priority, (const char*)fmt->buffer, ap);
 		evbuffer_free(fmt);
 	}
 	va_end(ap);
@@ -388,7 +388,7 @@ static int redsocks_socket_geterrno(redsocks_client *client, struct bufferevent 
 
 	assert(EVENT_FD(&buffev->ev_read) == EVENT_FD(&buffev->ev_write));
 
-	error = getsockopt(EVENT_FD(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
+	error = getsockopt(EVENT_FD(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, (socklen_t*)&optlen);
 	if (error) {
 		redsocks_log_errno(client, LOG_ERR, "getsockopt");
 		return -1;

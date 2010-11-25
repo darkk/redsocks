@@ -99,18 +99,17 @@ static struct evbuffer *socks4_mkconnect(redsocks_client *client)
 	const redsocks_config *config = &client->instance->config;
 	const char *username = config->login ? config->login : "";
 	int len = sizeof(socks4_req) + strlen(username);
-	union {
-		socks4_req req;
-		uint8_t raw[len];
-	} u;
+	socks4_req *req = calloc(1, len);
 
-	u.req.ver = socks4_ver;
-	u.req.cmd = socks4_cmd_connect;
-	u.req.port = client->destaddr.sin_port;
-	u.req.addr = client->destaddr.sin_addr.s_addr;
-	strcpy(u.req.login, username);
+	req->ver = socks4_ver;
+	req->cmd = socks4_cmd_connect;
+	req->port = client->destaddr.sin_port;
+	req->addr = client->destaddr.sin_addr.s_addr;
+	strcpy(req->login, username);
 
-	return mkevbuffer(&u.req, len);
+	struct evbuffer *ret = mkevbuffer(req, len);
+	free(req);
+	return ret;
 }
 
 static void socks4_write_cb(struct bufferevent *buffev, void *_arg)

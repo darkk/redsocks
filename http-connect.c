@@ -122,7 +122,6 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 							auth->last_auth_count = 0;
 
 							free(auth_request);
-							redsocks_log_error(client, LOG_NOTICE, "got challenge %s, restarting now", auth->last_auth_query);
 
 							if (bufferevent_disable(client->relay, EV_WRITE)) {
 								redsocks_log_errno(client, LOG_ERR, "bufferevent_disable");
@@ -197,7 +196,6 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 
 	if (auth->last_auth_query != NULL) {
 		/* find previous auth challange */
-		redsocks_log_error(client, LOG_NOTICE, "find previous challange %s, apply it", auth->last_auth_query);
 
 		if (strncasecmp(auth->last_auth_query, "Basic", 5) == 0) {
 			auth_string = basic_authentication_encode(client->instance->config.login, client->instance->config.password);
@@ -217,9 +215,6 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 					client->instance->config.login, client->instance->config.password, //user, pass
 					"CONNECT", uri, auth->last_auth_count, cnounce); // method, path, nc, cnounce
 			auth_scheme = "Digest";
-		}
-		if (auth_string != NULL) {
-			redsocks_log_error(client, LOG_NOTICE, "prepared answer %s", auth_string);
 		}
 	}
 

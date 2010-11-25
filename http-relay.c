@@ -195,7 +195,6 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 							auth->last_auth_count = 0;
 
 							free(auth_request);
-							redsocks_log_error(client, LOG_NOTICE, "got challenge %s, restarting now", auth->last_auth_query);
 
 							httpr_buffer_fini(&httpr->relay_buffer);
 
@@ -290,12 +289,11 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 
 		if (auth->last_auth_query != NULL) {
 			/* find previous auth challange */
-			redsocks_log_error(client, LOG_NOTICE, "find previous challange %s, apply it", auth->last_auth_query);
 
 			if (strncasecmp(auth->last_auth_query, "Basic", 5) == 0) {
 				auth_string = basic_authentication_encode(client->instance->config.login, client->instance->config.password);
 				auth_scheme = "Basic";
-			} else if (strncasecmp(auth->last_auth_query, "Digest", 6) == 0) {
+			} else if (strncasecmp(auth->last_auth_query, "Digest", 6) == 0 && httpr->firstline) {
 				/* calculate method & uri */
 				char *ptr = strchr(httpr->firstline, ' ');
 				char *method = calloc(ptr - httpr->firstline + 1, 1);
@@ -326,9 +324,6 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 				free_null(method);
 				free_null(uri);
 				auth_scheme = "Digest";
-			}
-			if (auth_string != NULL) {
-				redsocks_log_error(client, LOG_NOTICE, "prepared answer %s", auth_string);
 			}
 		}
 
@@ -500,6 +495,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 
 	if (client->state == httpr_recv_request_headers) {
 		httpr_client_read_content(buffev, client);
+		return;
 	}
 
 	char *line = NULL;
