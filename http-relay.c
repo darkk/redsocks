@@ -450,7 +450,6 @@ static void httpr_client_read_content(struct bufferevent *buffev, redsocks_clien
 	static int post_buffer_len = 64 * 1024;
 	char *post_buffer = calloc(post_buffer_len, 1);
 	if (!post_buffer) {
-		free(post_buffer);
 		redsocks_log_error(client, LOG_ERR, "run out of memory");
 		redsocks_drop_client(client);
 		return;
