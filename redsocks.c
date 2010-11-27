@@ -477,21 +477,13 @@ void redsocks_write_helper(
 static void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
-	int pseudo_errno;
 
 	assert(buffev == client->relay);
 
 	redsocks_touch_client(client);
 
-	pseudo_errno = redsocks_socket_geterrno(client, buffev);
-	if (pseudo_errno == -1) {
-		redsocks_log_errno(client, LOG_NOTICE, "redsocks_socket_geterrno");
-		goto fail;
-	}
-
-	if (pseudo_errno) {
-		errno = pseudo_errno;
-		redsocks_log_errno(client, LOG_NOTICE, "connect");
+	if (!red_is_socket_connected_ok(buffev)) {
+		redsocks_log_errno(client, LOG_NOTICE, "red_is_socket_connected_ok");
 		goto fail;
 	}
 

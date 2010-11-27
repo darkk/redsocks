@@ -103,4 +103,21 @@ int fcntl_nonblock(int fd)
 	return 0;
 }
 
+int red_is_socket_connected_ok(struct bufferevent *buffev)
+{
+	int pseudo_errno = red_socket_geterrno(buffev);
+
+	if (pseudo_errno == -1) {
+		return 0;
+	}
+	else if (pseudo_errno) {
+		errno = pseudo_errno;
+		log_errno(LOG_NOTICE, "connect");
+		return 0;
+	}
+	else {
+		return 1;
+	}
+}
+
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

@@ -26,6 +26,8 @@
 time_t redsocks_time(time_t *t);
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg);
 int red_socket_geterrno(struct bufferevent *buffev);
+int red_is_socket_connected_ok(struct bufferevent *buffev);
+
 int fcntl_nonblock(int fd);
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
