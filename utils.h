@@ -2,6 +2,9 @@
 #define UTILS_H_SAT_FEB__2_02_24_05_2008
 
 #include <stddef.h>
+#include <time.h>
+#include <netinet/in.h>
+#include <event.h>
 
 
 #define SIZEOF_ARRAY(arr)        (sizeof(arr) / sizeof(arr[0]))
@@ -20,6 +23,10 @@
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+time_t redsocks_time(time_t *t);
+struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg);
+int red_socket_geterrno(struct bufferevent *buffev);
+int fcntl_nonblock(int fd);
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */

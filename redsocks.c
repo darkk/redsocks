@@ -19,7 +19,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
@@ -41,26 +40,6 @@
 static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 
 
-/** simple fcntl(2) wrapper, provides errno and all logging to caller
- * I have to use it in event-driven code because of accept(2) (see NOTES)
- * and connect(2) (see ERRORS about EINPROGRESS)
- */
-static int fcntl_nonblock(int fd)
-{
-	int error;
-	int flags;
-
-	flags = fcntl(fd, F_GETFL);
-	if (flags == -1)
-		return -1;
-
-	error = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-	if (error)
-		return -1;
-
-	return 0;
-}
-
 extern relay_subsys http_connect_subsys;
 extern relay_subsys http_relay_subsys;
 extern relay_subsys socks4_subsys;
@@ -73,7 +52,7 @@ static relay_subsys *relay_subsystems[] =
 	&socks5_subsys,
 };
 
-list_head instances = LIST_HEAD_INIT(instances);
+static list_head instances = LIST_HEAD_INIT(instances);
 
 static parser_entry redsocks_entries[] =
 {
@@ -196,16 +175,6 @@ void redsocks_log_write(
 	}
 	va_end(ap);
 }
-
-static time_t redsocks_time(time_t *t)
-{
-	time_t retval;
-	retval = time(t);
-	if (retval == ((time_t) -1))
-		log_errno(LOG_WARNING, "time");
-	return retval;
-}
-
 
 void redsocks_touch_client(redsocks_client *client)
 {
@@ -375,15 +344,9 @@ static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffe
 // I assume that -1 is invalid errno value
 static int redsocks_socket_geterrno(redsocks_client *client, struct bufferevent *buffev)
 {
-	int error;
-	int pseudo_errno;
-	size_t optlen = sizeof(pseudo_errno);
-
-	assert(EVENT_FD(&buffev->ev_read) == EVENT_FD(&buffev->ev_write));
-
-	error = getsockopt(EVENT_FD(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
-	if (error) {
-		redsocks_log_errno(client, LOG_ERR, "getsockopt");
+	int pseudo_errno = red_socket_geterrno(buffev);
+	if (pseudo_errno == -1) {
+		redsocks_log_errno(client, LOG_ERR, "red_socket_geterrno");
 		return -1;
 	}
 	return pseudo_errno;
@@ -543,53 +506,12 @@ fail:
 
 void redsocks_connect_relay(redsocks_client *client)
 {
-	int on = 1;
-	int relay_fd = -1;
-	int error;
-
-	relay_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (relay_fd == -1) {
-		redsocks_log_errno(client, LOG_ERR, "socket");
-		goto fail;
-	}
-
-	error = fcntl_nonblock(relay_fd);
-	if (error) {
-		redsocks_log_errno(client, LOG_ERR, "fcntl");
-		goto fail;
-	}
-
-	error = setsockopt(relay_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
-	if (error) {
-		redsocks_log_errno(client, LOG_WARNING, "setsockopt");
-		goto fail;
-	}
-
-	error = connect(relay_fd, (struct sockaddr*)&client->instance->config.relayaddr, sizeof(client->instance->config.relayaddr));
-	if (error && errno != EINPROGRESS) {
-		redsocks_log_errno(client, LOG_NOTICE, "connect");
-		goto fail;
-	}
-
-	client->relay = bufferevent_new(relay_fd, NULL, redsocks_relay_connected, redsocks_event_error, client);
+	client->relay = red_connect_relay(&client->instance->config.relayaddr,
+			                          redsocks_relay_connected, redsocks_event_error, client);
 	if (!client->relay) {
-		redsocks_log_errno(client, LOG_ERR, "bufferevent_new");
-		goto fail;
+		redsocks_log_errno(client, LOG_ERR, "red_connect_relay");
+		redsocks_drop_client(client);
 	}
-	relay_fd = -1;
-
-	error = bufferevent_enable(client->relay, EV_WRITE); // we wait for connection...
-	if (error) {
-		redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
-		goto fail;
-	}
-
-	return; // OK
-
-fail:
-	if (relay_fd != -1)
-		close(relay_fd);
-	redsocks_drop_client(client);
 }
 
 static void redsocks_accept_client(int fd, short what, void *_arg)
