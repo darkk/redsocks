@@ -30,6 +30,15 @@ int red_is_socket_connected_ok(struct bufferevent *buffev);
 
 int fcntl_nonblock(int fd);
 
+#define event_fmt_str "%s|%s|%s|%s|%s|0x%x"
+#define event_fmt(what) \
+				(what) & EVBUFFER_READ ? "EVBUFFER_READ" : "0", \
+				(what) & EVBUFFER_WRITE ? "EVBUFFER_WRITE" : "0", \
+				(what) & EVBUFFER_EOF ? "EVBUFFER_EOF" : "0", \
+				(what) & EVBUFFER_ERROR ? "EVBUFFER_ERROR" : "0", \
+				(what) & EVBUFFER_TIMEOUT ? "EVBUFFER_TIMEOUT" : "0", \
+				(what) & ~(EVBUFFER_READ|EVBUFFER_WRITE|EVBUFFER_EOF|EVBUFFER_ERROR|EVBUFFER_TIMEOUT)
+
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */
 #endif /* UTILS_H_SAT_FEB__2_02_24_05_2008 */

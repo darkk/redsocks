@@ -373,14 +373,9 @@ static void redsocks_event_error(struct bufferevent *buffev, short what, void *_
 	}
 	else {
 		errno = redsocks_socket_geterrno(client, buffev);
-		redsocks_log_errno(client, LOG_NOTICE, "%s error, code %s|%s|%s|%s|%s == %X",
+		redsocks_log_errno(client, LOG_NOTICE, "%s error, code " event_fmt_str,
 				buffev == client->relay ? "relay" : "client",
-				what & EVBUFFER_READ ? "EVBUFFER_READ" : "0",
-				what & EVBUFFER_WRITE ? "EVBUFFER_WRITE" : "0",
-				what & EVBUFFER_EOF ? "EVBUFFER_EOF" : "0",
-				what & EVBUFFER_ERROR ? "EVBUFFER_ERROR" : "0",
-				what & EVBUFFER_TIMEOUT ? "EVBUFFER_TIMEOUT" : "0",
-				what);
+				event_fmt(what));
 		redsocks_drop_client(client);
 	}
 }
