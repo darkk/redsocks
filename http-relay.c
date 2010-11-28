@@ -34,7 +34,6 @@
 typedef enum httpr_state_t {
 	httpr_new,
 	httpr_recv_request_headers,
-	httpr_recv_request,
 	httpr_request_sent,
 	httpr_reply_came,
 	httpr_headers_skipped,
@@ -53,7 +52,6 @@ typedef struct httpr_client_t {
 	int has_host;
 	httpr_buffer client_buffer;
 	httpr_buffer relay_buffer;
-	int content_len_left;
 } httpr_client;
 
 extern const char *auth_request_header;
@@ -208,7 +206,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 							bufferevent_free(client->relay);
 
 							/* set to initial state*/
-							client->state = httpr_recv_request;
+							client->state = httpr_recv_request_headers;
 
 							/* and reconnect */
 							redsocks_connect_relay(client);
@@ -266,11 +264,11 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 	httpr_client *httpr = (void*)(client + 1);
 	int len = 0;
 
-	assert(client->state >= httpr_recv_request);
+	assert(client->state >= httpr_recv_request_headers);
 
 	redsocks_touch_client(client);
 
-	if (client->state == httpr_recv_request) {
+	if (client->state == httpr_recv_request_headers) {
 		if (httpr->firstline) {
 			len = bufferevent_write(client->relay, httpr->firstline, strlen(httpr->firstline));
 			if (len < 0) {
@@ -315,7 +313,7 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 				char cnounce[17];
 				srand(time(0));
 				for (int i = 0; i < 16; i += 4)
-					sprintf(cnounce + i, "%02x", rand() & 65535);
+					sprintf(cnounce + i, "%04x", rand() & 65535);
 
 				auth_string = digest_authentication_encode(auth->last_auth_query + 7, //line
 						client->instance->config.login, client->instance->config.password, //user, pass
@@ -356,8 +354,6 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 		buffev->wm_read.low = 1;
 		buffev->wm_read.high = HTTP_HEAD_WM_HIGH;
 		bufferevent_enable(buffev, EV_READ);
-	} else if (client->state >= httpr_request_sent) { 
-		bufferevent_disable(buffev, EV_WRITE);
 	}
 }
 
@@ -440,8 +436,6 @@ static void httpr_client_read_content(struct bufferevent *buffev, redsocks_clien
 {
 	httpr_client *httpr = (void*)(client + 1);
 
-	assert(client->state == httpr_recv_request_headers);
-
 	static int post_buffer_len = 64 * 1024;
 	char *post_buffer = calloc(post_buffer_len, 1);
 	if (!post_buffer) {
@@ -450,9 +444,9 @@ static void httpr_client_read_content(struct bufferevent *buffev, redsocks_clien
 		return;
 	}
 	int error;
-	while (httpr->content_len_left > 0) {
+	while (true) {
 		error = evbuffer_remove(buffev->input, post_buffer, post_buffer_len);
-		if (error == -1) {
+		if (error < 0) {
 			free(post_buffer);
 			redsocks_log_error(client, LOG_ERR, "evbuffer_remove");
 			redsocks_drop_client(client);
@@ -460,21 +454,18 @@ static void httpr_client_read_content(struct bufferevent *buffev, redsocks_clien
 		}
 		if (error == 0)
 			break;
-		httpr->content_len_left -= error;
 		httpr_buffer_append(&httpr->client_buffer, post_buffer, error);
+		if (client->relay && client->state >= httpr_request_sent) {
+			if (bufferevent_write(client->relay, post_buffer, error) != 0) {
+				free(post_buffer);
+				redsocks_log_error(client, LOG_ERR, "bufferevent_write");
+				redsocks_drop_client(client);
+				return;
+			}
+		}
+
 	}
 	free(post_buffer);
-
-	if (httpr->content_len_left == 0) {
-		client->state = httpr_recv_request;
-		redsocks_connect_relay(client);
-	}
-}
-
-static void httpr_client_eof(redsocks_client *client)
-{
-	client->state = httpr_recv_request;
-	redsocks_connect_relay(client);
 }
 
 static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
@@ -484,16 +475,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 
 	redsocks_touch_client(client);
 
-	if (client->state >= httpr_recv_request) {
-		int error = bufferevent_disable(buffev, EV_READ);
-		if (error) {
-			redsocks_log_errno(client, LOG_ERR, "bufferevent_disable");
-			redsocks_drop_client(client);
-		}
-		return;
-	}
-
-	if (client->state == httpr_recv_request_headers) {
+	if (client->state >= httpr_recv_request_headers) {
 		httpr_client_read_content(buffev, client);
 		return;
 	}
@@ -501,7 +483,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 	char *line = NULL;
 	int connect_relay = 0;
 
-	while ( (line = evbuffer_readline(buffev->input)) && !connect_relay) {
+	while (!connect_relay && (line = evbuffer_readline(buffev->input))) {
 		int skip_line = 0;
 		int do_drop = 0;
 
@@ -521,11 +503,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 				skip_line = 1;
 			else if (strncasecmp(line, "Connection", 10) == 0)
 				skip_line = 1;
-			else if (strncasecmp(line, "Content-Length", 14) == 0) {
-				int content_len;
-				if (sscanf(line + 15, "%d", &content_len) == 1 && content_len >= 0)
-					httpr->content_len_left = content_len;
-			}
+
 		}
 		else { // last line of request
 			if (!httpr->firstline || httpr_toss_http_firstline(client) < 0)
@@ -561,13 +539,9 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 	}
 
 	if (connect_relay) {
-		if (httpr->content_len_left == 0) {
-			client->state = httpr_recv_request;
-			redsocks_connect_relay(client);
-		} else {
-			client->state = httpr_recv_request_headers;
-			httpr_client_read_content(buffev, client);
-		}
+		client->state = httpr_recv_request_headers;
+		httpr_client_read_content(buffev, client);
+		redsocks_connect_relay(client);
 	}
 }
 
@@ -593,7 +567,6 @@ relay_subsys http_relay_subsys =
 	.connect_relay        = httpr_connect_relay,
 	.readcb               = httpr_relay_read_cb,
 	.writecb              = httpr_relay_write_cb,
-	.client_eof           = httpr_client_eof,
 	.instance_fini        = httpr_instance_fini,
 };
 

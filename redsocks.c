@@ -412,10 +412,7 @@ static void redsocks_event_error(struct bufferevent *buffev, short what, void *_
 
 		redsocks_shutdown(client, buffev, SHUT_RD);
 
-		if (buffev == client->client && antiev == NULL) {
-			if (client->instance->relay_ss->client_eof)
-				client->instance->relay_ss->client_eof(client);
-		} else if (EVBUFFER_LENGTH(antiev->output) == 0)
+		if (EVBUFFER_LENGTH(antiev->output) == 0)
 			redsocks_shutdown(client, antiev, SHUT_WR);
 	}
 	else {
