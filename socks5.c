@@ -21,6 +21,7 @@
 #include "utils.h"
 #include "log.h"
 #include "redsocks.h"
+#include "socks5.h"
 
 typedef enum socks5_state_t {
 	socks5_new,
@@ -125,36 +126,49 @@ const char *socks5_strstatus[] = {
 	"address type not supported",
 };
 
+int socks5_is_valid_cred(const char *login, const char *password)
+{
+	if (!login || !password)
+		return 0;
+	if (strlen(login) > 255) {
+		log_error(LOG_WARNING, "Socks5 login can't be more than 255 chars, <%s> is too long", login);
+		return 0;
+	}
+	if (strlen(password) > 255) {
+		log_error(LOG_WARNING, "Socks5 password can't be more than 255 chars, <%s> is too long", password);
+		return 0;
+	}
+	return 1;
+}
+
 void socks5_client_init(redsocks_client *client)
 {
 	socks5_client *socks5 = (void*)(client + 1);
 	const redsocks_config *config = &client->instance->config;
 
 	client->state = socks5_new;
-	socks5->do_password = 0;
-	if (config->login && config->password) {
-		if (strlen(config->login) > 255)
-			redsocks_log_error(client, LOG_WARNING, "Socks5 login can't be more than 255 chars");
-		else if (strlen(config->password) > 255)
-			redsocks_log_error(client, LOG_WARNING, "Socks5 password can't be more than 255 chars");
-		else
-			socks5->do_password = 1;
-	}
+	socks5->do_password = socks5_is_valid_cred(config->login, config->password);
 }
 
 static struct evbuffer *socks5_mkmethods(redsocks_client *client)
 {
 	socks5_client *socks5 = (void*)(client + 1);
-	int len = sizeof(socks5_method_req) + socks5->do_password;
+	return socks5_mkmethods_plain(socks5->do_password);
+}
+
+struct evbuffer *socks5_mkmethods_plain(int do_password)
+{
+	assert(do_password == 0 || do_password == 1);
+	int len = sizeof(socks5_method_req) + do_password;
 	union {
 		socks5_method_req req;
 		uint8_t raw[len];
 	} u;
 
 	u.req.ver = socks5_ver;
-	u.req.num_methods = 1 + socks5->do_password;
+	u.req.num_methods = 1 + do_password;
 	u.req.methods[0] = socks5_auth_none;
-	if (socks5->do_password)
+	if (do_password)
 		u.req.methods[1] = socks5_auth_password;
 
 	return mkevbuffer(&u.req, len);
@@ -162,8 +176,11 @@ static struct evbuffer *socks5_mkmethods(redsocks_client *client)
 
 static struct evbuffer *socks5_mkpassword(redsocks_client *client)
 {
-	const char *login = client->instance->config.login;
-	const char *password = client->instance->config.password;
+	return socks5_mkpassword_plain(client->instance->config.login, client->instance->config.password);
+}
+
+struct evbuffer *socks5_mkpassword_plain(const char *login, const char *password)
+{
 	size_t ulen = strlen(login);
 	size_t plen = strlen(password);
 	size_t length =  1 /* version */ + 1 + ulen + 1 + plen;
