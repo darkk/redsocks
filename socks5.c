@@ -224,15 +224,29 @@ static void socks5_write_cb(struct bufferevent *buffev, void *_arg)
 	}
 }
 
+const char* socks5_is_known_auth_method(socks5_method_reply *reply, int do_password)
+{
+	if (reply->ver != socks5_ver)
+		return "Socks5 server reported unexpected auth methods reply version...";
+	else if (reply->method == socks5_auth_invalid)
+		return "Socks5 server refused all our auth methods.";
+	else if (reply->method != socks5_auth_none && !(reply->method == socks5_auth_password && do_password))
+		return "Socks5 server requested unexpected auth method...";
+	else
+		return NULL;
+}
+
 static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client *client, socks5_client *socks5)
 {
 	socks5_method_reply reply;
+	const char *error = NULL;
 
 	if (redsocks_read_expected(client, buffev->input, &reply, sizes_equal, sizeof(reply)) < 0)
 		return;
 
-	if (reply.ver != socks5_ver) {
-		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected auth methods reply version...");
+	error = socks5_is_known_auth_method(&reply, socks5->do_password);
+	if (error) {
+		redsocks_log_error(client, LOG_NOTICE, error);
 		redsocks_drop_client(client);
 	}
 	else if (reply.method == socks5_auth_none) {
@@ -241,16 +255,11 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client
 			socks5_mkconnect, socks5_request_sent, sizeof(socks5_reply)
 			);
 	}
-	else if (reply.method == socks5_auth_password && socks5->do_password) {
+	else if (reply.method == socks5_auth_password) {
 		redsocks_write_helper(
 			buffev, client,
 			socks5_mkpassword, socks5_auth_sent, sizeof(socks5_auth_reply)
 			);
-	}
-	else {
-		if (reply.method != socks5_auth_invalid)
-			redsocks_log_error(client, LOG_NOTICE, "Socks5 server requested unexpected auth method...");
-		redsocks_drop_client(client);
 	}
 }
 
