@@ -429,27 +429,40 @@ fail:
 	return retval;
 }
 
-void redsocks_write_helper_ex(
+int redsocks_write_helper_ex(
 	struct bufferevent *buffev, redsocks_client *client,
 	redsocks_message_maker mkmessage, int state, size_t wm_low, size_t wm_high)
+{
+	assert(client);
+	return redsocks_write_helper_ex_plain(buffev, client, (redsocks_message_maker_plain)mkmessage,
+	                                      client, state, wm_low, wm_high);
+}
+
+int redsocks_write_helper_ex_plain(
+	struct bufferevent *buffev, redsocks_client *client,
+	redsocks_message_maker_plain mkmessage, void *p, int state, size_t wm_low, size_t wm_high)
 {
 	int len;
 	struct evbuffer *buff = NULL;
 	int drop = 1;
 
 	if (mkmessage) {
-		buff = mkmessage(client);
+		buff = mkmessage(p);
 		if (!buff)
 			goto fail;
 
 		len = bufferevent_write_buffer(client->relay, buff);
 		if (len < 0) {
-			redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
+			if (client)
+				redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
+			else
+				log_errno(LOG_ERR, "bufferevent_write_buffer");
 			goto fail;
 		}
 	}
 
-	client->state = state;
+	if (client)
+		client->state = state;
 	buffev->wm_read.low = wm_low;
 	buffev->wm_read.high = wm_high;
 	bufferevent_enable(buffev, EV_READ);
@@ -458,15 +471,17 @@ void redsocks_write_helper_ex(
 fail:
 	if (buff)
 		evbuffer_free(buff);
-	if (drop)
+	if (drop && client)
 		redsocks_drop_client(client);
+	return drop ? -1 : 0;
 }
 
-void redsocks_write_helper(
+int redsocks_write_helper(
 	struct bufferevent *buffev, redsocks_client *client,
 	redsocks_message_maker mkmessage, int state, size_t wm_only)
 {
-	redsocks_write_helper_ex(buffev, client, mkmessage, state, wm_only, wm_only);
+	assert(client);
+	return redsocks_write_helper_ex(buffev, client, mkmessage, state, wm_only, wm_only);
 }
 
 static void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)

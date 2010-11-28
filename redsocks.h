@@ -70,11 +70,16 @@ int sizes_greater_equal(size_t a, size_t b);
 int redsocks_read_expected(redsocks_client *client, struct evbuffer *input, void *data, size_comparator comparator, size_t expected);
 
 typedef struct evbuffer* (*redsocks_message_maker)(redsocks_client *client);
+typedef struct evbuffer* (*redsocks_message_maker_plain)(void *p);
 struct evbuffer *mkevbuffer(void *data, size_t len);
-void redsocks_write_helper_ex(
+/* Yahoo! This code is ex-plain! :-D */
+int redsocks_write_helper_ex_plain(
+	struct bufferevent *buffev, redsocks_client *client,
+	redsocks_message_maker_plain mkmessage, void *p, int state, size_t wm_low, size_t wm_high);
+int redsocks_write_helper_ex(
 	struct bufferevent *buffev, redsocks_client *client,
 	redsocks_message_maker mkmessage, int state, size_t wm_low, size_t wm_high);
-void redsocks_write_helper(
+int redsocks_write_helper(
 	struct bufferevent *buffev, redsocks_client *client,
 	redsocks_message_maker mkmessage, int state, size_t wm_only);
 
