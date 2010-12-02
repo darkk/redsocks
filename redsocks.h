@@ -6,12 +6,6 @@
 #include <event.h>
 #include "list.h"
 
-#if defined __GNUC__
-#define PACKED __attribute__((packed))
-#else
-#error Unknown compiler, modify types.h for it
-#endif
-
 
 struct redsocks_client_t;
 
