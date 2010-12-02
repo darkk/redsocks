@@ -141,9 +141,10 @@ static parser_section redsocks_conf_section =
 	.onexit  = redsocks_onexit
 };
 
-void redsocks_log_write(
+void redsocks_log_write_plain(
 		const char *file, int line, const char *func, int do_errno,
-		redsocks_client *client, int priority, const char *orig_fmt, ...
+		const struct sockaddr_in *clientaddr, const struct sockaddr_in *destaddr,
+		int priority, const char *orig_fmt, ...
 ) {
 	int saved_errno = errno;
 	struct evbuffer *fmt = evbuffer_new();
@@ -155,15 +156,15 @@ void redsocks_log_write(
 		// no return, as I have to call va_start/va_end
 	}
 
-	if (!inet_ntop(client->clientaddr.sin_family, &client->clientaddr.sin_addr, clientaddr_str, sizeof(clientaddr_str)))
+	if (!inet_ntop(clientaddr->sin_family, &clientaddr->sin_addr, clientaddr_str, sizeof(clientaddr_str)))
 		strncpy(clientaddr_str, "???", sizeof(clientaddr_str));
-	if (!inet_ntop(client->destaddr.sin_family, &client->destaddr.sin_addr, destaddr_str, sizeof(destaddr_str)))
+	if (!inet_ntop(destaddr->sin_family, &destaddr->sin_addr, destaddr_str, sizeof(destaddr_str)))
 		strncpy(destaddr_str, "???", sizeof(destaddr_str));
 
 	if (fmt) {
 		evbuffer_add_printf(fmt, "[%s:%i->%s:%i]: %s",
-				clientaddr_str, ntohs(client->clientaddr.sin_port),
-				destaddr_str, ntohs(client->destaddr.sin_port),
+				clientaddr_str, ntohs(clientaddr->sin_port),
+				destaddr_str, ntohs(destaddr->sin_port),
 				orig_fmt);
 	}
 
