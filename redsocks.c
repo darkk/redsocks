@@ -452,7 +452,8 @@ int redsocks_write_helper_ex_plain(
 		if (!buff)
 			goto fail;
 
-		len = bufferevent_write_buffer(client->relay, buff);
+		assert(!client || buffev == client->relay);
+		len = bufferevent_write_buffer(buffev, buff);
 		if (len < 0) {
 			if (client)
 				redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
