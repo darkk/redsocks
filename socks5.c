@@ -21,6 +21,7 @@
 #include "utils.h"
 #include "log.h"
 #include "redsocks.h"
+#include "socks5.h"
 
 typedef enum socks5_state_t {
 	socks5_new,
@@ -37,82 +38,6 @@ typedef struct socks5_client_t {
 	int to_skip;     // valid while reading last reply (after main request)
 } socks5_client;
 
-typedef struct socks5_method_req_t {
-	uint8_t ver;
-	uint8_t num_methods;
-	uint8_t methods[1]; // at least one
-} PACKED socks5_method_req;
-
-typedef struct socks5_method_reply_t {
-	uint8_t ver;
-	uint8_t method;
-} PACKED socks5_method_reply;
-
-const int socks5_ver = 5;
-
-const int socks5_auth_none = 0x00;
-const int socks5_auth_gssapi = 0x01;
-const int socks5_auth_password = 0x02;
-const int socks5_auth_invalid = 0xFF;
-
-typedef struct socks5_auth_reply_t {
-	uint8_t ver;
-	uint8_t status;
-} PACKED socks5_auth_reply;
-
-const int socks5_password_ver = 0x01;
-const int socks5_password_passed = 0x00;
-
-
-typedef struct socks5_addr_ipv4_t {
-	uint32_t addr;
-	uint16_t port;
-} PACKED socks5_addr_ipv4;
-
-typedef struct socks5_addr_domain_t {
-	uint8_t size;
-	uint8_t more[1];
-	/* uint16_t port; */
-} PACKED socks5_addr_domain;
-
-typedef struct socks5_addr_ipv6_t {
-	uint8_t addr[16];
-	uint16_t port;
-} PACKED socks5_addr_ipv6;
-
-typedef struct socks5_req_t {
-	uint8_t ver;
-	uint8_t cmd;
-	uint8_t reserved;
-	uint8_t addrtype;
-	/* socks5_addr_* */
-} PACKED socks5_req;
-
-typedef struct socks5_reply_t {
-	uint8_t ver;
-	uint8_t status;
-	uint8_t reserved;
-	uint8_t addrtype;
-	/* socks5_addr_* */
-} PACKED socks5_reply;
-
-const int socks5_reply_maxlen = 512; // as domain name can't be longer than 256 bytes
-const int socks5_cmd_connect = 1;
-const int socks5_cmd_bind = 2;
-const int socks5_cmd_udp_associate = 2;
-const int socks5_addrtype_ipv4 = 1;
-const int socks5_addrtype_domain = 3;
-const int socks5_addrtype_ipv6 = 4;
-const int socks5_status_succeeded = 0;
-const int socks5_status_server_failure = 1;
-const int socks5_status_connection_not_allowed_by_ruleset = 2;
-const int socks5_status_Network_unreachable = 3;
-const int socks5_status_Host_unreachable = 4;
-const int socks5_status_Connection_refused = 5;
-const int socks5_status_TTL_expired = 6;
-const int socks5_status_Command_not_supported = 7;
-const int socks5_status_Address_type_not_supported = 8;
-
 const char *socks5_strstatus[] = {
 	"ok",
 	"server failure",
@@ -124,6 +49,32 @@ const char *socks5_strstatus[] = {
 	"command not supported",
 	"address type not supported",
 };
+const size_t socks5_strstatus_len = SIZEOF_ARRAY(socks5_strstatus);
+
+const char* socks5_status_to_str(int socks5_status)
+{
+	if (0 <= socks5_status && socks5_status < socks5_strstatus_len) {
+		return socks5_strstatus[socks5_status];
+	}
+	else {
+		return "";
+	}
+}
+
+int socks5_is_valid_cred(const char *login, const char *password)
+{
+	if (!login || !password)
+		return 0;
+	if (strlen(login) > 255) {
+		log_error(LOG_WARNING, "Socks5 login can't be more than 255 chars, <%s> is too long", login);
+		return 0;
+	}
+	if (strlen(password) > 255) {
+		log_error(LOG_WARNING, "Socks5 password can't be more than 255 chars, <%s> is too long", password);
+		return 0;
+	}
+	return 1;
+}
 
 void socks5_client_init(redsocks_client *client)
 {
@@ -131,27 +82,25 @@ void socks5_client_init(redsocks_client *client)
 	const redsocks_config *config = &client->instance->config;
 
 	client->state = socks5_new;
-	socks5->do_password = 0;
-	if (config->login && config->password) {
-		if (strlen(config->login) > 255)
-			redsocks_log_error(client, LOG_WARNING, "Socks5 login can't be more than 255 chars");
-		else if (strlen(config->password) > 255)
-			redsocks_log_error(client, LOG_WARNING, "Socks5 password can't be more than 255 chars");
-		else
-			socks5->do_password = 1;
-	}
+	socks5->do_password = socks5_is_valid_cred(config->login, config->password);
 }
 
 static struct evbuffer *socks5_mkmethods(redsocks_client *client)
 {
 	socks5_client *socks5 = (void*)(client + 1);
-	int len = sizeof(socks5_method_req) + socks5->do_password;
-	socks5_method_req *req = calloc(1, len);
+	return socks5_mkmethods_plain(socks5->do_password);
+}
+
+struct evbuffer *socks5_mkmethods_plain(int do_password)
+{
+	assert(do_password == 0 || do_password == 1);
+	int len = sizeof(socks5_method_req) + do_password;
+    socks5_method_req *req = calloc(1, len);
 
 	req->ver = socks5_ver;
-	req->num_methods = 1 + socks5->do_password;
+	req->num_methods = 1 + do_password;
 	req->methods[0] = socks5_auth_none;
-	if (socks5->do_password)
+	if (do_password)
 		req->methods[1] = socks5_auth_password;
 
 	struct evbuffer *ret = mkevbuffer(req, len);
@@ -161,8 +110,11 @@ static struct evbuffer *socks5_mkmethods(redsocks_client *client)
 
 static struct evbuffer *socks5_mkpassword(redsocks_client *client)
 {
-	const char *login = client->instance->config.login;
-	const char *password = client->instance->config.password;
+	return socks5_mkpassword_plain(client->instance->config.login, client->instance->config.password);
+}
+
+struct evbuffer *socks5_mkpassword_plain(const char *login, const char *password)
+{
 	size_t ulen = strlen(login);
 	size_t plen = strlen(password);
 	size_t length =  1 /* version */ + 1 + ulen + 1 + plen;
@@ -176,20 +128,27 @@ static struct evbuffer *socks5_mkpassword(redsocks_client *client)
 	return mkevbuffer(req, length);
 }
 
-static struct evbuffer *socks5_mkconnect(redsocks_client *client)
+struct evbuffer *socks5_mkcommand_plain(int socks5_cmd, const struct sockaddr_in *destaddr)
 {
 	struct {
 		socks5_req head;
 		socks5_addr_ipv4 ip;
 	} PACKED req;
 
+	assert(destaddr->sin_family == AF_INET);
+
 	req.head.ver = socks5_ver;
-	req.head.cmd = socks5_cmd_connect;
+	req.head.cmd = socks5_cmd;
 	req.head.reserved = 0;
 	req.head.addrtype = socks5_addrtype_ipv4;
-	req.ip.addr = client->destaddr.sin_addr.s_addr;
-	req.ip.port = client->destaddr.sin_port;
+	req.ip.addr = destaddr->sin_addr.s_addr;
+	req.ip.port = destaddr->sin_port;
 	return mkevbuffer(&req, sizeof(req));
+}
+
+static struct evbuffer *socks5_mkconnect(redsocks_client *client)
+{
+	return socks5_mkcommand_plain(socks5_cmd_connect, &client->destaddr);
 }
 
 static void socks5_write_cb(struct bufferevent *buffev, void *_arg)
@@ -206,15 +165,29 @@ static void socks5_write_cb(struct bufferevent *buffev, void *_arg)
 	}
 }
 
+const char* socks5_is_known_auth_method(socks5_method_reply *reply, int do_password)
+{
+	if (reply->ver != socks5_ver)
+		return "Socks5 server reported unexpected auth methods reply version...";
+	else if (reply->method == socks5_auth_invalid)
+		return "Socks5 server refused all our auth methods.";
+	else if (reply->method != socks5_auth_none && !(reply->method == socks5_auth_password && do_password))
+		return "Socks5 server requested unexpected auth method...";
+	else
+		return NULL;
+}
+
 static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client *client, socks5_client *socks5)
 {
 	socks5_method_reply reply;
+	const char *error = NULL;
 
 	if (redsocks_read_expected(client, buffev->input, &reply, sizes_equal, sizeof(reply)) < 0)
 		return;
 
-	if (reply.ver != socks5_ver) {
-		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected auth methods reply version...");
+	error = socks5_is_known_auth_method(&reply, socks5->do_password);
+	if (error) {
+		redsocks_log_error(client, LOG_NOTICE, "socks5_is_known_auth_method: %s", error);
 		redsocks_drop_client(client);
 	}
 	else if (reply.method == socks5_auth_none) {
@@ -223,16 +196,11 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client
 			socks5_mkconnect, socks5_request_sent, sizeof(socks5_reply)
 			);
 	}
-	else if (reply.method == socks5_auth_password && socks5->do_password) {
+	else if (reply.method == socks5_auth_password) {
 		redsocks_write_helper(
 			buffev, client,
 			socks5_mkpassword, socks5_auth_sent, sizeof(socks5_auth_reply)
 			);
-	}
-	else {
-		if (reply.method != socks5_auth_invalid)
-			redsocks_log_error(client, LOG_NOTICE, "Socks5 server requested unexpected auth method...");
-		redsocks_drop_client(client);
 	}
 }
 

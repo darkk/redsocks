@@ -6,12 +6,6 @@
 #include <event.h>
 #include "list.h"
 
-#if defined __GNUC__
-#define PACKED __attribute__((packed))
-#else
-#error Unknown compiler, modify types.h for it
-#endif
-
 
 struct redsocks_client_t;
 struct redsocks_instance_t;
@@ -73,18 +67,32 @@ int sizes_greater_equal(size_t a, size_t b);
 int redsocks_read_expected(redsocks_client *client, struct evbuffer *input, void *data, size_comparator comparator, size_t expected);
 
 typedef struct evbuffer* (*redsocks_message_maker)(redsocks_client *client);
+typedef struct evbuffer* (*redsocks_message_maker_plain)(void *p);
 struct evbuffer *mkevbuffer(void *data, size_t len);
-void redsocks_write_helper_ex(
+/* Yahoo! This code is ex-plain! :-D */
+int redsocks_write_helper_ex_plain(
+	struct bufferevent *buffev, redsocks_client *client,
+	redsocks_message_maker_plain mkmessage, void *p, int state, size_t wm_low, size_t wm_high);
+int redsocks_write_helper_ex(
 	struct bufferevent *buffev, redsocks_client *client,
 	redsocks_message_maker mkmessage, int state, size_t wm_low, size_t wm_high);
-void redsocks_write_helper(
+int redsocks_write_helper(
 	struct bufferevent *buffev, redsocks_client *client,
 	redsocks_message_maker mkmessage, int state, size_t wm_only);
 
 
-#define redsocks_log_error(client, prio, msg...) redsocks_log_write(__FILE__, __LINE__, __func__, 0, client, prio, ## msg)
-#define redsocks_log_errno(client, prio, msg...) redsocks_log_write(__FILE__, __LINE__, __func__, 1, client, prio, ## msg)
-void redsocks_log_write(const char *file, int line, const char *func, int do_errno, redsocks_client *client, int priority, const char *fmt, ...);
+#define redsocks_log_error(client, prio, msg...) \
+	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 0, &(client)->clientaddr, &(client)->destaddr, prio, ## msg)
+#define redsocks_log_errno(client, prio, msg...) \
+	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 1, &(client)->clientaddr, &(client)->destaddr, prio, ## msg)
+void redsocks_log_write_plain(
+		const char *file, int line, const char *func, int do_errno,
+		const struct sockaddr_in *clientaddr, const struct sockaddr_in *destaddr,
+		int priority, const char *fmt, ...)
+#if defined(__GNUC__)
+	__attribute__ (( format (printf, 8, 9) ))
+#endif
+;
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */

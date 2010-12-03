@@ -32,6 +32,8 @@ Login/password authentication is supported for SOCKS5/HTTPS connections.
 SOCKS4 supports only username, password is ignored. for HTTPS, currently
 only Basic and Digest scheme is supported.
 
+Redirect UDP packets via SOCKS5 proxy server.
+
 Redirect any HTTP connection to proxy that does not support transparent
 proxying (e.g. old SQUID had broken `acl myport' for such connections).
 

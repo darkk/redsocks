@@ -3,7 +3,7 @@ CFLAGS=-std=gnu99 -Wall -g -O0
 .PHONY: all
 all: redsocks
 
-obj = parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o
+obj = parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o
 src = $(patsubst %.o,%.c,$(obj))
 
 redsocks: $(obj)
