@@ -28,6 +28,8 @@ Features
 Redirect any TCP connection to SOCKS4, SOCKS5 or HTTPS (HTTP/CONNECT)
 proxy server.
 
+Redirect UDP packets via SOCKS5 proxy server.
+
 Login/password authentication is supported for SOCKS5 connections.
 SOCKS4 supports only username, password is ignored.
 

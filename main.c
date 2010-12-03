@@ -29,12 +29,12 @@
 
 extern app_subsys redsocks_subsys;
 extern app_subsys base_subsys;
-// extern app_subsys reddns_subsys;
+extern app_subsys redudp_subsys;
 
 app_subsys *subsystems[] = {
 	&redsocks_subsys,
 	&base_subsys,
-//	&reddns_subsys,
+	&redudp_subsys,
 };
 
 static const char *confname = "redsocks.conf";
