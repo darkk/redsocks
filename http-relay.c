@@ -293,18 +293,24 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 				auth_scheme = "Basic";
 			} else if (strncasecmp(auth->last_auth_query, "Digest", 6) == 0 && httpr->firstline) {
 				/* calculate method & uri */
-				char *ptr = strchr(httpr->firstline, ' ');
+				char *ptr = strchr(httpr->firstline, ' '), *ptr2;
 				char *method = calloc(ptr - httpr->firstline + 1, 1);
 				memcpy(method, httpr->firstline, ptr - httpr->firstline);
 				method[ptr - httpr->firstline] = 0;
 
 				ptr = strchr(httpr->firstline, '/');
 				if (!ptr || *++ptr != '/') {
+					free(method);
 					redsocks_log_error(client, LOG_NOTICE, "malformed request came");
+					redsocks_drop_client(client);
 					return;
 				}
-				ptr = strchr(++ptr, '/');
-				char *ptr2 = strchr(ptr, ' ');
+				if (!(ptr = strchr(++ptr, '/')) || !(ptr2 = strchr(ptr, ' '))) {
+					free(method);
+					redsocks_log_error(client, LOG_NOTICE, "malformed request came");
+					redsocks_drop_client(client);
+					return;
+				}
 				char *uri = calloc(ptr2 - ptr + 1, 1);
 				memcpy(uri, ptr, ptr2 - ptr);
 				uri[ptr2 - ptr] = 0;
@@ -426,9 +432,9 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 	return 0;
 
 addition_fail:
-	redsocks_log_error(client, LOG_ERR, "httpr_buffer_init");
-fail:
 	httpr_buffer_fini(&nbuff);
+fail:
+	redsocks_log_error(client, LOG_ERR, "httpr_toss_http_firstline");
 	return -1;
 }
 
