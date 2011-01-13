@@ -26,7 +26,6 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#include "utils.h"
 #include "md5.h"
 #include "base64.h"
 
@@ -174,19 +173,19 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 	}
 
 	if (!realm || !nonce || !user || !passwd || !path || !method) {
-		free_null(realm);
-		free_null(opaque);
-		free_null(nonce);
-		free_null(qop);
+		free(realm);
+		free(opaque);
+		free(nonce);
+		free(qop);
 		return NULL;
 	}
 
 	if (!qop && strncasecmp(qop, "auth", 4) != 0) { 
 		/* FIXME: currently don't support auth-int */
-		free_null(realm);
-		free_null(opaque);
-		free_null(nonce);
-		free_null(qop);
+		free(realm);
+		free(opaque);
+		free(nonce);
+		free(qop);
 		return NULL;
 	}
 
@@ -267,10 +266,10 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 		strcat (p, "\"");
 	}
 
-	free_null(realm);
-	free_null(opaque);
-	free_null(nonce);
-	free_null(qop);
+	free(realm);
+	free(opaque);
+	free(nonce);
+	free(qop);
 	return res;
 }
 

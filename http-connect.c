@@ -49,7 +49,7 @@ static void httpc_client_init(redsocks_client *client)
 static void httpc_instance_fini(redsocks_instance *instance)
 {
 	http_auth *auth = (void*)(instance + 1);
-	free_null(auth->last_auth_query);
+	free(auth->last_auth_query);
 	auth->last_auth_query = NULL;
 }
 
@@ -64,7 +64,7 @@ static char *get_auth_request_header(struct evbuffer *buf)
 	for (;;) {
 		line = evbuffer_readline(buf);
 		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
-			free_null(line);
+			free(line);
 			return NULL;
 		}
 		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
@@ -110,7 +110,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 							dropped = 1;
 						} else {
 							free(line);
-							free_null(auth->last_auth_query);
+							free(auth->last_auth_query);
 							char *ptr = auth_request;
 
 							ptr += strlen(auth_request_header);
@@ -235,7 +235,7 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 		);
 	}
 
-	free_null(auth_string);
+	free(auth_string);
 
 	if (len < 0) {
 		redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");

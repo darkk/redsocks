@@ -29,8 +29,6 @@
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
-#define free_null(p) if (!(p)) ; else free (p)
-
 time_t redsocks_time(time_t *t);
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg);
 int red_socket_geterrno(struct bufferevent *buffev);
