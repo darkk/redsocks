@@ -401,7 +401,7 @@ static void redudp_relay_error(struct bufferevent *buffev, short what, void *_ar
 static void redudp_timeout(int fd, short what, void *_arg)
 {
 	redudp_client *client = _arg;
-	redudp_log_error(client, LOG_INFO, "Client timeout. First: %u, last_client: %u, last_relay: %u.",
+	redudp_log_error(client, LOG_INFO, "Client timeout. First: %li, last_client: %li, last_relay: %li.",
 	                 client->first_event, client->last_client_event, client->last_relay_event);
 	redudp_drop_client(client);
 }
@@ -585,17 +585,17 @@ static int redudp_onenter(parser_section *section)
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
-			(strcmp(entry->key, "local_ip") == 0)   ? &instance->config.bindaddr.sin_addr :
-			(strcmp(entry->key, "local_port") == 0) ? &instance->config.bindaddr.sin_port :
-			(strcmp(entry->key, "ip") == 0)         ? &instance->config.relayaddr.sin_addr :
-			(strcmp(entry->key, "port") == 0)       ? &instance->config.relayaddr.sin_port :
-			(strcmp(entry->key, "login") == 0)      ? &instance->config.login :
-			(strcmp(entry->key, "password") == 0)   ? &instance->config.password :
-			(strcmp(entry->key, "dest_ip") == 0)    ? &instance->config.destaddr.sin_addr :
-			(strcmp(entry->key, "dest_port") == 0)  ? &instance->config.destaddr.sin_port :
-			(strcmp(entry->key, "max_pktqueue") == 0) ? &instance->config.max_pktqueue :
-			(strcmp(entry->key, "udp_timeout") == 0) ? &instance->config.udp_timeout:
-			(strcmp(entry->key, "udp_timeout_stream") == 0) ? &instance->config.udp_timeout_stream :
+			(strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
+			(strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
+			(strcmp(entry->key, "ip") == 0)         ? (void*)&instance->config.relayaddr.sin_addr :
+			(strcmp(entry->key, "port") == 0)       ? (void*)&instance->config.relayaddr.sin_port :
+			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
+			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
+			(strcmp(entry->key, "dest_ip") == 0)    ? (void*)&instance->config.destaddr.sin_addr :
+			(strcmp(entry->key, "dest_port") == 0)  ? (void*)&instance->config.destaddr.sin_port :
+			(strcmp(entry->key, "max_pktqueue") == 0) ? (void*)&instance->config.max_pktqueue :
+			(strcmp(entry->key, "udp_timeout") == 0) ? (void*)&instance->config.udp_timeout:
+			(strcmp(entry->key, "udp_timeout_stream") == 0) ? (void*)&instance->config.udp_timeout_stream :
 			NULL;
 	section->data = instance;
 	return 0;

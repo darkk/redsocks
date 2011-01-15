@@ -517,8 +517,9 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 
 			if (!httpr->has_host) {
 				char host[32]; // "Host: 123.456.789.012:34567"
-				strncpy(host, "Host: ", sizeof(host));
-				strncat(host, fmt_http_host(client->destaddr), sizeof(host));
+				int written_wo_null = snprintf(host, sizeof(host), "Host: %s",
+				                               fmt_http_host(client->destaddr));
+				assert(0 < written_wo_null && written_wo_null < sizeof(host));
 				if (httpr_append_header(client, host) < 0)
 					do_drop = 1;
 			}

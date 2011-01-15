@@ -296,8 +296,8 @@ static int base_fini();
 
 static int base_init()
 {
-	uid_t uid;
-	gid_t gid;
+	uid_t uid = -1;
+	gid_t gid = -1;
 	int devnull = -1;
 
 	if (!instance.configured) {

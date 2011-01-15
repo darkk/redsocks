@@ -1,4 +1,4 @@
-CFLAGS=-std=gnu99 -Wall -g -O0
+CFLAGS=-std=gnu99 -Wall -g -O2
 
 .PHONY: all
 all: redsocks

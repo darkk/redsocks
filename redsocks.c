@@ -304,8 +304,8 @@ void redsocks_drop_client(redsocks_client *client)
 
 static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how)
 {
-	short evhow;
-	char *strev, *strhow, *strevhow;
+	short evhow = 0;
+	char *strev, *strhow = NULL, *strevhow = NULL;
 	unsigned short *pevshut;
 
 	assert(how == SHUT_RD || how == SHUT_WR || how == SHUT_RDWR);
@@ -327,6 +327,8 @@ static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffe
 		evhow = EV_READ|EV_WRITE;
 		strevhow = "EV_READ|EV_WRITE";
 	}
+
+	assert(strhow && strevhow);
 
 	strev = buffev == client->client ? "client" : "relay";
 	pevshut = buffev == client->client ? &client->client_evshut : &client->relay_evshut;
@@ -632,7 +634,7 @@ static void redsocks_debug_dump_instance(redsocks_instance *instance, time_t now
 		const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
 		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
-		redsocks_log_error(client, LOG_DEBUG, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %i sec, idle: %i sec.",
+		redsocks_log_error(client, LOG_DEBUG, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %li sec, idle: %li sec.",
 			EVENT_FD(&client->client->ev_write),
 				redsocks_event_str(client->client->enabled),
 				s_client_evshut[0] ? " " : "", s_client_evshut,
