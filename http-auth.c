@@ -40,12 +40,10 @@ char* basic_authentication_encode(const char *user, const char *passwd)
 	sprintf(pair_ptr, "%s:%s", user, passwd);
 
 	/* calculate the final string length */
-	int basic_len = 6 + BASE64_SIZE(pair_len);
+	int basic_len = BASE64_SIZE(pair_len);
 	char *basic_ptr = calloc(basic_len + 1, 1);
 
-	strcpy(basic_ptr, "Basic ");
-
-	if (!base64_encode(basic_ptr + 6, basic_len - 6, (const uint8_t*)pair_ptr, pair_len))
+	if (!base64_encode(basic_ptr, basic_len, (const uint8_t*)pair_ptr, pair_len))
 		return NULL;
 
 	return basic_ptr;
