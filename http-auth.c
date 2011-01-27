@@ -156,15 +156,15 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 			strncpy(realm  = calloc(valuelen + 1, 1), value.b, valuelen);
 			realm[valuelen] = '\0';
 		}
-		if (strncasecmp(name.b, "opaque", namelen) == 0) {
+		else if (strncasecmp(name.b, "opaque", namelen) == 0) {
 			strncpy(opaque = calloc(valuelen + 1, 1), value.b, valuelen);
 			opaque[valuelen] = '\0';
 		}
-		if (strncasecmp(name.b, "nonce" , namelen) == 0) {
+		else if (strncasecmp(name.b, "nonce" , namelen) == 0) {
 			strncpy(nonce  = calloc(valuelen + 1, 1), value.b, valuelen);
 			nonce[valuelen] = '\0';
 		}
-		if (strncasecmp(name.b, "qop"   , namelen) == 0) {
+		else if (strncasecmp(name.b, "qop"   , namelen) == 0) {
 			strncpy(qop    = calloc(valuelen + 1, 1), value.b, valuelen);
 			qop[valuelen] = '\0';
 		}
