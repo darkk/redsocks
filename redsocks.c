@@ -30,6 +30,7 @@
 #include "main.h"
 #include "base.h"
 #include "redsocks.h"
+#include "utils.h"
 
 
 #define THE_ANSWER_TO_THE_ULTIMATE_QUESTION_OF_LIFE_THE_UNIVERSE_AND_EVERYTHING 42
@@ -405,6 +406,7 @@ int redsocks_read_expected(redsocks_client *client, struct evbuffer *input, void
 	size_t len = EVBUFFER_LENGTH(input);
 	if (comparator(len, expected)) {
 		int read = evbuffer_remove(input, data, expected);
+		UNUSED(read);
 		assert(read == expected);
 		return 0;
 	}

@@ -28,6 +28,7 @@
 #include "log.h"
 #include "redsocks.h"
 #include "http-auth.h"
+#include "utils.h"
 
 #define HTTP_HEAD_WM_HIGH (4096)
 
@@ -519,6 +520,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 				char host[32]; // "Host: 123.456.789.012:34567"
 				int written_wo_null = snprintf(host, sizeof(host), "Host: %s",
 				                               fmt_http_host(client->destaddr));
+				UNUSED(written_wo_null);
 				assert(0 < written_wo_null && written_wo_null < sizeof(host));
 				if (httpr_append_header(client, host) < 0)
 					do_drop = 1;

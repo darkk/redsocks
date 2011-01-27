@@ -11,6 +11,8 @@
 #define FOREACH(ptr, array)      for (ptr = array; ptr < array + SIZEOF_ARRAY(array); ptr++)
 #define FOREACH_REV(ptr, array)  for (ptr = array + SIZEOF_ARRAY(array) - 1; ptr >= array; ptr--)
 
+#define UNUSED(x)                ((void)(x))
+
 #if defined __GNUC__
 #define PACKED __attribute__((packed))
 #else
