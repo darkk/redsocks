@@ -252,6 +252,11 @@ static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *clien
 			len = sizeof(domain.size);
 			nextstate = socks5_skip_domain;
 		}
+		else {
+			redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected address type...");
+			redsocks_drop_client(client);
+			return;
+		}
 
 		redsocks_write_helper(
 			buffev, client,

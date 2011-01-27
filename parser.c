@@ -183,6 +183,10 @@ static char *gettoken(parser_context *context, char **iter)
 		copytype = gt_plainstr;
 		len = 2;
 	}
+	else {
+		parser_error(context, "unexpected char");
+		return NULL;
+	}
 
 	ret = malloc(len + 1);
 	if (!ret) {

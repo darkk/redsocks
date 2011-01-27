@@ -104,6 +104,7 @@ int main(int argc, char **argv)
 		return EXIT_SUCCESS;
 
 	event_init();
+	memset(terminators, 0, sizeof(terminators));
 
 	FOREACH(ss, subsystems) {
 		if ((*ss)->init) {
@@ -124,7 +125,6 @@ int main(int argc, char **argv)
 	}
 
 	assert(SIZEOF_ARRAY(exit_signals) == SIZEOF_ARRAY(terminators));
-	memset(terminators, 0, sizeof(terminators));
 	for (i = 0; i < SIZEOF_ARRAY(exit_signals); i++) {
 		signal_set(&terminators[i], exit_signals[i], terminate, NULL);
 		if (signal_add(&terminators[i], NULL) != 0) {
