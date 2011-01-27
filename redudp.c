@@ -656,7 +656,6 @@ static int redudp_init_instance(redudp_instance *instance)
 		log_errno(LOG_ERR, "event_add");
 		goto fail;
 	}
-	fd = -1;
 
 	return 0;
 

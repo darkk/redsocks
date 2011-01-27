@@ -399,7 +399,6 @@ static int base_init()
 			}
 
 		close(devnull);
-		devnull = -1;
 	}
 	return 0;
 fail:
