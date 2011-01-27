@@ -89,14 +89,14 @@ static int recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *in
 	}
 
 	if (addrlen != sizeof(*inaddr)) {
-		log_error(LOG_WARNING, "unexpected address length %u instead of %u", addrlen, sizeof(*inaddr));
+		log_error(LOG_WARNING, "unexpected address length %u instead of %zu", addrlen, sizeof(*inaddr));
 		return -1;
 	}
 
 	if (pktlen >= buflen) {
 		char buf[INET6_ADDRSTRLEN];
 		const char *addr = inet_ntop(inaddr->sin_family, &inaddr->sin_addr, buf, sizeof(buf));
-		log_error(LOG_WARNING, "wow! Truncated udp packet of size %u from %s:%u! impossible! dropping it...",
+		log_error(LOG_WARNING, "wow! Truncated udp packet of size %zd from %s:%u! impossible! dropping it...",
 		          pktlen, addr ? addr : "?", ntohs(inaddr->sin_port));
 		return -1;
 	}
@@ -174,7 +174,7 @@ static void redudp_forward_pkt(redudp_client *client, char *buf, size_t pktlen)
 		return;
 	}
 	else if (outgoing != fwdlen) {
-		redudp_log_error(client, LOG_WARNING, "sendmsg: I was sending %u bytes, but only %u were sent.", fwdlen, outgoing);
+		redudp_log_error(client, LOG_WARNING, "sendmsg: I was sending %zd bytes, but only %zd were sent.", fwdlen, outgoing);
 		return;
 	}
 }
@@ -227,7 +227,7 @@ static void redudp_read_assoc_reply(struct bufferevent *buffev, void *_arg)
 	redudp_log_error(client, LOG_DEBUG, "<trace>");
 
 	if (read != sizeof(reply)) {
-		redudp_log_errno(client, LOG_NOTICE, "evbuffer_remove returned only %i bytes instead of expected %u",
+		redudp_log_errno(client, LOG_NOTICE, "evbuffer_remove returned only %i bytes instead of expected %zu",
 		                 read, sizeof(reply));
 		goto fail;
 	}
@@ -292,7 +292,7 @@ static void redudp_read_auth_reply(struct bufferevent *buffev, void *_arg)
 	redudp_log_error(client, LOG_DEBUG, "<trace>");
 
 	if (read != sizeof(reply)) {
-		redudp_log_errno(client, LOG_NOTICE, "evbuffer_remove returned only %i bytes instead of expected %u",
+		redudp_log_errno(client, LOG_NOTICE, "evbuffer_remove returned only %i bytes instead of expected %zu",
 		                 read, sizeof(reply));
 		goto fail;
 	}
@@ -328,7 +328,7 @@ static void redudp_read_auth_methods(struct bufferevent *buffev, void *_arg)
 	redudp_log_error(client, LOG_DEBUG, "<trace>");
 
 	if (read != sizeof(reply)) {
-		redudp_log_errno(client, LOG_NOTICE, "evbuffer_remove returned only %i bytes instead of expected %u",
+		redudp_log_errno(client, LOG_NOTICE, "evbuffer_remove returned only %i bytes instead of expected %zu",
 		                 read, sizeof(reply));
 		goto fail;
 	}
@@ -500,7 +500,7 @@ static void redudp_pkt_from_socks(int fd, short what, void *_arg)
 	                  pkt.buf + sizeof(pkt.header), fwdlen, 0,
 	                  (struct sockaddr*)&client->clientaddr, sizeof(client->clientaddr));
 	if (outgoing != fwdlen) {
-		redudp_log_error(client, LOG_WARNING, "sendto: I was sending %d bytes, but only %d were sent.",
+		redudp_log_error(client, LOG_WARNING, "sendto: I was sending %zd bytes, but only %zd were sent.",
 		                 fwdlen, outgoing);
 		return;
 	}
