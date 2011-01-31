@@ -179,7 +179,7 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 	}
 
 	if (qop && strncasecmp(qop, "auth", 5) != 0) {
-		/* FIXME: currently don't support auth-int */
+		/* FIXME: currently don't support auth-int, only "auth" is supported */
 		free(realm);
 		free(opaque);
 		free(nonce);
