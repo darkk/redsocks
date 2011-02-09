@@ -79,6 +79,7 @@ parser_section reddns_conf_section = {
 };
 
 int reddns_init() {
+#error It's non-working stub at the moment.
 	return 0;
 }
 

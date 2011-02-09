@@ -16,6 +16,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -28,6 +29,12 @@
 # include <limits.h>
 # include <netinet/in.h>
 # include <linux/netfilter_ipv4.h>
+#endif
+#if defined USE_PF
+# include <net/if.h>
+# include <net/pfvar.h>
+# include <sys/ioctl.h>
+# include <errno.h>
 #endif
 #include "log.h"
 #include "main.h"
@@ -62,7 +69,7 @@ static base_instance instance = {
 	.log_info = false,
 };
 
-#if defined __FreeBSD__ || defined __OpenBSD__
+#if defined __FreeBSD__ || defined USE_PF
 static int redir_open_private(const char *fname, int flags)
 {
 	int fd = open(fname, flags);
@@ -89,7 +96,7 @@ static int redir_init_ipf()
 #else
 	const char *fname = IPL_NAME;
 #endif
-	return redir_init_open_fname(fname, O_RDONLY);
+	return redir_open_private(fname, O_RDONLY);
 }
 
 static int getdestaddr_ipf(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
@@ -146,10 +153,10 @@ static int getdestaddr_ipf(int fd, const struct sockaddr_in *client, const struc
 }
 #endif
 
-#ifdef __OpenBSD__
+#ifdef USE_PF
 static int redir_init_pf()
 {
-	return redir_init_open_fname("/dev/pf", O_RDWR);
+	return redir_open_private("/dev/pf", O_RDWR);
 }
 
 static int getdestaddr_pf(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
@@ -217,7 +224,7 @@ static redirector_subsys redirector_subsystems[] =
 #ifdef __FreeBSD__
 	{ .name = "ipf", .init = redir_init_ipf, .fini = redir_close_private, .getdestaddr = getdestaddr_ipf },
 #endif
-#ifdef __OpenBSD__
+#ifdef USE_PF
 	{ .name = "pf",  .init = redir_init_pf,  .fini = redir_close_private, .getdestaddr = getdestaddr_pf },
 #endif
 #ifdef USE_IPTABLES

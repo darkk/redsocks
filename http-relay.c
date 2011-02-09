@@ -25,6 +25,8 @@
 #include <ctype.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include "log.h"
 #include "redsocks.h"
 #include "http-auth.h"

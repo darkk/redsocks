@@ -20,8 +20,11 @@ $(CONF):
 	Linux*) \
 		echo "#define USE_IPTABLES" >$(CONF) \
 		;; \
+	OpenBSD) \
+		echo "#define USE_PF" >$(CONF) \
+		;; \
 	*) \
-		echo "Unknown system, only generic firewall code is compiled" 1>&2 \
+		echo "Unknown system, only generic firewall code is compiled" 1>&2; \
 		echo "/* Unknown system, only generic firewall code is compiled */" >$(CONF) \
 		;; \
 	esac

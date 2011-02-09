@@ -3,9 +3,9 @@
 
 #include <stddef.h>
 #include <time.h>
-#include <netinet/in.h>
 #include <event.h>
 
+struct sockaddr_in;
 
 #define SIZEOF_ARRAY(arr)        (sizeof(arr) / sizeof(arr[0]))
 #define FOREACH(ptr, array)      for (ptr = array; ptr < array + SIZEOF_ARRAY(array); ptr++)

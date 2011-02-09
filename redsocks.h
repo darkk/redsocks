@@ -2,7 +2,7 @@
 #define REDSOCKS_H_WED_JAN_24_22_17_11_2007
 #include <sys/time.h>
 #include <sys/types.h>
-#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <event.h>
 #include "list.h"
 

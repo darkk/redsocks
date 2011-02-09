@@ -17,7 +17,11 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/uio.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <assert.h>
 
@@ -419,7 +423,7 @@ static void redudp_first_pkt_from_client(redudp_instance *self, struct sockaddr_
 	INIT_LIST_HEAD(&client->queue);
 	client->instance = self;
 	memcpy(&client->clientaddr, clientaddr, sizeof(*clientaddr));
-	timeout_set(&client->timeout, redudp_timeout, client);
+	evtimer_set(&client->timeout, redudp_timeout, client);
 	// XXX: self->relay_ss->init(client);
 
 	client->relay = red_connect_relay(&client->instance->config.relayaddr,

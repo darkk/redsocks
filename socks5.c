@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/socket.h>
 #include "utils.h"
 #include "log.h"
 #include "redsocks.h"
