@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include "log.h"
 #include "redsocks.h"
