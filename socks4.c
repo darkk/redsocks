@@ -98,14 +98,16 @@ static struct evbuffer *socks4_mkconnect(redsocks_client *client)
 {
 	const redsocks_config *config = &client->instance->config;
 	const char *username = config->login ? config->login : "";
-	int len = sizeof(socks4_req) + strlen(username);
+	// space for \0 comes from socks4_req->login
+	size_t username_len = strlen(username);
+	size_t len = sizeof(socks4_req) + username_len;
 	socks4_req *req = calloc(1, len);
 
 	req->ver = socks4_ver;
 	req->cmd = socks4_cmd_connect;
 	req->port = client->destaddr.sin_port;
 	req->addr = client->destaddr.sin_addr.s_addr;
-	strcpy(req->login, username);
+	memcpy(req->login, username, username_len + 1);
 
 	struct evbuffer *ret = mkevbuffer(req, len);
 	free(req);
