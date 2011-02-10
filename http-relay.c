@@ -321,7 +321,6 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 
 				/* prepare an random string for cnounce */
 				char cnounce[17];
-				srand(time(0));
 				for (int i = 0; i < 16; i += 4)
 					sprintf(cnounce + i, "%04x", rand() & 65535);
 

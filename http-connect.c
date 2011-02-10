@@ -210,7 +210,6 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 
 			/* prepare an random string for cnounce */
 			char cnounce[17];
-			srand(time(0));
 			for (int i = 0; i < 16; i += 4)
 				sprintf(cnounce + i, "%02x", rand() & 65535);
 
