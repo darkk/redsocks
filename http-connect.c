@@ -211,8 +211,8 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 
 			/* prepare an random string for cnounce */
 			char cnounce[17];
-			for (int i = 0; i < 16; i += 4)
-				sprintf(cnounce + i, "%02x", rand() & 65535);
+			snprintf(cnounce, sizeof(cnounce), "%04x%04x%04x%04x",
+			         rand() & 0xffff, rand() & 0xffff, rand() & 0xffff, rand() & 0xffff);
 
 			auth_string = digest_authentication_encode(auth->last_auth_query + 7, //line
 					client->instance->config.login, client->instance->config.password, //user, pass
