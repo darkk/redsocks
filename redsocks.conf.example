@@ -27,7 +27,7 @@ base {
 	/* possible `redirector' values are:
 	 *   iptables   - for Linux
 	 *   ipf        - for FreeBSD
-	 *   pw         - for OpenBSD
+	 *   pf         - for OpenBSD
 	 *   generic    - some generic redirector that MAY work
 	 */
 	redirector = iptables;
