@@ -17,6 +17,8 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -27,7 +29,6 @@
 #include "config.h"
 #if defined USE_IPTABLES
 # include <limits.h>
-# include <netinet/in.h>
 # include <linux/netfilter_ipv4.h>
 #endif
 #if defined USE_PF
@@ -159,10 +160,14 @@ static int redir_init_pf()
 	return redir_open_private("/dev/pf", O_RDWR);
 }
 
-static int getdestaddr_pf(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
+static int getdestaddr_pf(
+		int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr,
+		struct sockaddr_in *destaddr)
 {
 	int pffd = instance.redirector->private;
-    struct pfioc_natlook nl;
+	struct pfioc_natlook nl;
+	int saved_errno;
+	char clientaddr_str[INET6_ADDRSTRLEN], bindaddr_str[INET6_ADDRSTRLEN];
 
 	memset(&nl, 0, sizeof(struct pfioc_natlook));
 	nl.saddr.v4.s_addr = client->sin_addr.s_addr;
@@ -173,16 +178,33 @@ static int getdestaddr_pf(int fd, const struct sockaddr_in *client, const struct
 	nl.proto = IPPROTO_TCP;
 	nl.direction = PF_OUT;
 
-	if (ioctl(pffd, DIOCNATLOOK, &nl) == 0) {
-		destaddr->sin_family = AF_INET;
-		destaddr->sin_port = nl.rdport;
-		destaddr->sin_addr = nl.rdaddr.v4;
-		return 0;
-	} else {
-		if (errno != ENOENT)
-			log_errno(LOG_WARNING, "ioctl(DIOCNATLOOK)");
-		return -1;
+	if (ioctl(pffd, DIOCNATLOOK, &nl) != 0) {
+		if (errno == ENOENT) {
+			nl.direction = PF_IN; // required to redirect local packets
+			if (ioctl(pffd, DIOCNATLOOK, &nl) != 0) {
+				goto fail;
+			}
+		}
+		else {
+			goto fail;
+		}
 	}
+	destaddr->sin_family = AF_INET;
+	destaddr->sin_port = nl.rdport;
+	destaddr->sin_addr = nl.rdaddr.v4;
+	return 0;
+
+fail:
+	saved_errno = errno;
+	if (!inet_ntop(client->sin_family, &client->sin_addr, clientaddr_str, sizeof(clientaddr_str)))
+		strncpy(clientaddr_str, "???", sizeof(clientaddr_str));
+	if (!inet_ntop(bindaddr->sin_family, &bindaddr->sin_addr, bindaddr_str, sizeof(bindaddr_str)))
+		strncpy(bindaddr_str, "???", sizeof(bindaddr_str));
+
+	errno = saved_errno;
+	log_errno(LOG_WARNING, "ioctl(DIOCNATLOOK {src=%s:%d, dst=%s:%d})",
+			  clientaddr_str, ntohs(nl.sport), bindaddr_str, ntohs(nl.dport));
+	return -1;
 }
 #endif
 

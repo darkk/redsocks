@@ -537,6 +537,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 	redsocks_instance *self = _arg;
 	redsocks_client   *client = NULL;
 	struct sockaddr_in clientaddr;
+	struct sockaddr_in myaddr;
 	struct sockaddr_in destaddr;
 	socklen_t          addrlen = sizeof(clientaddr);
 	int on = 1;
@@ -550,7 +551,15 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		goto fail;
 	}
 
-	error = getdestaddr(client_fd, &clientaddr, &self->config.bindaddr, &destaddr);
+	// socket is really bound now (it could be bound to 0.0.0.0)
+	addrlen = sizeof(myaddr);
+	error = getsockname(client_fd, (struct sockaddr*)&myaddr, &addrlen);
+	if (error) {
+		log_errno(LOG_WARNING, "getsockname");
+		goto fail;
+	}
+
+	error = getdestaddr(client_fd, &clientaddr, &myaddr, &destaddr);
 	if (error) {
 		goto fail;
 	}
