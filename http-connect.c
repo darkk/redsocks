@@ -120,8 +120,9 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 							while (isspace(*ptr))
 								ptr++;
 
-							auth->last_auth_query = calloc(strlen(ptr) + 1, 1);
-							strcpy(auth->last_auth_query, ptr);
+							size_t last_auth_query_len = strlen(ptr) + 1;
+							auth->last_auth_query = calloc(last_auth_query_len, 1);
+							memcpy(auth->last_auth_query, ptr, last_auth_query_len);
 							auth->last_auth_count = 0;
 
 							free(auth_request);
