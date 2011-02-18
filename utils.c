@@ -16,6 +16,15 @@ time_t redsocks_time(time_t *t)
 	return retval;
 }
 
+const char *redsocks_evbuffer_pullup(struct evbuffer *buf)
+{
+#if _EVENT_NUMERIC_VERSION >= 0x02000000
+	return (const char*)evbuffer_pullup(buf, -1);
+#else
+	return (const char*)buf->buffer;
+#endif
+}
+
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg)
 {
 	struct bufferevent *retval = NULL;

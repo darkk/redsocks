@@ -144,7 +144,7 @@ void _log_vwrite(const char *file, int line, const char *func, int do_errno, int
 
 	if (buff) {
 		evbuffer_add_vprintf(buff, fmt, ap);
-		message = (const char*)buff->buffer;
+		message = redsocks_evbuffer_pullup(buff);
 	}
 	else
 		message = lowmem;
