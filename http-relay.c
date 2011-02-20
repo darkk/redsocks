@@ -131,7 +131,7 @@ static char *get_auth_request_header(struct evbuffer *buf)
 {
 	char *line;
 	for (;;) {
-		line = evbuffer_readline(buf);
+		line = redsocks_evbuffer_readline(buf);
 		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
 			free(line);
 			return NULL;
@@ -157,7 +157,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 
 	if (client->state == httpr_request_sent) {
 		size_t len = EVBUFFER_LENGTH(buffev->input);
-		char *line = evbuffer_readline(buffev->input);
+		char *line = redsocks_evbuffer_readline(buffev->input);
 		if (line) {
 			httpr_buffer_append(&httpr->relay_buffer, line, strlen(line));
 			httpr_buffer_append(&httpr->relay_buffer, "\r\n", 2);
@@ -237,7 +237,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 		return;
 
 	while (client->state == httpr_reply_came) {
-		char *line = evbuffer_readline(buffev->input);
+		char *line = redsocks_evbuffer_readline(buffev->input);
 		if (line) {
 			httpr_buffer_append(&httpr->relay_buffer, line, strlen(line));
 			httpr_buffer_append(&httpr->relay_buffer, "\r\n", 2);
@@ -492,7 +492,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 	char *line = NULL;
 	int connect_relay = 0;
 
-	while (!connect_relay && (line = evbuffer_readline(buffev->input))) {
+	while (!connect_relay && (line = redsocks_evbuffer_readline(buffev->input))) {
 		int skip_line = 0;
 		int do_drop = 0;
 

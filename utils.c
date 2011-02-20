@@ -31,6 +31,15 @@ const char *redsocks_evbuffer_pullup(struct evbuffer *buf)
 	return buffer;
 }
 
+char *redsocks_evbuffer_readline(struct evbuffer *buf)
+{
+#if _EVENT_NUMERIC_VERSION >= 0x02000000
+	return evbuffer_readln(buf, NULL, EVBUFFER_EOL_CRLF);
+#else
+	return evbuffer_readline(buf);
+#endif
+}
+
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg)
 {
 	struct bufferevent *retval = NULL;
