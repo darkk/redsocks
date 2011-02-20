@@ -64,7 +64,7 @@ static char *get_auth_request_header(struct evbuffer *buf)
 {
 	char *line;
 	for (;;) {
-		line = evbuffer_readline(buf);
+		line = redsocks_evbuffer_readline(buf);
 		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
 			free(line);
 			return NULL;
@@ -86,7 +86,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 
 	if (client->state == httpc_request_sent) {
 		size_t len = EVBUFFER_LENGTH(buffev->input);
-		char *line = evbuffer_readline(buffev->input);
+		char *line = redsocks_evbuffer_readline(buffev->input);
 		if (line) {
 			unsigned int code;
 			if (sscanf(line, "HTTP/%*u.%*u %u", &code) == 1) { // 1 == one _assigned_ match
@@ -163,7 +163,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 		return;
 
 	while (client->state == httpc_reply_came) {
-		char *line = evbuffer_readline(buffev->input);
+		char *line = redsocks_evbuffer_readline(buffev->input);
 		if (line) {
 			if (strlen(line) == 0) {
 				client->state = httpc_headers_skipped;
