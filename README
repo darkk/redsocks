@@ -41,11 +41,8 @@ proxying (e.g. old SQUID had broken `acl myport' for such connections).
 License
 =======
 
-All source code is licensed under GPLv3 or later. Contact the author
-if you want to use the code and GPLv3 (or later) does not permit you to
-do so.
-
-Text of GPLv3 is included in file `COPYING'.
+All source code is licensed under Apache 2.0 license.
+You can get a copy at http://www.apache.org/licenses/LICENSE-2.0.html
 
 
 Compilation
@@ -115,10 +112,9 @@ TODO
 Test OpenBSD (pf) and FreeBSD (ipfw) and write setup examples for those
 firewall types.
 
-Allow redirecting of UDP and/or DNS packets.
+Allow redirecting of DNS packets.
 
 
 Author
 ======
 This program was written by Leonid Evdokimov <leon@darkk.net.ru>
-
