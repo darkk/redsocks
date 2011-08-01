@@ -181,7 +181,7 @@ void redsocks_log_write_plain(
 	va_start(ap, orig_fmt);
 	if (fmt) {
 		errno = saved_errno;
-		_log_vwrite(file, line, func, do_errno, priority, (const char*)fmt->buffer, ap);
+		_log_vwrite(file, line, func, do_errno, priority, (const char*)EVBUFFER_DATA(fmt), ap);
 		evbuffer_free(fmt);
 	}
 	va_end(ap);
