@@ -78,4 +78,11 @@ redudp {
 	udp_timeout_stream = 180;
 }
 
+dnstc {
+	// fake and really dumb DNS server that returns "truncated answer" to
+	// every query via UDP
+	local_ip = 127.0.0.1;
+	local_port = 5300;
+}
+
 // you can add more `redsocks' and `redudp' sections if you need.

@@ -20,8 +20,36 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include "log.h"
 #include "utils.h"
+
+int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr)
+{
+	socklen_t addrlen = sizeof(*inaddr);
+	ssize_t pktlen;
+
+	pktlen = recvfrom(fd, buf, buflen, 0, (struct sockaddr*)inaddr, &addrlen);
+	if (pktlen == -1) {
+		log_errno(LOG_WARNING, "recvfrom");
+		return -1;
+	}
+
+	if (addrlen != sizeof(*inaddr)) {
+		log_error(LOG_WARNING, "unexpected address length %u instead of %zu", addrlen, sizeof(*inaddr));
+		return -1;
+	}
+
+	if (pktlen >= buflen) {
+		char buf[INET6_ADDRSTRLEN];
+		const char *addr = inet_ntop(inaddr->sin_family, &inaddr->sin_addr, buf, sizeof(buf));
+		log_error(LOG_WARNING, "wow! Truncated udp packet of size %zd from %s:%u! impossible! dropping it...",
+		          pktlen, addr ? addr : "?", ntohs(inaddr->sin_port));
+		return -1;
+	}
+
+	return pktlen;
+}
 
 time_t redsocks_time(time_t *t)
 {

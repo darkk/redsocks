@@ -114,8 +114,6 @@ TODO
 Test OpenBSD (pf) and FreeBSD (ipfw) and write setup examples for those
 firewall types.
 
-Allow redirecting of DNS packets.
-
 
 Author
 ======

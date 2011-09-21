@@ -80,33 +80,6 @@ static struct evbuffer* socks5_mkassociate(void *p)
 	return socks5_mkcommand_plain(socks5_cmd_udp_associate, &sa);
 }
 
-static int recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr)
-{
-	socklen_t addrlen = sizeof(*inaddr);
-	ssize_t pktlen;
-
-	pktlen = recvfrom(fd, buf, buflen, 0, (struct sockaddr*)inaddr, &addrlen);
-	if (pktlen == -1) {
-		log_errno(LOG_WARNING, "recvfrom");
-		return -1;
-	}
-
-	if (addrlen != sizeof(*inaddr)) {
-		log_error(LOG_WARNING, "unexpected address length %u instead of %zu", addrlen, sizeof(*inaddr));
-		return -1;
-	}
-
-	if (pktlen >= buflen) {
-		char buf[INET6_ADDRSTRLEN];
-		const char *addr = inet_ntop(inaddr->sin_family, &inaddr->sin_addr, buf, sizeof(buf));
-		log_error(LOG_WARNING, "wow! Truncated udp packet of size %zd from %s:%u! impossible! dropping it...",
-		          pktlen, addr ? addr : "?", ntohs(inaddr->sin_port));
-		return -1;
-	}
-
-	return pktlen;
-}
-
 /***********************************************************************
  * Logic
  */
@@ -458,11 +431,9 @@ static void redudp_pkt_from_socks(int fd, short what, void *_arg)
 
 	assert(fd == EVENT_FD(&client->udprelay));
 
-	pktlen = recv_udp_pkt(fd, pkt.buf, sizeof(pkt.buf), &udprelayaddr);
-	if (pktlen == -1) {
-		redudp_log_errno(client, LOG_WARNING, "recv_udp_pkt");
+	pktlen = red_recv_udp_pkt(fd, pkt.buf, sizeof(pkt.buf), &udprelayaddr);
+	if (pktlen == -1)
 		return;
-	}
 
 	if (memcmp(&udprelayaddr, &client->udprelayaddr, sizeof(udprelayaddr)) != 0) {
 		char buf[INET6_ADDRSTRLEN];
@@ -518,10 +489,9 @@ static void redudp_pkt_from_client(int fd, short what, void *_arg)
 	redudp_client *tmp, *client = NULL;
 
 	assert(fd == EVENT_FD(&self->listener));
-	pktlen = recv_udp_pkt(fd, buf, sizeof(buf), &clientaddr);
-	if (pktlen == -1) {
+	pktlen = red_recv_udp_pkt(fd, buf, sizeof(buf), &clientaddr);
+	if (pktlen == -1)
 		return;
-	}
 
 	// TODO: this lookup may be SLOOOOOW.
 	list_for_each_entry(tmp, &self->clients, list) {
