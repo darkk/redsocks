@@ -55,7 +55,8 @@ Login/password authentication is supported for SOCKS5/HTTPS connections.
 SOCKS4 supports only username, password is ignored. for HTTPS, currently
 only Basic and Digest scheme is supported.
 
-Redirect UDP packets via SOCKS5 proxy server.
+Redirect UDP packets via SOCKS5 proxy server. NB: UDP still goes via UDP, so
+you can't relay UDP via OpenSSH.
 
 Sends "truncated reply" as an answer to UDP DNS queries.
 
@@ -82,13 +83,13 @@ Compilation is as easy as running `make', there is no `./configure' magic.
 
 GNU Make works, other implementations of make were not tested.
 
-[5] http://www.monkey.org/~provos/libevent/
+[5] http://libevent.org/ || http://www.monkey.org/~provos/libevent/
 
 
 Running
 =======
 
-Program has only two command-line options:
+Program has following command-line options:
  -c   sets proper path to config file ("./redsocks.conf" is default one)
  -t   tests config file syntax
  -p   set a file to write the getpid() into
@@ -131,6 +132,10 @@ Homepage
 http://darkk.net.ru/redsocks/
 
 Mailing list: redsocks@librelist.com
+
+Mailing list also has archives[1].
+
+[1] http://librelist.com/browser/redsocks/
 
 
 TODO
