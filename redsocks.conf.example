@@ -11,6 +11,8 @@ base {
 	 *   syslog:FACILITY  facility is any of "daemon", "local0"..."local7"
 	 */
 	log = stderr;
+	// log = "file:/path/to/file";
+	// log = "syslog:local7";
 
 	// detach from console
 	daemon = off;
@@ -80,7 +82,8 @@ redudp {
 
 dnstc {
 	// fake and really dumb DNS server that returns "truncated answer" to
-	// every query via UDP
+	// every query via UDP, RFC-compliant resolver should repeat same query
+	// via TCP in this case.
 	local_ip = 127.0.0.1;
 	local_port = 5300;
 }

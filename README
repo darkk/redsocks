@@ -22,6 +22,29 @@ and does not support authentication.
 [4] http://oss.tiggerswelt.net/transocks_ev/
 
 
+Another related issue is DNS over TCP. Redsocks includes `dnstc' that is fake
+and really dumb DNS server that returns "truncated answer" to every query via
+UDP. RFC-compliant resolver should repeat same query via TCP in this case - so
+the request can be redirected using usual redsocks facilities.
+
+Known compliant resolvers are:
+ * bind9 (server)
+ * dig, nslookup (tools based on bind9 code)
+Known non-compliant resolvers are:
+ * eglibc resolver fails without any attempt to send request via TCP
+ * powerdns-recursor can't properly startup without UDP connectivity as it
+   can't load root hints
+
+On the other hand, DNS via TCP using bind9 may be painfully slow. If your bind9
+setup is really slow, you have at least two options: pdnsd[5] caching server
+can run in TCP-only mode, ttdnsd[6][7] has no cache but can be useful for same
+purpose.
+
+[5] http://www.phys.uu.nl/~rombouts/pdnsd.html
+[6] http://www.mulliner.org/collin/ttdnsd.php
+[7] https://gitweb.torproject.org/ioerror/ttdnsd.git
+
+
 Features
 ========
 
@@ -33,6 +56,8 @@ SOCKS4 supports only username, password is ignored. for HTTPS, currently
 only Basic and Digest scheme is supported.
 
 Redirect UDP packets via SOCKS5 proxy server.
+
+Sends "truncated reply" as an answer to UDP DNS queries.
 
 Redirect any HTTP connection to proxy that does not support transparent
 proxying (e.g. old SQUID had broken `acl myport' for such connections).
