@@ -16,10 +16,17 @@ Transocks[3] is alike project but it has noticable performance penality.
 Transsocks_ev[4] is alike project too, but it has no HTTPS-proxy support
 and does not support authentication.
 
+Several Andoird apps also use redsocks under-the-hood: ProxyDroid[5][6] and
+sshtunnel[7][8]. And that's over 100'000 downloads! Wow!
+
 [1] http://www.torproject.org
 [2] http://www.globax.biz
 [3] http://transocks.sourceforge.net/
 [4] http://oss.tiggerswelt.net/transocks_ev/
+[5] http://code.google.com/p/proxydroid/
+[6] https://market.android.com/details?id=org.proxydroid
+[7] http://code.google.com/p/sshtunnel/
+[8] https://market.android.com/details?id=org.sshtunnel
 
 
 Another related issue is DNS over TCP. Redsocks includes `dnstc' that is fake
@@ -36,13 +43,13 @@ Known non-compliant resolvers are:
    can't load root hints
 
 On the other hand, DNS via TCP using bind9 may be painfully slow. If your bind9
-setup is really slow, you have at least two options: pdnsd[5] caching server
-can run in TCP-only mode, ttdnsd[6][7] has no cache but can be useful for same
+setup is really slow, you have at least two options: pdnsd[9] caching server
+can run in TCP-only mode, ttdnsd[10][11] has no cache but can be useful for same
 purpose.
 
-[5] http://www.phys.uu.nl/~rombouts/pdnsd.html
-[6] http://www.mulliner.org/collin/ttdnsd.php
-[7] https://gitweb.torproject.org/ioerror/ttdnsd.git
+[9] http://www.phys.uu.nl/~rombouts/pdnsd.html
+[10] http://www.mulliner.org/collin/ttdnsd.php
+[11] https://gitweb.torproject.org/ioerror/ttdnsd.git
 
 
 Features
