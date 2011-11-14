@@ -36,6 +36,9 @@ your bugreports are welcome.</p>
 <p><a href="http://oss.tiggerswelt.net/transocks_ev/">Transsocks_ev</a> is alike project too, but it has no HTTPS-proxy support
 and does not support authentication.</p>
 
+<p>Several Andoird apps also use redsocks under-the-hood: <a href="http://code.google.com/p/proxydroid/">ProxyDroid</a> (<a href="https://market.android.com/details?id=org.proxydroid">@AndroidMarket</a>) and
+<a href="http://code.google.com/p/sshtunnel/">sshtunnel</a> (<a href="https://market.android.com/details?id=org.sshtunnel">@AndroidMarket</a>). And that's over 100'000 downloads! Wow!</p>
+
 <p>Another related issue is DNS over TCP. Redsocks includes `dnstc' that is fake
 and really dumb DNS server that returns "truncated answer" to every query via
 UDP. RFC-compliant resolver should repeat same query via TCP in this case - so
