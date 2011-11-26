@@ -25,6 +25,7 @@
 #include "log.h"
 #include "main.h"
 #include "utils.h"
+#include "version.h"
 
 extern app_subsys redsocks_subsys;
 extern app_subsys base_subsys;
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
 	int i;
 
 	red_srand();
-	while ((opt = getopt(argc, argv, "tc:p:")) != -1) {
+	while ((opt = getopt(argc, argv, "h?vtc:p:")) != -1) {
 		switch (opt) {
 		case 't':
 			conftest = true;
@@ -77,13 +78,18 @@ int main(int argc, char **argv)
 		case 'p':
 			pidfile = optarg;
 			break;
+		case 'v':
+			puts(redsocks_version);
+			return EXIT_SUCCESS;
 		default:
 			printf(
-				"Usage: %s [-t] [-c config] [-p pidfile]\n"
+				"Usage: %s [-?hvt] [-c config] [-p pidfile]\n"
+				"  -h, -?       this message\n"
+				"  -v           print version\n"
 				"  -t           test config syntax\n"
 				"  -p           write pid to pidfile\n",
 				argv[0]);
-			return EXIT_FAILURE;
+			return (opt == '?' || opt == 'h') ? EXIT_SUCCESS : EXIT_FAILURE;
 		}
 	}
 

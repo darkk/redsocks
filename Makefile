@@ -1,4 +1,4 @@
-OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o
+OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
@@ -28,6 +28,22 @@ $(CONF):
 		echo "/* Unknown system, only generic firewall code is compiled */" >$(CONF) \
 		;; \
 	esac
+
+# Dependency on .git is useful to rebuild `version.c' after commit
+# FIXME: non-git builds should be supported.
+gen/version.c: *.c *.h gen/.build .git
+	rm -f $@.tmp
+	echo '/* this file is auto-generated during build */' > $@.tmp
+	echo '#include "../version.h"' > $@.tmp
+	echo 'const char* redsocks_version = "redsocks.git/"' >> $@.tmp
+	echo '"'`git describe --tags`'"' >> $@.tmp
+	[ `git status --porcelain | grep -v -c '^??'` != 0 ] && { echo '"-unclean"' >> $@.tmp; } || true
+	echo ';' >> $@.tmp
+	mv -f $@.tmp $@
+
+gen/.build:
+	mkdir -p gen
+	touch $@
 
 base.c: $(CONF)
 
@@ -64,3 +80,4 @@ clean:
 
 distclean: clean
 	$(RM) tags $(DEPS)
+	$(RM) -r gen
