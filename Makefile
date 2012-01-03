@@ -3,6 +3,7 @@ SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks
+VERSION := 0.2
 
 LIBS := -levent
 CFLAGS += -g -O2
@@ -29,15 +30,18 @@ $(CONF):
 		;; \
 	esac
 
-# Dependency on .git is useful to rebuild `version.c' after commit
-# FIXME: non-git builds should be supported.
-gen/version.c: *.c *.h gen/.build .git
+# Dependency on .git is useful to rebuild `version.c' after commit, but it breaks non-git builds.
+gen/version.c: *.c *.h gen/.build
 	rm -f $@.tmp
 	echo '/* this file is auto-generated during build */' > $@.tmp
-	echo '#include "../version.h"' > $@.tmp
-	echo 'const char* redsocks_version = "redsocks.git/"' >> $@.tmp
-	echo '"'`git describe --tags`'"' >> $@.tmp
-	[ `git status --porcelain | grep -v -c '^??'` != 0 ] && { echo '"-unclean"' >> $@.tmp; } || true
+	echo '#include "../version.h"' >> $@.tmp
+	echo 'const char* redsocks_version = ' >> $@.tmp
+	if [ -d .git ]; then \
+		echo '"redsocks.git/'`git describe --tags`'"'; \
+		[ `git status --porcelain | grep -v -c '^??'` != 0 ] && { echo '"-unclean"' ; } \
+	else \
+		echo '"redsocks/$(VERSION)"'; \
+	fi >> $@.tmp
 	echo ';' >> $@.tmp
 	mv -f $@.tmp $@
 
