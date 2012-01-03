@@ -20,11 +20,15 @@
 #include <string.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
+#include <errno.h>
 #include "utils.h"
 #include "parser.h"
+#include "log.h"
 
 #define FREE(ptr) do { free(ptr); ptr = NULL; } while (0)
 
@@ -286,14 +290,45 @@ static int vp_uint16(parser_context *context, void *addr, const char *token)
 static int vp_in_addr(parser_context *context, void *addr, const char *token)
 {
 	struct in_addr ia;
+
 	if (inet_aton(token, &ia)) {
 		memcpy(addr, &ia, sizeof(ia));
-		return 0;
 	}
 	else {
-		parser_error(context, "invalid IP address");
-		return -1;
+		struct addrinfo *addr, hints;
+		int err;
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET; /* IPv4-only */
+		hints.ai_socktype = SOCK_STREAM; /* I want to have one address once and ONLY once, that's why I specify socktype and protocol */
+		hints.ai_protocol = IPPROTO_TCP;
+		hints.ai_flags = AI_ADDRCONFIG; /* I don't need IPv4 addrs without IPv4 connectivity */
+		err = getaddrinfo(token, NULL, &hints, &addr);
+		if (err == 0) {
+			int count, taken;
+			struct addrinfo *iter;
+			struct sockaddr_in *resolved_addr;
+			for (iter = addr, count = 0; iter; iter = iter->ai_next, ++count)
+				;
+			taken = rand() % count;
+			for (iter = addr; taken > 0; iter = iter->ai_next, --taken)
+				;
+			resolved_addr = (struct sockaddr_in*)iter->ai_addr;
+			assert(resolved_addr->sin_family == iter->ai_family && iter->ai_family == AF_INET);
+			if (count != 1)
+				log_error(LOG_WARNING, "%s resolves to %d addresses, using %s",
+				          token, count, inet_ntoa(resolved_addr->sin_addr));
+			memcpy(addr, &resolved_addr->sin_addr, sizeof(ia));
+			freeaddrinfo(addr);
+		}
+		else {
+			if (err == EAI_SYSTEM)
+				parser_error(context, strerror(errno));
+			else
+				parser_error(context, gai_strerror(err));
+			return -1;
+		}
 	}
+	return 0;
 }
 
 static int vp_in_addr2(parser_context *context, void *addr, const char *token)

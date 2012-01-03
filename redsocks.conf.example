@@ -44,7 +44,7 @@ redsocks {
 	local_port = 12345;
 
 	// `ip' and `port' are IP and tcp-port of proxy-server
-	ip = 127.0.0.1;
+	ip = example.org;
 	port = 1080;
 
 
