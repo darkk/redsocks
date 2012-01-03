@@ -7,7 +7,7 @@ base {
 
 	/* possible `log' values are:
 	 *   stderr
-	 *   file:/path/to/file
+	 *   "file:/path/to/file"
 	 *   syslog:FACILITY  facility is any of "daemon", "local0"..."local7"
 	 */
 	log = stderr;
@@ -44,6 +44,8 @@ redsocks {
 	local_port = 12345;
 
 	// `ip' and `port' are IP and tcp-port of proxy-server
+	// You can also use hostname instead of IP, only one (random)
+	// address of multihomed host will be used.
 	ip = example.org;
 	port = 1080;
 
