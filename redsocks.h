@@ -29,6 +29,7 @@ typedef struct redsocks_config_t {
 	char *type;
 	char *login;
 	char *password;
+	uint16_t max_backoff_ms; // backoff capped by 65 seconds is enough :)
 	uint16_t listenq;
 } redsocks_config;
 
@@ -41,6 +42,8 @@ typedef struct redsocks_instance_t {
 	list_head       list;
 	redsocks_config config;
 	struct tracked_event listener;
+	struct tracked_event accept_backoff;
+	uint16_t        accept_backoff_ms;
 	list_head       clients;
 	relay_subsys   *relay_ss;
 } redsocks_instance;

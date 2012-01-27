@@ -65,6 +65,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "login",      .type = pt_pchar },
 	{ .key = "password",   .type = pt_pchar },
 	{ .key = "listenq",    .type = pt_uint16 },
+	{ .key = "max_accept_backoff", .type = pt_uint16 },
 	{ }
 };
 
@@ -119,6 +120,7 @@ static int redsocks_onenter(parser_section *section)
 	 * Linux:   sysctl net.core.somaxconn
 	 * FreeBSD: sysctl kern.ipc.somaxconn */
 	instance->config.listenq = SOMAXCONN;
+	instance->config.max_backoff_ms = 60000;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
@@ -130,6 +132,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
+			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
 			NULL;
 	section->data = instance;
 	return 0;
@@ -165,6 +168,10 @@ static int redsocks_onexit(parser_section *section)
 	}
 	else {
 		err = "no `type` for redsocks";
+	}
+
+	if (!err && !instance->config.max_backoff_ms) {
+		err = "`max_accept_backoff` must be positive, 0 ms is too low";
 	}
 
 	if (err)
@@ -561,6 +568,19 @@ void redsocks_connect_relay(redsocks_client *client)
 	}
 }
 
+static void redsocks_accept_backoff(int fd, short what, void *_arg)
+{
+	redsocks_instance *self = _arg;
+
+	/* Isn't it already deleted? EV_PERSIST has nothing common with timeouts in
+	 * old libevent... On the other hand libevent does not return any error. */
+	if (tracked_event_del(&self->accept_backoff) != 0)
+		log_errno(LOG_ERR, "event_del");
+
+	if (tracked_event_add(&self->listener, NULL) != 0)
+		log_errno(LOG_ERR, "event_add");
+}
+
 static void redsocks_accept_client(int fd, short what, void *_arg)
 {
 	redsocks_instance *self = _arg;
@@ -576,9 +596,27 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 	// working with client_fd
 	client_fd = accept(fd, (struct sockaddr*)&clientaddr, &addrlen);
 	if (client_fd == -1) {
-		log_errno(LOG_WARNING, "accept");
+		/* Different systems use different `errno` value to signal different
+		 * `lack of file descriptors` conditions. Here are most of them.  */
+		if (errno == ENFILE || errno == EMFILE || errno == ENOBUFS || errno == ENOMEM) {
+			// FIXME: should I log on every attempt?
+			self->accept_backoff_ms = (self->accept_backoff_ms << 1) + 1;
+			if (self->accept_backoff_ms > self->config.max_backoff_ms)
+				self->accept_backoff_ms = self->config.max_backoff_ms;
+			int delay = (random() % self->accept_backoff_ms) + 1;
+			log_errno(LOG_WARNING, "accept: out of file descriptos, backing off for %u ms", delay);
+			struct timeval tvdelay = { delay / 1000, (delay % 1000) * 1000 };
+			if (tracked_event_del(&self->listener) != 0)
+				log_errno(LOG_ERR, "event_del");
+			if (tracked_event_add(&self->accept_backoff, &tvdelay) != 0)
+				log_errno(LOG_ERR, "event_add");
+		}
+		else {
+			log_errno(LOG_WARNING, "accept");
+		}
 		goto fail;
 	}
+	self->accept_backoff_ms = 0;
 
 	// socket is really bound now (it could be bound to 0.0.0.0)
 	addrlen = sizeof(myaddr);
@@ -742,6 +780,8 @@ static int redsocks_init_instance(redsocks_instance *instance)
 	}
 
 	tracked_event_set(&instance->listener, fd, EV_READ | EV_PERSIST, redsocks_accept_client, instance);
+	tracked_event_set(&instance->accept_backoff, -1, 0, redsocks_accept_backoff, instance);
+
 	error = tracked_event_add(&instance->listener, NULL);
 	if (error) {
 		log_errno(LOG_ERR, "event_add");
@@ -780,6 +820,9 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 	if (event_initialized(&instance->listener.ev)) {
 		if (instance->listener.inserted)
 			if (tracked_event_del(&instance->listener) != 0)
+				log_errno(LOG_WARNING, "event_del");
+		if (instance->accept_backoff.inserted)
+			if (tracked_event_del(&instance->accept_backoff) != 0)
 				log_errno(LOG_WARNING, "event_del");
 		if (close(EVENT_FD(&instance->listener.ev)) != 0)
 			log_errno(LOG_WARNING, "close");
