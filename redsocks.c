@@ -68,6 +68,32 @@ static parser_entry redsocks_entries[] =
 	{ }
 };
 
+/* There is no way to get `EVLIST_INSERTED` event flag outside of libevent, so
+ * here are tracking functions. */
+static void tracked_event_set(
+		struct tracked_event *tev, evutil_socket_t fd, short events,
+		void (*callback)(evutil_socket_t, short, void *), void *arg)
+{
+	event_set(&tev->ev, fd, events, callback, arg);
+	tev->inserted = 0;
+}
+
+static int tracked_event_add(struct tracked_event *tev, const struct timeval *tv)
+{
+	int ret = event_add(&tev->ev, tv);
+	if (ret == 0)
+		tev->inserted = 1;
+	return ret;
+}
+
+static int tracked_event_del(struct tracked_event *tev)
+{
+	int ret = event_del(&tev->ev);
+	if (ret == 0)
+		tev->inserted = 0;
+	return ret;
+}
+
 static int redsocks_onenter(parser_section *section)
 {
 	// FIXME: find proper way to calulate instance_payload_len
@@ -715,8 +741,8 @@ static int redsocks_init_instance(redsocks_instance *instance)
 		goto fail;
 	}
 
-	event_set(&instance->listener, fd, EV_READ | EV_PERSIST, redsocks_accept_client, instance);
-	error = event_add(&instance->listener, NULL);
+	tracked_event_set(&instance->listener, fd, EV_READ | EV_PERSIST, redsocks_accept_client, instance);
+	error = tracked_event_add(&instance->listener, NULL);
 	if (error) {
 		log_errno(LOG_ERR, "event_add");
 		goto fail;
@@ -751,10 +777,11 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 	if (instance->relay_ss->instance_fini)
 		instance->relay_ss->instance_fini(instance);
 
-	if (event_initialized(&instance->listener)) {
-		if (event_del(&instance->listener) != 0)
-			log_errno(LOG_WARNING, "event_del");
-		if (close(EVENT_FD(&instance->listener)) != 0)
+	if (event_initialized(&instance->listener.ev)) {
+		if (instance->listener.inserted)
+			if (tracked_event_del(&instance->listener) != 0)
+				log_errno(LOG_WARNING, "event_del");
+		if (close(EVENT_FD(&instance->listener.ev)) != 0)
 			log_errno(LOG_WARNING, "close");
 		memset(&instance->listener, 0, sizeof(instance->listener));
 	}

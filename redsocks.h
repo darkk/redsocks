@@ -32,10 +32,15 @@ typedef struct redsocks_config_t {
 	uint16_t listenq;
 } redsocks_config;
 
+struct tracked_event {
+	struct event ev;
+	int inserted;
+};
+
 typedef struct redsocks_instance_t {
 	list_head       list;
 	redsocks_config config;
-	struct event    listener;
+	struct tracked_event listener;
 	list_head       clients;
 	relay_subsys   *relay_ss;
 } redsocks_instance;
