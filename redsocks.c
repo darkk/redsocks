@@ -35,8 +35,6 @@
 #include "utils.h"
 
 
-#define THE_ANSWER_TO_THE_ULTIMATE_QUESTION_OF_LIFE_THE_UNIVERSE_AND_EVERYTHING 42
-
 #define REDSOCKS_RELAY_HALFBUFF  4096
 
 
@@ -66,6 +64,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "type",       .type = pt_pchar },
 	{ .key = "login",      .type = pt_pchar },
 	{ .key = "password",   .type = pt_pchar },
+	{ .key = "listenq",    .type = pt_uint16 },
 	{ }
 };
 
@@ -90,6 +89,10 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	instance->config.relayaddr.sin_family = AF_INET;
 	instance->config.relayaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	/* Default value can be checked in run-time, but I doubt anyone needs that.
+	 * Linux:   sysctl net.core.somaxconn
+	 * FreeBSD: sysctl kern.ipc.somaxconn */
+	instance->config.listenq = SOMAXCONN;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
@@ -100,6 +103,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "type") == 0)       ? (void*)&instance->config.type :
 			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
+			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
 			NULL;
 	section->data = instance;
 	return 0;
@@ -705,7 +709,7 @@ static int redsocks_init_instance(redsocks_instance *instance)
 		goto fail;
 	}
 
-	error = listen(fd, THE_ANSWER_TO_THE_ULTIMATE_QUESTION_OF_LIFE_THE_UNIVERSE_AND_EVERYTHING); // does anyone know better value?
+	error = listen(fd, instance->config.listenq);
 	if (error) {
 		log_errno(LOG_ERR, "listen");
 		goto fail;

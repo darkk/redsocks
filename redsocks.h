@@ -29,6 +29,7 @@ typedef struct redsocks_config_t {
 	char *type;
 	char *login;
 	char *password;
+	uint16_t listenq;
 } redsocks_config;
 
 typedef struct redsocks_instance_t {

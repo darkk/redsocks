@@ -43,6 +43,10 @@ redsocks {
 	local_ip = 127.0.0.1;
 	local_port = 12345;
 
+	// listen() queue length. Default value is SOMAXCONN and it should be
+	// good enough for most of us.
+	// listenq = 128;
+
 	// `ip' and `port' are IP and tcp-port of proxy-server
 	// You can also use hostname instead of IP, only one (random)
 	// address of multihomed host will be used.
