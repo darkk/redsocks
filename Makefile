@@ -38,7 +38,9 @@ gen/version.c: *.c *.h gen/.build
 	echo 'const char* redsocks_version = ' >> $@.tmp
 	if [ -d .git ]; then \
 		echo '"redsocks.git/'`git describe --tags`'"'; \
-		[ `git status --porcelain | grep -v -c '^??'` != 0 ] && { echo '"-unclean"' ; } \
+		if [ `git status --porcelain | grep -v -c '^??'` != 0 ]; then \
+			echo '"-unclean"'; \
+		fi \
 	else \
 		echo '"redsocks/$(VERSION)"'; \
 	fi >> $@.tmp
