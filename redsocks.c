@@ -604,7 +604,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 			if (self->accept_backoff_ms > self->config.max_backoff_ms)
 				self->accept_backoff_ms = self->config.max_backoff_ms;
 			int delay = (random() % self->accept_backoff_ms) + 1;
-			log_errno(LOG_WARNING, "accept: out of file descriptos, backing off for %u ms", delay);
+			log_errno(LOG_WARNING, "accept: out of file descriptors, backing off for %u ms", delay);
 			struct timeval tvdelay = { delay / 1000, (delay % 1000) * 1000 };
 			if (tracked_event_del(&self->listener) != 0)
 				log_errno(LOG_ERR, "event_del");
