@@ -149,6 +149,13 @@ luser$ sg socksified -c id
 uid=1000(luser) gid=1001(socksified) groups=1000(luser),1001(socksified)
 luser$ sg socksified -c "firefox"
 
+Note about GID-based redirection
+========
+Keep in mind, that changed GID affects filesystem permissions, so if your
+application creates some files, the files will be created with luser:socksified
+owner/group. So, if you're not the only user in the group `socksified` and your
+umask allows to create group-readble files and your directory permissions, etc.
+Ok, you have been warned.
 
 Homepage
 ========
