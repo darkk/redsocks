@@ -115,25 +115,42 @@ SIGTERM and SIGINT terminates daemon, all active connections are closed</p>
 
 <p>You have to build iptables with connection tracking and REDIRECT target.</p>
 
-<pre># Create new chain
-<code>iptables -t nat -N REDSOCKS</code>
+<pre>
+# Create new chain
+<strong>root#</strong> <code>iptables -t nat -N REDSOCKS</code>
 
 # Ignore LANs and some other reserved addresses.
-<code>iptables -t nat -A REDSOCKS -d 0.0.0.0/8 -j RETURN
-iptables -t nat -A REDSOCKS -d 10.0.0.0/8 -j RETURN
-iptables -t nat -A REDSOCKS -d 127.0.0.0/8 -j RETURN
-iptables -t nat -A REDSOCKS -d 169.254.0.0/16 -j RETURN
-iptables -t nat -A REDSOCKS -d 172.16.0.0/12 -j RETURN
-iptables -t nat -A REDSOCKS -d 192.168.0.0/16 -j RETURN
-iptables -t nat -A REDSOCKS -d 224.0.0.0/4 -j RETURN
-iptables -t nat -A REDSOCKS -d 240.0.0.0/4 -j RETURN</code>
+# See <a href="http://en.wikipedia.org/wiki/Reserved_IP_addresses#Reserved_IPv4_addresses">Wikipedia</a> and <a href="http://tools.ietf.org/html/rfc5735">RFC5735</a> for full list of reserved networks.
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 0.0.0.0/8 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 10.0.0.0/8 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 127.0.0.0/8 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 169.254.0.0/16 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 172.16.0.0/12 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 192.168.0.0/16 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 224.0.0.0/4 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 240.0.0.0/4 -j RETURN</code>
 
 # Anything else should be redirected to port 12345
-<code>iptables -t nat -A REDSOCKS -p tcp -j REDIRECT --to-ports 12345</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -p tcp -j REDIRECT --to-ports 12345</code>
 
-# Any tcp connection made by `darkk' should be redirected.
-<code>iptables -t nat -A OUTPUT -p tcp -m owner --uid-owner darkk -j REDSOCKS</code></pre>
+# Any tcp connection made by `luser' should be redirected.
+<strong>root#</strong> <code>iptables -t nat -A OUTPUT -p tcp -m owner --uid-owner luser -j REDSOCKS</code>
 
+# You can also control that in more precise way using `gid-owner` from
+# iptables.
+<strong>root#</strong> <code>groupadd socksified</code>
+<strong>root#</strong> <code>usermod --append --groups socksified luser</code>
+<strong>root#</strong> <code>iptables -t nat -A OUTPUT -p tcp -m owner --gid-owner socksified -j REDSOCKS</code>
+
+# Now you can launch your specific application with GID `socksified` and it
+# will be... socksified. See following commands (numbers may vary).
+# Note: you may have to relogin to apply `usermod` changes.
+<strong>luser$</strong> <code>id</code>
+uid=1000(luser) gid=1000(luser) groups=1000(luser),1001(socksified)
+<strong>luser$</strong> <code>sg socksified -c id</code>
+uid=1000(luser) gid=1001(socksified) groups=1000(luser),1001(socksified)
+<strong>luser$</strong> <code>sg socksified -c "firefox"</code>
+</pre>
 
 <h2>Homepage</h2>
 
