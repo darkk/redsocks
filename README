@@ -154,7 +154,8 @@ Note about GID-based redirection
 Keep in mind, that changed GID affects filesystem permissions, so if your
 application creates some files, the files will be created with luser:socksified
 owner/group. So, if you're not the only user in the group `socksified` and your
-umask allows to create group-readble files and your directory permissions, etc.
+umask allows to create group-readable files and your directory permissions, and
+so on, blah-blah, etc. THEN you may expose your files to another user.
 Ok, you have been warned.
 
 Homepage
