@@ -1,0 +1,16 @@
+Name: libevent
+URL: http://www.monkey.org/~provos/libevent/
+Version: 1.4.13
+License: BSD
+
+Local Modifications:
+Rather than use libevent's own build system, we just build a Chrome
+static library using GYP.
+
+1) Run configure and "make event-config.h" on a Linux, FreeBSD, and
+   Mac box and copy config.h and event-config.h to linux/, freebsd/,
+   and mac/ respectively.
+2) Add libevent.gyp.
+3) chromium.patch is applied to allow libevent to be used without
+   being installed.
+4) The directories WIN32-Code and WIN32-Prj are not included.

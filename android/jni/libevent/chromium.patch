@@ -1,0 +1,57 @@
+diff --git a/third_party/libevent/event-config.h b/third_party/libevent/event-config.h
+new file mode 100644
+index 0000000..78a4727
+--- /dev/null
++++ b/third_party/libevent/event-config.h
+@@ -0,0 +1,16 @@
++// Copyright (c) 2009 The Chromium Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++// This file is Chromium-specific, and brings in the appropriate
++// event-config.h depending on your platform.
++
++#if defined(__APPLE__)
++#include "mac/event-config.h"
++#elif defined(__linux__)
++#include "linux/event-config.h"
++#elif defined(__FreeBSD__)
++#include "freebsd/event-config.h"
++#else
++#error generate event-config.h for your platform
++#endif
+diff --git a/third_party/libevent/event.h b/third_party/libevent/event.h
+index cfa0fc3..72e9b8b 100644
+--- a/third_party/libevent/event.h
++++ b/third_party/libevent/event.h
+@@ -159,7 +159,7 @@
+ extern "C" {
+ #endif
+ 
+-#include <event-config.h>
++#include "event-config.h"
+ #ifdef _EVENT_HAVE_SYS_TYPES_H
+ #include <sys/types.h>
+ #endif
+@@ -172,7 +172,7 @@ extern "C" {
+ #include <stdarg.h>
+ 
+ /* For int types. */
+-#include <evutil.h>
++#include "evutil.h"
+ 
+ #ifdef WIN32
+ #define WIN32_LEAN_AND_MEAN
+diff --git a/third_party/libevent/evutil.h b/third_party/libevent/evutil.h
+index dcb0013..8b664b9 100644
+--- a/third_party/libevent/evutil.h
++++ b/third_party/libevent/evutil.h
+@@ -38,7 +38,7 @@
+ extern "C" {
+ #endif
+ 
+-#include <event-config.h>
++#include "event-config.h"
+ #ifdef _EVENT_HAVE_SYS_TIME_H
+ #include <sys/time.h>
+ #endif

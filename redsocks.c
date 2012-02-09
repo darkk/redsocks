@@ -71,9 +71,11 @@ static parser_entry redsocks_entries[] =
 
 /* There is no way to get `EVLIST_INSERTED` event flag outside of libevent, so
  * here are tracking functions. */
+/*  XXX: For the compatibility with libevent-1.4.X, we have to use int instead of
+ *  evutil_socket_t */
 static void tracked_event_set(
-		struct tracked_event *tev, evutil_socket_t fd, short events,
-		void (*callback)(evutil_socket_t, short, void *), void *arg)
+		struct tracked_event *tev, int fd, short events,
+		void (*callback)(int, short, void *), void *arg)
 {
 	event_set(&tev->ev, fd, events, callback, arg);
 	tev->inserted = 0;

@@ -1,0 +1,7 @@
+# Copyright 2011 Google Inc. All Rights Reserved.
+version=1.4.13-stable
+isNative=true
+name=libevent
+onDevice=true
+homepage=http://monkey.org/~provos/libevent/
+
