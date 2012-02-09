@@ -92,6 +92,11 @@ GNU Make works, other implementations of make were not tested.
 
 [5] http://libevent.org/ || http://www.monkey.org/~provos/libevent/
 
+To build redsocks for Android, just install Android NDK[6] and run `ndk-build`
+under the `android` folder.
+
+[6] http://developer.android.com/sdk/ndk/index.html
+
 
 Running
 =======
