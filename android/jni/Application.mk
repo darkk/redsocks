@@ -1,1 +1,1 @@
-Application.mk := libevent redsocks
+APP_ABI := armeabi x86
