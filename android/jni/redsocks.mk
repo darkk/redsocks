@@ -29,11 +29,11 @@ LOCAL_SRC_FILES := \
 	android/version.c
 
 LOCAL_C_INCLUDES := \
-	$(JNI_PATH)/libevent \
-	$(JNI_PATH)/libevent/android
+	$(JNI_PATH)/../ \
+	$(JNI_PATH)/libevent
 
 LOCAL_STATIC_LIBRARIES := libevent
 
-LOCAL_CFLAGS := -O2 -std=gnu99 -Wall -DUSE_IPTABLES
+LOCAL_CFLAGS := -O2 -std=gnu99 -Wall -Devutil_socket_t=int
 
 include $(BUILD_EXECUTABLE)
