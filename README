@@ -149,6 +149,14 @@ luser$ sg socksified -c id
 uid=1000(luser) gid=1001(socksified) groups=1000(luser),1001(socksified)
 luser$ sg socksified -c "firefox"
 
+# If you want to configure socksifying router, you should look at
+# doc/iptables-packet-flow.png and doc/iptables-packet-flow-ng.png
+# Note, you should have proper `local_ip' value to get external packets with
+# redsocks, default 127.0.0.1 will not go. See iptables(8) manpage regarding
+# REDIRECT target for details.
+# Depending on your network configuration iptables conf. may be as easy as:
+root# iptables -t nat -A PREROUTING --in-interface eth_int -p tcp -j REDSOCKS
+
 Note about GID-based redirection
 ========
 Keep in mind, that changed GID affects filesystem permissions, so if your
