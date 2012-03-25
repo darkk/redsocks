@@ -821,12 +821,16 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 		if (instance->listener.inserted)
 			if (tracked_event_del(&instance->listener) != 0)
 				log_errno(LOG_WARNING, "event_del");
-		if (instance->accept_backoff.inserted)
-			if (tracked_event_del(&instance->accept_backoff) != 0)
-				log_errno(LOG_WARNING, "event_del");
 		if (close(EVENT_FD(&instance->listener.ev)) != 0)
 			log_errno(LOG_WARNING, "close");
 		memset(&instance->listener, 0, sizeof(instance->listener));
+	}
+
+	if (event_initialized(&instance->accept_backoff.ev)) {
+		if (instance->accept_backoff.inserted)
+			if (tracked_event_del(&instance->accept_backoff) != 0)
+				log_errno(LOG_WARNING, "event_del");
+		memset(&instance->accept_backoff, 0, sizeof(instance->accept_backoff));
 	}
 
 	list_del(&instance->list);
