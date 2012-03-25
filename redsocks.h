@@ -29,13 +29,14 @@ typedef struct redsocks_config_t {
 	char *type;
 	char *login;
 	char *password;
+	uint16_t min_backoff_ms;
 	uint16_t max_backoff_ms; // backoff capped by 65 seconds is enough :)
 	uint16_t listenq;
 } redsocks_config;
 
 struct tracked_event {
 	struct event ev;
-	int inserted;
+	struct timeval inserted;
 };
 
 typedef struct redsocks_instance_t {
@@ -89,6 +90,9 @@ int redsocks_write_helper(
 	struct bufferevent *buffev, redsocks_client *client,
 	redsocks_message_maker mkmessage, int state, size_t wm_only);
 
+
+#define redsocks_close(fd) redsocks_close_internal((fd), __FILE__, __LINE__, __func__)
+void redsocks_close_internal(int fd, const char* file, int line, const char *func);
 
 #define redsocks_log_error(client, prio, msg...) \
 	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 0, &(client)->clientaddr, &(client)->destaddr, prio, ## msg)

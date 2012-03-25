@@ -96,13 +96,13 @@ static void redudp_drop_client(redudp_client *client)
 		fd = EVENT_FD(&client->relay->ev_read);
 		bufferevent_free(client->relay);
 		shutdown(fd, SHUT_RDWR);
-		close(fd);
+		redsocks_close(fd);
 	}
 	if (event_initialized(&client->udprelay)) {
 		fd = EVENT_FD(&client->udprelay);
 		if (event_del(&client->udprelay) == -1)
 			redudp_log_errno(client, LOG_ERR, "event_del");
-		close(fd);
+		redsocks_close(fd);
 	}
 	list_for_each_entry_safe(q, tmp, &client->queue, list) {
 		list_del(&q->list);
@@ -255,7 +255,7 @@ static void redudp_read_assoc_reply(struct bufferevent *buffev, void *_arg)
 
 fail:
 	if (fd != -1)
-		close(fd);
+		redsocks_close(fd);
 	redudp_drop_client(client);
 }
 
@@ -636,8 +636,7 @@ fail:
 	redudp_fini_instance(instance);
 
 	if (fd != -1) {
-		if (close(fd) != 0)
-			log_errno(LOG_WARNING, "close");
+		redsocks_close(fd);
 	}
 
 	return -1;
@@ -660,8 +659,7 @@ static void redudp_fini_instance(redudp_instance *instance)
 	if (event_initialized(&instance->listener)) {
 		if (event_del(&instance->listener) != 0)
 			log_errno(LOG_WARNING, "event_del");
-		if (close(EVENT_FD(&instance->listener)) != 0)
-			log_errno(LOG_WARNING, "close");
+		redsocks_close(EVENT_FD(&instance->listener));
 		memset(&instance->listener, 0, sizeof(instance->listener));
 	}
 

@@ -23,6 +23,7 @@
 #include <arpa/inet.h>
 #include "log.h"
 #include "utils.h"
+#include "redsocks.h" // for redsocks_close
 
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr)
 {
@@ -116,7 +117,7 @@ struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb write
 
 fail:
 	if (relay_fd != -1)
-		close(relay_fd);
+		redsocks_close(relay_fd);
 	if (retval)
 		bufferevent_free(retval);
 	return NULL;

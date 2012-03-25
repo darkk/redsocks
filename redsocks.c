@@ -65,6 +65,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "login",      .type = pt_pchar },
 	{ .key = "password",   .type = pt_pchar },
 	{ .key = "listenq",    .type = pt_uint16 },
+	{ .key = "min_accept_backoff", .type = pt_uint16 },
 	{ .key = "max_accept_backoff", .type = pt_uint16 },
 	{ }
 };
@@ -76,14 +77,14 @@ static void tracked_event_set(
 		void (*callback)(evutil_socket_t, short, void *), void *arg)
 {
 	event_set(&tev->ev, fd, events, callback, arg);
-	tev->inserted = 0;
+	timerclear(&tev->inserted);
 }
 
 static int tracked_event_add(struct tracked_event *tev, const struct timeval *tv)
 {
 	int ret = event_add(&tev->ev, tv);
 	if (ret == 0)
-		tev->inserted = 1;
+		gettimeofday(&tev->inserted, NULL);
 	return ret;
 }
 
@@ -91,7 +92,7 @@ static int tracked_event_del(struct tracked_event *tev)
 {
 	int ret = event_del(&tev->ev);
 	if (ret == 0)
-		tev->inserted = 0;
+		timerclear(&tev->inserted);
 	return ret;
 }
 
@@ -120,6 +121,7 @@ static int redsocks_onenter(parser_section *section)
 	 * Linux:   sysctl net.core.somaxconn
 	 * FreeBSD: sysctl kern.ipc.somaxconn */
 	instance->config.listenq = SOMAXCONN;
+	instance->config.min_backoff_ms = 100;
 	instance->config.max_backoff_ms = 60000;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
@@ -132,6 +134,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
+			(strcmp(entry->key, "min_accept_backoff") == 0) ? (void*)&instance->config.min_backoff_ms :
 			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
 			NULL;
 	section->data = instance;
@@ -170,8 +173,16 @@ static int redsocks_onexit(parser_section *section)
 		err = "no `type` for redsocks";
 	}
 
+	if (!err && !instance->config.min_backoff_ms) {
+		err = "`min_accept_backoff` must be positive, 0 ms is too low";
+	}
+
 	if (!err && !instance->config.max_backoff_ms) {
 		err = "`max_accept_backoff` must be positive, 0 ms is too low";
+	}
+
+	if (!err && !(instance->config.min_backoff_ms < instance->config.max_backoff_ms)) {
+		err = "`min_accept_backoff` must be less than `max_accept_backoff`";
 	}
 
 	if (err)
@@ -329,12 +340,12 @@ void redsocks_drop_client(redsocks_client *client)
 		client->instance->relay_ss->fini(client);
 
 	if (client->client) {
-		close(EVENT_FD(&client->client->ev_write));
+		redsocks_close(EVENT_FD(&client->client->ev_write));
 		bufferevent_free(client->client);
 	}
 
 	if (client->relay) {
-		close(EVENT_FD(&client->relay->ev_write));
+		redsocks_close(EVENT_FD(&client->relay->ev_write));
 		bufferevent_free(client->relay);
 	}
 
@@ -581,6 +592,32 @@ static void redsocks_accept_backoff(int fd, short what, void *_arg)
 		log_errno(LOG_ERR, "event_add");
 }
 
+void redsocks_close_internal(int fd, const char* file, int line, const char *func)
+{
+	if (close(fd) == 0) {
+		redsocks_instance *instance = NULL;
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		list_for_each_entry(instance, &instances, list) {
+			if (timerisset(&instance->accept_backoff.inserted)) {
+				struct timeval min_accept_backoff = {
+					instance->config.min_backoff_ms / 1000,
+					(instance->config.min_backoff_ms % 1000) * 1000};
+				struct timeval time_passed;
+				timersub(&now, &instance->accept_backoff.inserted, &time_passed);
+				if (timercmp(&min_accept_backoff, &time_passed, <)) {
+					redsocks_accept_backoff(-1, 0, instance);
+					break;
+				}
+			}
+		}
+	}
+	else {
+		const int do_errno = 1;
+		_log_write(file, line, func, do_errno, LOG_WARNING, "close");
+	}
+}
+
 static void redsocks_accept_client(int fd, short what, void *_arg)
 {
 	redsocks_instance *self = _arg;
@@ -599,10 +636,8 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		/* Different systems use different `errno` value to signal different
 		 * `lack of file descriptors` conditions. Here are most of them.  */
 		if (errno == ENFILE || errno == EMFILE || errno == ENOBUFS || errno == ENOMEM) {
-			// FIXME: should I log on every attempt?
 			self->accept_backoff_ms = (self->accept_backoff_ms << 1) + 1;
-			if (self->accept_backoff_ms > self->config.max_backoff_ms)
-				self->accept_backoff_ms = self->config.max_backoff_ms;
+			clamp_value(self->accept_backoff_ms, self->config.min_backoff_ms, self->config.max_backoff_ms);
 			int delay = (random() % self->accept_backoff_ms) + 1;
 			log_errno(LOG_WARNING, "accept: out of file descriptors, backing off for %u ms", delay);
 			struct timeval tvdelay = { delay / 1000, (delay % 1000) * 1000 };
@@ -683,7 +718,7 @@ fail:
 		redsocks_drop_client(client);
 	}
 	if (client_fd != -1)
-		close(client_fd);
+		redsocks_close(client_fd);
 }
 
 static const char *redsocks_evshut_str(unsigned short evshut)
@@ -780,6 +815,8 @@ static int redsocks_init_instance(redsocks_instance *instance)
 	}
 
 	tracked_event_set(&instance->listener, fd, EV_READ | EV_PERSIST, redsocks_accept_client, instance);
+	fd = -1;
+
 	tracked_event_set(&instance->accept_backoff, -1, 0, redsocks_accept_backoff, instance);
 
 	error = tracked_event_add(&instance->listener, NULL);
@@ -794,8 +831,7 @@ fail:
 	redsocks_fini_instance(instance);
 
 	if (fd != -1) {
-		if (close(fd) != 0)
-			log_errno(LOG_WARNING, "close");
+		redsocks_close(fd);
 	}
 
 	return -1;
@@ -818,16 +854,15 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 		instance->relay_ss->instance_fini(instance);
 
 	if (event_initialized(&instance->listener.ev)) {
-		if (instance->listener.inserted)
+		if (timerisset(&instance->listener.inserted))
 			if (tracked_event_del(&instance->listener) != 0)
 				log_errno(LOG_WARNING, "event_del");
-		if (close(EVENT_FD(&instance->listener.ev)) != 0)
-			log_errno(LOG_WARNING, "close");
+		redsocks_close(EVENT_FD(&instance->listener.ev));
 		memset(&instance->listener, 0, sizeof(instance->listener));
 	}
 
 	if (event_initialized(&instance->accept_backoff.ev)) {
-		if (instance->accept_backoff.inserted)
+		if (timerisset(&instance->accept_backoff.inserted))
 			if (tracked_event_del(&instance->accept_backoff) != 0)
 				log_errno(LOG_WARNING, "event_del");
 		memset(&instance->accept_backoff, 0, sizeof(instance->accept_backoff));

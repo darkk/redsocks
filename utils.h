@@ -31,6 +31,14 @@ struct sockaddr_in;
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+#define clamp_value(value, min_val, max_val) do { \
+       if (value < min_val) \
+               value = min_val; \
+       if (value > max_val) \
+               value = max_val; \
+} while (0)
+
+
 time_t redsocks_time(time_t *t);
 char *redsocks_evbuffer_readline(struct evbuffer *buf);
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg);
