@@ -295,22 +295,22 @@ static int vp_in_addr(parser_context *context, void *addr, const char *token)
 		memcpy(addr, &ia, sizeof(ia));
 	}
 	else {
-		struct addrinfo *addr, hints;
+		struct addrinfo *ainfo, hints;
 		int err;
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = AF_INET; /* IPv4-only */
 		hints.ai_socktype = SOCK_STREAM; /* I want to have one address once and ONLY once, that's why I specify socktype and protocol */
 		hints.ai_protocol = IPPROTO_TCP;
 		hints.ai_flags = AI_ADDRCONFIG; /* I don't need IPv4 addrs without IPv4 connectivity */
-		err = getaddrinfo(token, NULL, &hints, &addr);
+		err = getaddrinfo(token, NULL, &hints, &ainfo);
 		if (err == 0) {
 			int count, taken;
 			struct addrinfo *iter;
 			struct sockaddr_in *resolved_addr;
-			for (iter = addr, count = 0; iter; iter = iter->ai_next, ++count)
+			for (iter = ainfo, count = 0; iter; iter = iter->ai_next, ++count)
 				;
 			taken = rand() % count;
-			for (iter = addr; taken > 0; iter = iter->ai_next, --taken)
+			for (iter = ainfo; taken > 0; iter = iter->ai_next, --taken)
 				;
 			resolved_addr = (struct sockaddr_in*)iter->ai_addr;
 			assert(resolved_addr->sin_family == iter->ai_family && iter->ai_family == AF_INET);
@@ -318,7 +318,7 @@ static int vp_in_addr(parser_context *context, void *addr, const char *token)
 				log_error(LOG_WARNING, "%s resolves to %d addresses, using %s",
 				          token, count, inet_ntoa(resolved_addr->sin_addr));
 			memcpy(addr, &resolved_addr->sin_addr, sizeof(ia));
-			freeaddrinfo(addr);
+			freeaddrinfo(ainfo);
 		}
 		else {
 			if (err == EAI_SYSTEM)
