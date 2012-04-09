@@ -57,6 +57,13 @@ int fcntl_nonblock(int fd);
 				(what) & EVBUFFER_TIMEOUT ? "EVBUFFER_TIMEOUT" : "0", \
 				(what) & ~(EVBUFFER_READ|EVBUFFER_WRITE|EVBUFFER_EOF|EVBUFFER_ERROR|EVBUFFER_TIMEOUT)
 
+#if INET6_ADDRSTRLEN < INET_ADDRSTRLEN
+#	error Impossible happens: INET6_ADDRSTRLEN < INET_ADDRSTRLEN
+#else
+#	define RED_INET_ADDRSTRLEN (INET6_ADDRSTRLEN + 1 + 5 + 1) // addr + : + port + \0
+#endif
+char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_size);
+
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */
 #endif /* UTILS_H_SAT_FEB__2_02_24_05_2008 */

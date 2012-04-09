@@ -436,10 +436,9 @@ static void redudp_pkt_from_socks(int fd, short what, void *_arg)
 		return;
 
 	if (memcmp(&udprelayaddr, &client->udprelayaddr, sizeof(udprelayaddr)) != 0) {
-		char buf[INET6_ADDRSTRLEN];
-		const char *addr = inet_ntop(udprelayaddr.sin_family, &udprelayaddr.sin_addr, buf, sizeof(buf));
-		redudp_log_error(client, LOG_NOTICE, "Got packet from unexpected address %s:%u.",
-		                 addr ? addr : "?", ntohs(udprelayaddr.sin_port));
+		char buf[RED_INET_ADDRSTRLEN];
+		redudp_log_error(client, LOG_NOTICE, "Got packet from unexpected address %s.",
+		                 red_inet_ntop(&udprelayaddr, buf, sizeof(buf)));
 		return;
 	}
 
@@ -459,10 +458,14 @@ static void redudp_pkt_from_socks(int fd, short what, void *_arg)
 	if (pkt.header.ip.port != client->instance->config.destaddr.sin_port ||
 	    pkt.header.ip.addr != client->instance->config.destaddr.sin_addr.s_addr)
 	{
-		char buf[INET6_ADDRSTRLEN];
-		const char *addr = inet_ntop(AF_INET, &pkt.header.ip.addr, buf, sizeof(buf));
-		redudp_log_error(client, LOG_NOTICE, "Socks5 server relayed packet from unexpected address %s:%u.",
-		                 addr ? addr : "?", ntohs(pkt.header.ip.port));
+		char buf[RED_INET_ADDRSTRLEN];
+		struct sockaddr_in pktaddr = {
+			.sin_family = AF_INET,
+			.sin_addr   = { pkt.header.ip.addr },
+			.sin_port   = pkt.header.ip.port,
+		};
+		redudp_log_error(client, LOG_NOTICE, "Socks5 server relayed packet from unexpected address %s.",
+		                 red_inet_ntop(&pktaddr, buf, sizeof(buf)));
 		return;
 	}
 

@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <fcntl.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -42,10 +43,9 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
 	}
 
 	if (pktlen >= buflen) {
-		char buf[INET6_ADDRSTRLEN];
-		const char *addr = inet_ntop(inaddr->sin_family, &inaddr->sin_addr, buf, sizeof(buf));
-		log_error(LOG_WARNING, "wow! Truncated udp packet of size %zd from %s:%u! impossible! dropping it...",
-		          pktlen, addr ? addr : "?", ntohs(inaddr->sin_port));
+		char buf[RED_INET_ADDRSTRLEN];
+		log_error(LOG_WARNING, "wow! Truncated udp packet of size %zd from %s! impossible! dropping it...",
+		          pktlen, red_inet_ntop(inaddr, buf, sizeof(buf)));
 		return -1;
 	}
 
@@ -174,6 +174,35 @@ int red_is_socket_connected_ok(struct bufferevent *buffev)
 	else {
 		return 1;
 	}
+}
+
+char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_size)
+{
+	const char *retval = 0;
+	size_t len = 0;
+	uint16_t port;
+	const char placeholder[] = "???:???";
+
+	assert(buffer_size >= sizeof(placeholder));
+
+	memset(buffer, buffer_size, 0);
+	if (sa->sin_family == AF_INET) {
+		retval = inet_ntop(AF_INET, &sa->sin_addr, buffer, buffer_size);
+		port = ((struct sockaddr_in*)sa)->sin_port;
+	}
+	else if (sa->sin_family == AF_INET6) {
+		retval = inet_ntop(AF_INET6, &((const struct sockaddr_in6*)sa)->sin6_addr, buffer, buffer_size);
+		port = ((struct sockaddr_in6*)sa)->sin6_port;
+	}
+	if (retval) {
+		assert(retval == buffer);
+		len = strlen(retval);
+		snprintf(buffer + len, buffer_size - len, ":%d", ntohs(port));
+	}
+	else {
+		strcpy(buffer, placeholder);
+	}
+	return buffer;
 }
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

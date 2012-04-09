@@ -207,22 +207,17 @@ void redsocks_log_write_plain(
 	int saved_errno = errno;
 	struct evbuffer *fmt = evbuffer_new();
 	va_list ap;
-	char clientaddr_str[INET6_ADDRSTRLEN], destaddr_str[INET6_ADDRSTRLEN];
+	char clientaddr_str[RED_INET_ADDRSTRLEN], destaddr_str[RED_INET_ADDRSTRLEN];
 
 	if (!fmt) {
 		log_errno(LOG_ERR, "evbuffer_new()");
 		// no return, as I have to call va_start/va_end
 	}
 
-	if (!inet_ntop(clientaddr->sin_family, &clientaddr->sin_addr, clientaddr_str, sizeof(clientaddr_str)))
-		strncpy(clientaddr_str, "???", sizeof(clientaddr_str));
-	if (!inet_ntop(destaddr->sin_family, &destaddr->sin_addr, destaddr_str, sizeof(destaddr_str)))
-		strncpy(destaddr_str, "???", sizeof(destaddr_str));
-
 	if (fmt) {
-		evbuffer_add_printf(fmt, "[%s:%i->%s:%i]: %s",
-				clientaddr_str, ntohs(clientaddr->sin_port),
-				destaddr_str, ntohs(destaddr->sin_port),
+		evbuffer_add_printf(fmt, "[%s->%s]: %s",
+				red_inet_ntop(clientaddr, clientaddr_str, sizeof(clientaddr_str)),
+				red_inet_ntop(destaddr, destaddr_str, sizeof(destaddr_str)),
 				orig_fmt);
 	}
 
