@@ -24,6 +24,8 @@ typedef struct redudp_client_t {
 	list_head           list;
 	redudp_instance    *instance;
 	struct sockaddr_in  clientaddr;
+	struct sockaddr_in  destaddr;
+	int                 sender_fd; // shared between several clients socket (bound to `destaddr`)
 	struct event        timeout;
 	struct bufferevent *relay;
 	struct event        udprelay;

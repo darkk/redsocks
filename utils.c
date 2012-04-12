@@ -26,15 +26,52 @@
 #include "utils.h"
 #include "redsocks.h" // for redsocks_close
 
-int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr)
+int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr, struct sockaddr_in *toaddr)
 {
 	socklen_t addrlen = sizeof(*inaddr);
 	ssize_t pktlen;
+	struct msghdr msg;
+	struct iovec io;
+	char control[1024];
 
-	pktlen = recvfrom(fd, buf, buflen, 0, (struct sockaddr*)inaddr, &addrlen);
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_name = inaddr;
+	msg.msg_namelen = sizeof(*inaddr);
+	msg.msg_iov = &io;
+	msg.msg_iovlen = 1;
+	msg.msg_control = control;
+	msg.msg_controllen = sizeof(control);
+	io.iov_base = buf;
+	io.iov_len = buflen;
+
+	pktlen = recvmsg(fd, &msg, 0);
 	if (pktlen == -1) {
 		log_errno(LOG_WARNING, "recvfrom");
 		return -1;
+	}
+
+	if (toaddr) {
+		memset(toaddr, 0, sizeof(*toaddr));
+		for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+			if (
+				cmsg->cmsg_level == SOL_IP &&
+				cmsg->cmsg_type == IP_ORIGDSTADDR &&
+				cmsg->cmsg_len >= CMSG_LEN(sizeof(*toaddr))
+			) {
+				struct sockaddr_in* cmsgaddr = (struct sockaddr_in*)CMSG_DATA(cmsg);
+				char buf[RED_INET_ADDRSTRLEN];
+				log_error(LOG_DEBUG, "IP_ORIGDSTADDR: %s", red_inet_ntop(cmsgaddr, buf, sizeof(buf)));
+				memcpy(toaddr, cmsgaddr, sizeof(*toaddr));
+			}
+			else {
+				log_error(LOG_WARNING, "unexepcted cmsg (level,type) = (%d,%d)",
+					cmsg->cmsg_level, cmsg->cmsg_type);
+			}
+		}
+		if (toaddr->sin_family != AF_INET) {
+			log_error(LOG_WARNING, "(SOL_IP, IP_ORIGDSTADDR) not found");
+			return -1;
+		}
 	}
 
 	if (addrlen != sizeof(*inaddr)) {

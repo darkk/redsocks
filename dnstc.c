@@ -68,7 +68,7 @@ static void dnstc_pkt_from_client(int fd, short what, void *_arg)
 	ssize_t pktlen, outgoing;
 
 	assert(fd == EVENT_FD(&self->listener));
-	pktlen = red_recv_udp_pkt(fd, buf.raw, sizeof(buf), &clientaddr);
+	pktlen = red_recv_udp_pkt(fd, buf.raw, sizeof(buf), &clientaddr, NULL);
 	if (pktlen == -1)
 		return;
 
