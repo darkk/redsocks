@@ -222,7 +222,7 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
 
 	assert(buffer_size >= sizeof(placeholder));
 
-	memset(buffer, buffer_size, 0);
+	memset(buffer, 0, buffer_size);
 	if (sa->sin_family == AF_INET) {
 		retval = inet_ntop(AF_INET, &sa->sin_addr, buffer, buffer_size);
 		port = ((struct sockaddr_in*)sa)->sin_port;
