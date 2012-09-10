@@ -82,11 +82,14 @@ redudp {
 	login = username;
 	password = pazzw0rd;
 
-	// kernel does not give us this information, so we have to duplicate it
-	// in both iptables rules and configuration file.  By the way, you can
-	// set `local_ip' to 127.45.67.89 if you need more than 65535 ports to
-	// forward ;-)
-	// This limitation may be relaxed in future versions using contrack-tools.
+	// redsocks knows about two options while redirecting UDP packets at
+	// linux: TPROXY and REDIRECT.  TPROXY requires more complex routing
+	// configuration and fresh kernel (>= 2.6.37 according to squid
+	// developers[1]) but has hack-free way to get original destination
+	// address, REDIRECT is easier to configure, but requires `dest_ip` and
+	// `dest_port` to be set, limiting packet redirection to single
+	// destination.
+	// [1] http://wiki.squid-cache.org/Features/Tproxy4
 	dest_ip = 8.8.8.8;
 	dest_port = 53;
 
