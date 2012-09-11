@@ -33,6 +33,7 @@
 #include "base.h"
 #include "redsocks.h"
 #include "utils.h"
+#include "libevent-compat.h"
 
 
 #define REDSOCKS_RELAY_HALFBUFF  4096

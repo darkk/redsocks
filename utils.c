@@ -25,6 +25,7 @@
 #include "log.h"
 #include "utils.h"
 #include "redsocks.h" // for redsocks_close
+#include "libc-compat.h"
 
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr, struct sockaddr_in *toaddr)
 {
