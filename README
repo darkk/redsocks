@@ -16,7 +16,7 @@ Transocks[3] is alike project but it has noticable performance penality.
 Transsocks_ev[4] is alike project too, but it has no HTTPS-proxy support
 and does not support authentication.
 
-Several Andoird apps also use redsocks under-the-hood: ProxyDroid[5][6] and
+Several Android apps also use redsocks under-the-hood: ProxyDroid[5][6] and
 sshtunnel[7][8]. And that's over 100'000 downloads! Wow!
 
 [1] http://www.torproject.org
