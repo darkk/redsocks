@@ -1,12 +1,12 @@
-OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
+OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o autosocks.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks
-VERSION := 0.4
+VERSION := 0.41
 
 LIBS := -levent
-CFLAGS += -g -O2
+CFLAGS +=-static -fPIC -O2 -I /home/kitty/openwrt/backfire/build_dir/target-mips_uClibc-0.9.32/libevent-2.0.21-stable/ipkg-install/usr/include/ -L /home/kitty/openwrt/backfire/build_dir/target-mips_uClibc-0.9.32/libevent-2.0.21-stable/ipkg-install/usr/lib/ 
 override CFLAGS += -std=gnu99 -Wall
 
 all: $(OUT)

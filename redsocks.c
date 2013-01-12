@@ -35,18 +35,61 @@
 #include "utils.h"
 
 
-#define REDSOCKS_RELAY_HALFBUFF  4096
+#define REDSOCKS_RELAY_HALFBUFF 1024*32 
+void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 
+static void redsocks_relay_relayreadcb(struct bufferevent *from, void *_client);
+static void redsocks_relay_relaywritecb(struct bufferevent *from, void *_client);
+void redsocks_direct_connect_relay(redsocks_client *client);
+static void direct_relay_init(redsocks_client *client)
+{
+      client->state = 0;
+}
 
-static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
-
+static void direct_instance_fini(redsocks_instance *instance)
+{
+}
+static void direct_read_cb(struct bufferevent *buffev, void *_arg)
+{
+	redsocks_client *client = _arg;
+    redsocks_touch_client(client);
+    if (client->state == 0)
+    {
+        client->state = 1;
+        redsocks_start_relay(client);
+    }
+}
+static void direct_write_cb(struct bufferevent *buffev, void *_arg)
+{
+	redsocks_client *client = _arg;
+    redsocks_touch_client(client);
+    if (client->state == 0)
+    {
+        client->state = 1;
+        redsocks_start_relay(client);
+    }
+}
+relay_subsys direct_connect_subsys =
+{
+    .name                 = "direct",
+    .payload_len          = 0,
+    .instance_payload_len = 0,
+	.readcb = direct_read_cb,
+	.writecb = direct_write_cb,
+	.init                 = direct_relay_init,
+	.instance_fini        = direct_instance_fini,
+    .connect_relay = redsocks_direct_connect_relay,
+};
 
 extern relay_subsys http_connect_subsys;
 extern relay_subsys http_relay_subsys;
 extern relay_subsys socks4_subsys;
 extern relay_subsys socks5_subsys;
+extern relay_subsys autosocks5_subsys;
 static relay_subsys *relay_subsystems[] =
 {
+    &autosocks5_subsys,
+    &direct_connect_subsys,
 	&http_connect_subsys,
 	&http_relay_subsys,
 	&socks4_subsys,
@@ -348,7 +391,7 @@ void redsocks_drop_client(redsocks_client *client)
 	free(client);
 }
 
-static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how)
+void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how)
 {
 	short evhow = 0;
 	char *strev, *strhow = NULL, *strevhow = NULL;
@@ -395,6 +438,11 @@ static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffe
 		redsocks_log_error(client, LOG_DEBUG, "both client and server disconnected");
 		redsocks_drop_client(client);
 	}
+    else
+    {
+        if (how == SHUT_WR && buffev == client->relay && client->relay->enabled == 0)
+		    redsocks_drop_client(client);
+    } 
 }
 
 // I assume that -1 is invalid errno value
@@ -573,6 +621,16 @@ void redsocks_connect_relay(redsocks_client *client)
 		redsocks_drop_client(client);
 	}
 }
+void redsocks_direct_connect_relay(redsocks_client *client)
+{
+	client->relay = red_connect_relay(&client->destaddr,
+			                          redsocks_relay_connected, redsocks_event_error, client);
+	if (!client->relay) {
+		redsocks_log_errno(client, LOG_ERR, "red_connect_relay");
+		redsocks_drop_client(client);
+	}
+}
+
 
 static void redsocks_accept_backoff(int fd, short what, void *_arg)
 {
@@ -767,6 +825,19 @@ static void redsocks_debug_dump(int sig, short what, void *_arg)
 		redsocks_debug_dump_instance(instance, now);
 }
 
+static void redsocks_heartbeat(int sig, short what, void *_arg)
+{
+	time_t now = redsocks_time(NULL);
+    FILE * tmp = NULL;
+
+    tmp = fopen("/tmp/redtime", "w");
+    if (tmp)
+    {
+        fprintf(tmp, "%d", now);
+        fclose(tmp);
+    }
+}
+
 static void redsocks_fini_instance(redsocks_instance *instance);
 
 static int redsocks_init_instance(redsocks_instance *instance)
@@ -876,14 +947,25 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 static int redsocks_fini();
 
 static struct event debug_dumper;
+static struct event heartbeat_writer;
+
+//static void ignore_sig(int t) {}
 
 static int redsocks_init() {
-	struct sigaction sa = { }, sa_old = { };
+	struct sigaction sa , sa_old;
 	redsocks_instance *tmp, *instance = NULL;
-
+    void (* old_hdl)(int)= NULL;
+/*
+    old_hdl = signal(SIGPIPE, ignore_sig); 
+	if (old_hdl == -1) {
+		log_errno(LOG_ERR, "sigaction");
+		return -1;
+	}
+*/
 	sa.sa_handler = SIG_IGN;
 	sa.sa_flags = SA_RESTART;
-	if (sigaction(SIGPIPE, &sa, &sa_old) == -1) {
+
+	if (sigaction(SIGPIPE, &sa, NULL)  == -1) {
 		log_errno(LOG_ERR, "sigaction");
 		return -1;
 	}
@@ -891,6 +973,11 @@ static int redsocks_init() {
 	signal_set(&debug_dumper, SIGUSR1, redsocks_debug_dump, NULL);
 	if (signal_add(&debug_dumper, NULL) != 0) {
 		log_errno(LOG_ERR, "signal_add");
+		goto fail;
+	}
+	signal_set(&heartbeat_writer, SIGUSR2, redsocks_heartbeat, NULL);
+	if (signal_add(&heartbeat_writer, NULL) != 0) {
+		log_errno(LOG_ERR, "signal_add SIGUSR2");
 		goto fail;
 	}
 
@@ -903,7 +990,8 @@ static int redsocks_init() {
 
 fail:
 	// that was the first resource allocation, it return's on failure, not goto-fail's
-	sigaction(SIGPIPE, &sa_old, NULL);
+/*	sigaction(SIGPIPE, &sa_old, NULL); */
+//    signal(SIGPIPE, old_hdl);
 
 	redsocks_fini();
 

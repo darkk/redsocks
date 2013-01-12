@@ -26,6 +26,10 @@
 #include "utils.h"
 #include "redsocks.h" // for redsocks_close
 
+#ifndef IP_ORIGDSTADDR
+#define IP_ORIGDSTADDR 20
+#endif
+
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr, struct sockaddr_in *toaddr)
 {
 	socklen_t addrlen = sizeof(*inaddr);

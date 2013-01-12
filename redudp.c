@@ -33,6 +33,30 @@
 #include "redsocks.h"
 #include "redudp.h"
 
+/* Just in case the IP_TRANSPARENT define isn't included somehow */
+
+#if !defined(IP_TRANSPARENT)
+#define IP_TRANSPARENT 19
+#define IP_ORIGDSTADDR       20
+#define IP_RECVORIGDSTADDR   IP_ORIGDSTADDR
+#endif
+
+/* Just in case the IP_TRANSPARENT define isn't included somehow */
+
+#if !defined(IP_TRANSPARENT)
+#define IP_TRANSPARENT 19
+#define IP_ORIGDSTADDR       20
+#define IP_RECVORIGDSTADDR   IP_ORIGDSTADDR
+#endif
+
+/* Just in case the IP_TRANSPARENT define isn't included somehow */
+
+#if !defined(IP_TRANSPARENT)
+#define IP_TRANSPARENT 19
+#define IP_ORIGDSTADDR       20
+#define IP_RECVORIGDSTADDR   IP_ORIGDSTADDR
+#endif
+
 #define redudp_log_error(client, prio, msg...) \
 	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 0, &(client)->clientaddr, get_destaddr(client), prio, ## msg)
 #define redudp_log_errno(client, prio, msg...) \
