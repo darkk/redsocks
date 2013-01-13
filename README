@@ -1,5 +1,31 @@
-This is an modified version of original redsocks.
+This is a modified version of original redsocks.
 This variant is useful for anti-GFW (Great Fire Wall).
+It provides the following advanced features:
+1. new 'direct' mehtod. 
+   This method is intent to direct any TCP connections directly without
+going through a proxy. Why this mehtod? Some ISP, like China Mobile (CMCC), 
+detects numbers of computers in your local network sharing same account by 
+montioring HTTP/HTTPS traffic. Only one computer has full access to all 
+websites. Other computers in local network are limited to some websites.
+By depolying transparent proxy with this method, all your computers can
+access websites without restrictions.
+2. new 'autosocks5' method.
+   This mehtod is specially customized for fighting against GFW. By
+default, all TCP connections are redirected to connect to target directly
+without going through socks5 proxy. But, in case the connection to target
+is RESET/CLOSED immediately for some reason (e.g. by GFW), the connection
+is redirected via socks5 proxy. The same logic is also applied when the
+connection to target fails to establish in certain seconds (13 seconds 
+currently). For such slow connection, no matter it is really a slow 
+connection or the handshake packets are dropped by GFW, let such 
+connections go through proxy is not a bad idea. 
+   REDSOCKS also maintances a cache for addresses that need to be relayed
+via proxy. So, whenever an address is identified need to be relayed via
+proxy, the susequent connections to those addresses will be relayed via
+proxy immediately unless the addresses are removed from cache by code logic.
+   The advantage of this method is that you do not need to set thousands
+entries in iptables for blocked sites manually. It is especially useful
+for proxy Youtube traffic.
 
 ---------------------------------------------------------------------
 This tool allows you to redirect any TCP connection to SOCKS or HTTPS
