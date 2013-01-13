@@ -25,8 +25,6 @@
 #include "socks5.h"
 
 typedef enum socks5_state_t {
-        socks5_pre_detect,
-        socks5_direct,
 	socks5_new,
 	socks5_method_sent,
 	socks5_auth_sent,
@@ -34,6 +32,8 @@ typedef enum socks5_state_t {
 	socks5_skip_domain,
 	socks5_skip_address,
 	socks5_MAX,
+    socks5_pre_detect=100, /* Introduce additional states to socks5 subsystem */
+    socks5_direct,
 } socks5_state;
 
 typedef struct socks5_client_t {
@@ -42,20 +42,6 @@ typedef struct socks5_client_t {
 	time_t time_connect_relay; // timestamp when start to connect relay
 } socks5_client;
 
-static const char *socks5_strstatus[] = {
-	"ok",
-	"server failure",
-	"connection not allowed by ruleset",
-	"network unreachable",
-	"host unreachable",
-	"connection refused",
-	"TTL expired",
-	"command not supported",
-	"address type not supported",
-};
-static const size_t socks5_strstatus_len = SIZEOF_ARRAY(socks5_strstatus);
-
-const char* socks5_status_to_str(int socks5_status);
 
 int socks5_is_valid_cred(const char *login, const char *password);
 
@@ -63,29 +49,41 @@ static int auto_retry_or_drop(redsocks_client * client);
 
 static void auto_connect_relay(redsocks_client *client);
 
-#define ADDR_CACHE_SIZE 64 
-static struct sockaddr_in addr_cache[ADDR_CACHE_SIZE];
-static int addr_count = 0;
-static int first_addr = 0;
+#define CIRCUIT_RESET_SECONDS 3
+#define ADDR_CACHE_BLOCKS 64
+#define ADDR_CACHE_BLOCK_SIZE 32 
+#define block_from_sockaddr_in(addr) (addr->sin_addr.s_addr & 0xFF) / (256/ADDR_CACHE_BLOCKS)
+static struct sockaddr_in addr_cache[ADDR_CACHE_BLOCKS][ADDR_CACHE_BLOCK_SIZE];
+static int addr_cache_counters[ADDR_CACHE_BLOCKS];
+static int addr_cache_pointers[ADDR_CACHE_BLOCKS];
 static int cache_init = 0;
 
 static void init_addr_cache()
 {			
 	if (!cache_init)
 	{
-		memset((void *)addr_cache, 0, sizeof(struct sockaddr_in)*ADDR_CACHE_SIZE);
-		addr_count = 0;
-		first_addr = 0;
+		memset((void *)addr_cache, 0, sizeof(addr_cache));
+		memset((void *)addr_cache_counters, 0, sizeof(addr_cache_counters));
+		memset((void *)addr_cache_pointers, 0, sizeof(addr_cache_pointers));
 		cache_init = 1;
 	}
 }
 
 static int is_addr_in_cache(const struct sockaddr_in * addr)
 {
+	/* get block index */
+	int block = block_from_sockaddr_in(addr);
+	int count = addr_cache_counters[block];
+	int first = addr_cache_pointers[block];
 	int i = 0;
 	/* do reverse search for efficency */
-	for ( i = addr_count - 1; i >= 0; i -- )
-		if (0 == memcmp((void *)addr, (void *)&addr_cache[(first_addr+i)%ADDR_CACHE_SIZE], sizeof(struct sockaddr_in)))
+	for ( i = count - 1; i >= 0; i -- )
+		/*
+		if (0 == memcmp((void *)addr, (void *)&addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE], sizeof(struct sockaddr_in)))
+*/
+		if (addr->sin_addr.s_addr == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].sin_addr.s_addr
+			 && addr->sin_family == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].sin_family
+           )
 			return 1;
 			
 	return 0;
@@ -93,16 +91,20 @@ static int is_addr_in_cache(const struct sockaddr_in * addr)
 
 static void add_addr_to_cache(const struct sockaddr_in * addr)
 {
-	if (addr_count < ADDR_CACHE_SIZE)
+	int block = block_from_sockaddr_in(addr);
+	int count = addr_cache_counters[block];
+	int first = addr_cache_pointers[block];
+
+	if (count < ADDR_CACHE_BLOCK_SIZE)
 	{
-		memcpy((void *)&addr_cache[addr_count], (void *) addr, sizeof(struct sockaddr_in));
-		addr_count ++;
+		memcpy((void *)&addr_cache[block][count], (void *) addr, sizeof(struct sockaddr_in));
+		addr_cache_counters[block]++;
 	}
 	else
 	{
-		memcpy((void *)&addr_cache[first_addr], (void *) addr, sizeof(struct sockaddr_in));
-		first_addr ++;
-		first_addr %=  ADDR_CACHE_SIZE;
+		memcpy((void *)&addr_cache[block][first], (void *) addr, sizeof(struct sockaddr_in));
+		addr_cache_pointers[block]++;
+		addr_cache_pointers[block]%=ADDR_CACHE_BLOCK_SIZE;
 	}	
 }
 
@@ -117,28 +119,9 @@ void auto_socks5_client_init(redsocks_client *client)
 	init_addr_cache();
 }
 
-static struct evbuffer *socks5_mkmethods(redsocks_client *client)
-{
-	socks5_client *socks5 = (void*)(client + 1);
-	return socks5_mkmethods_plain(socks5->do_password);
-}
 
-struct evbuffer *socks5_mkmethods_plain(int do_password);
-
-static struct evbuffer *socks5_mkpassword(redsocks_client *client)
-{
-	return socks5_mkpassword_plain(client->instance->config.login, client->instance->config.password);
-}
-
-struct evbuffer *socks5_mkpassword_plain(const char *login, const char *password);
-struct evbuffer *socks5_mkcommand_plain(int socks5_cmd, const struct sockaddr_in *destaddr);
-
-static struct evbuffer *socks5_mkconnect(redsocks_client *client)
-{
-	return socks5_mkcommand_plain(socks5_cmd_connect, &client->destaddr);
-}
-
-static void socks5_write_cb(struct bufferevent *buffev, void *_arg)
+void socks5_write_cb(struct bufferevent *buffev, void *_arg);
+static void auto_write_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 
@@ -165,112 +148,14 @@ static void socks5_write_cb(struct bufferevent *buffev, void *_arg)
 	else if (client->state == socks5_direct)
 			redsocks_start_relay(client);
 */
-	else if (client->state == socks5_new) {
-		redsocks_write_helper(
-			buffev, client,
-			socks5_mkmethods, socks5_method_sent, sizeof(socks5_method_reply)
-			);
-	}
-}
-
-const char* socks5_is_known_auth_method(socks5_method_reply *reply, int do_password);
-
-
-static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client *client, socks5_client *socks5)
-{
-	socks5_method_reply reply;
-	const char *error = NULL;
-
-	if (redsocks_read_expected(client, buffev->input, &reply, sizes_equal, sizeof(reply)) < 0)
-		return;
-
-	error = socks5_is_known_auth_method(&reply, socks5->do_password);
-	if (error) {
-		redsocks_log_error(client, LOG_NOTICE, "socks5_is_known_auth_method: %s", error);
-		redsocks_drop_client(client);
-	}
-	else if (reply.method == socks5_auth_none) {
-		redsocks_write_helper(
-			buffev, client,
-			socks5_mkconnect, socks5_request_sent, sizeof(socks5_reply)
-			);
-	}
-	else if (reply.method == socks5_auth_password) {
-		redsocks_write_helper(
-			buffev, client,
-			socks5_mkpassword, socks5_auth_sent, sizeof(socks5_auth_reply)
-			);
-	}
-}
-
-static void socks5_read_auth_reply(struct bufferevent *buffev, redsocks_client *client, socks5_client *socks5)
-{
-	socks5_auth_reply reply;
-
-	if (redsocks_read_expected(client, buffev->input, &reply, sizes_equal, sizeof(reply)) < 0)
-		return;
-
-	if (reply.ver != socks5_password_ver) {
-		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected auth reply version...");
-		redsocks_drop_client(client);
-	}
-	else if (reply.status == socks5_password_passed)
-		redsocks_write_helper(
-			buffev, client,
-			socks5_mkconnect, socks5_request_sent, sizeof(socks5_reply)
-			);
 	else
-		redsocks_drop_client(client);
+		socks5_write_cb(buffev, _arg);
 }
 
-static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *client, socks5_client *socks5)
-{
-	socks5_reply reply;
 
-	if (redsocks_read_expected(client, buffev->input, &reply, sizes_greater_equal, sizeof(reply)) < 0)
-		return;
 
-	if (reply.ver != socks5_ver) {
-		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected reply version...");
-		redsocks_drop_client(client);
-	}
-	else if (reply.status == socks5_status_succeeded) {
-		socks5_state nextstate;
-		size_t len;
-
-		if (reply.addrtype == socks5_addrtype_ipv4) {
-			len = socks5->to_skip = sizeof(socks5_addr_ipv4);
-			nextstate = socks5_skip_address;
-		}
-		else if (reply.addrtype == socks5_addrtype_ipv6) {
-			len = socks5->to_skip = sizeof(socks5_addr_ipv6);
-			nextstate = socks5_skip_address;
-		}
-		else if (reply.addrtype == socks5_addrtype_domain) {
-			socks5_addr_domain domain;
-			len = sizeof(domain.size);
-			nextstate = socks5_skip_domain;
-		}
-		else {
-			redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected address type...");
-			redsocks_drop_client(client);
-			return;
-		}
-
-		redsocks_write_helper(
-			buffev, client,
-			NULL, nextstate, len
-			);
-	}
-	else {
-		redsocks_log_error(client, LOG_NOTICE, "Socks5 server status: %s (%i)",
-				/* 0 <= reply.status && */ reply.status < SIZEOF_ARRAY(socks5_strstatus)
-				? socks5_strstatus[reply.status] : "?", reply.status);
-		redsocks_drop_client(client);
-	}
-}
-
-static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
+void socks5_read_cb(struct bufferevent *buffev, void *_arg);
+static void auto_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 	socks5_client *socks5 = (void*)(client + 1);
@@ -287,34 +172,8 @@ static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 	else if (client->state == socks5_direct) {
 	/*	if (EVBUFFER_LENGTH(buffev->input) == 0 && client->relay_evshut & EV_READ) */
 	}
-	else if (client->state == socks5_method_sent) {
-		socks5_read_auth_methods(buffev, client, socks5);
-	}
-	else if (client->state == socks5_auth_sent) {
-		socks5_read_auth_reply(buffev, client, socks5);
-	}
-	else if (client->state == socks5_request_sent) {
-		socks5_read_reply(buffev, client, socks5);
-	}
-	else if (client->state == socks5_skip_domain) {
-		socks5_addr_ipv4 ipv4; // all socks5_addr*.port are equal
-		uint8_t size;
-		if (redsocks_read_expected(client, buffev->input, &size, sizes_greater_equal, sizeof(size)) < 0)
-			return;
-		socks5->to_skip = size + sizeof(ipv4.port);
-		redsocks_write_helper(
-			buffev, client,
-			NULL, socks5_skip_address, socks5->to_skip
-			);
-	}
-	else if (client->state == socks5_skip_address) {
-		uint8_t data[socks5->to_skip];
-		if (redsocks_read_expected(client, buffev->input, data, sizes_greater_equal, socks5->to_skip) < 0)
-			return;
-		redsocks_start_relay(client);
-	}
 	else {
-		redsocks_drop_client(client);
+		socks5_read_cb(buffev, _arg);
 	}
 }
 
@@ -402,7 +261,7 @@ static int auto_retry_or_drop(redsocks_client * client)
 	
 	if (client->state == socks5_pre_detect || client->state == socks5_direct)
 	{
-		if (now - socks5->time_connect_relay <= 3) 
+		if (now - socks5->time_connect_relay <= CIRCUIT_RESET_SECONDS) 
 		{
 			if (client->state == socks5_direct)
 				bufferevent_disable(client->client, EV_READ| EV_WRITE);
@@ -452,8 +311,8 @@ relay_subsys autosocks5_subsys =
 	.name                 = "autosocks5",
 	.payload_len          = sizeof(socks5_client),
 	.instance_payload_len = 0,
-	.readcb               = socks5_read_cb,
-	.writecb              = socks5_write_cb,
+	.readcb               = auto_read_cb,
+	.writecb              = auto_write_cb,
 	.init                 = auto_socks5_client_init,
 	.connect_relay        = auto_connect_relay,
 };

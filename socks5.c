@@ -151,7 +151,7 @@ static struct evbuffer *socks5_mkconnect(redsocks_client *client)
 	return socks5_mkcommand_plain(socks5_cmd_connect, &client->destaddr);
 }
 
-static void socks5_write_cb(struct bufferevent *buffev, void *_arg)
+void socks5_write_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 
@@ -271,7 +271,7 @@ static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *clien
 	}
 }
 
-static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
+void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 	socks5_client *socks5 = (void*)(client + 1);
