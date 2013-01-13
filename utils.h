@@ -42,6 +42,7 @@ struct sockaddr_in;
 time_t redsocks_time(time_t *t);
 char *redsocks_evbuffer_readline(struct evbuffer *buf);
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg);
+struct bufferevent* red_connect_relay2(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg, const struct timeval *timeout_write);
 int red_socket_geterrno(struct bufferevent *buffev);
 int red_is_socket_connected_ok(struct bufferevent *buffev);
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *fromaddr, struct sockaddr_in *toaddr);
