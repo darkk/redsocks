@@ -50,6 +50,7 @@ static int auto_retry_or_drop(redsocks_client * client);
 static void auto_connect_relay(redsocks_client *client);
 
 #define CIRCUIT_RESET_SECONDS 3
+#define CONNECT_TIMEOUT_SECONDS 12 
 #define ADDR_CACHE_BLOCKS 64
 #define ADDR_CACHE_BLOCK_SIZE 32 
 #define block_from_sockaddr_in(addr) (addr->sin_addr.s_addr & 0xFF) / (256/ADDR_CACHE_BLOCKS)
@@ -130,6 +131,9 @@ static void auto_write_cb(struct bufferevent *buffev, void *_arg)
 	if (client->state == socks5_pre_detect) {
 		client->state = socks5_direct;
 
+		/* We do not need to detect timeouts any more.
+		The two ppers will handle it. */
+		bufferevent_set_timeouts(buffev, NULL, NULL);
 /*
 		if (EVBUFFER_LENGTH(buffev->input) == 0 && client->relay_evshut & EV_READ)
 		{
@@ -188,6 +192,18 @@ static void auto_drop_relay(redsocks_client *client)
 	}
 }
 
+static int auto_retry(redsocks_client * client)
+{
+	if (client->state == socks5_direct)
+		bufferevent_disable(client->client, EV_READ| EV_WRITE);
+	/* drop relay and update state, then retry with socks5 relay */
+	auto_drop_relay(client);
+	client->state = socks5_new;
+	add_addr_to_cache(&client->destaddr);
+	auto_connect_relay(client); /* Retry SOCKS5 proxy relay */
+}
+
+
 void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 
 
@@ -223,12 +239,24 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
 		
 	redsocks_touch_client(client);
 			
+	if (what & EVBUFFER_TIMEOUT)
+	{
+		redsocks_log_errno(client, LOG_DEBUG, "Timeout %d", client->state);
+		/* In case timeout occurs for connecting relay, we try to connect
+		to target with SOCKS5 proxy. It is possible that the connection to
+		target can be set up a bit longer than the timeout value we set. 
+		However, it is still better to make connection via proxy. */
+		auto_retry(client);
+		return;
+	}
+
 	redsocks_log_errno(client, LOG_DEBUG, "EOF %d", client->state);
 	if (client->state == socks5_pre_detect || client->state == socks5_direct )
 	{
 		if (!auto_retry_or_drop(client))
 			return;
 	}
+		
 	if (what == (EVBUFFER_READ|EVBUFFER_EOF)) {
 		struct bufferevent *antiev;
 		if (buffev == client->relay)
@@ -263,13 +291,7 @@ static int auto_retry_or_drop(redsocks_client * client)
 	{
 		if (now - socks5->time_connect_relay <= CIRCUIT_RESET_SECONDS) 
 		{
-			if (client->state == socks5_direct)
-				bufferevent_disable(client->client, EV_READ| EV_WRITE);
-			/* drop relay and update state, then retry with socks5 relay */
-			auto_drop_relay(client);
-			client->state = socks5_new;
-			add_addr_to_cache(&client->destaddr);
-			auto_connect_relay(client); /* Retry SOCKS5 proxy relay */
+			auto_retry(client);
 			return 0; 
 		}
 	}
@@ -280,6 +302,9 @@ static int auto_retry_or_drop(redsocks_client * client)
 static void auto_connect_relay(redsocks_client *client)
 {
 	socks5_client *socks5 = (void*)(client + 1);
+	struct timeval tv;
+	tv.tv_sec = CONNECT_TIMEOUT_SECONDS;
+	tv.tv_usec = 0;
 	
 	if (client->state == socks5_pre_detect)
 	{
@@ -289,9 +314,10 @@ static void auto_connect_relay(redsocks_client *client)
 			redsocks_log_error(client, LOG_DEBUG, "Found in cache");
 		}
 	}
-	client->relay = red_connect_relay( client->state == socks5_pre_detect
+	client->relay = red_connect_relay2( client->state == socks5_pre_detect
 									 ? &client->destaddr : &client->instance->config.relayaddr,
-				auto_relay_connected, auto_event_error, client);
+					auto_relay_connected, auto_event_error, client,
+					client->state == socks5_pre_detect ? &tv: NULL);
 
 	socks5->time_connect_relay = redsocks_time(NULL);
        

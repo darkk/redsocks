@@ -164,6 +164,62 @@ fail:
 	return NULL;
 }
 
+
+struct bufferevent* red_connect_relay2(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg, const struct timeval *timeout_write)
+{
+	struct bufferevent *retval = NULL;
+	int on = 1;
+	int relay_fd = -1;
+	int error;
+
+	relay_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (relay_fd == -1) {
+		log_errno(LOG_ERR, "socket");
+		goto fail;
+	}
+
+	error = fcntl_nonblock(relay_fd);
+	if (error) {
+		log_errno(LOG_ERR, "fcntl");
+		goto fail;
+	}
+
+	error = setsockopt(relay_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
+	if (error) {
+		log_errno(LOG_WARNING, "setsockopt");
+		goto fail;
+	}
+
+	error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+	if (error && errno != EINPROGRESS) {
+		log_errno(LOG_NOTICE, "connect");
+		goto fail;
+	}
+
+	retval = bufferevent_new(relay_fd, NULL, writecb, errorcb, cbarg);
+	if (!retval) {
+		log_errno(LOG_ERR, "bufferevent_new");
+		goto fail;
+	}
+
+	bufferevent_set_timeouts(retval, NULL, timeout_write);
+
+	error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
+	if (error) {
+		log_errno(LOG_ERR, "bufferevent_enable");
+		goto fail;
+	}
+
+	return retval;
+
+fail:
+	if (relay_fd != -1)
+		redsocks_close(relay_fd);
+	if (retval)
+		bufferevent_free(retval);
+	return NULL;
+}
+
 int red_socket_geterrno(struct bufferevent *buffev)
 {
 	int error;
