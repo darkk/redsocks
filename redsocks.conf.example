@@ -58,11 +58,13 @@ redsocks {
 	// `ip' and `port' are IP and tcp-port of proxy-server
 	// You can also use hostname instead of IP, only one (random)
 	// address of multihomed host will be used.
+	// The two fields are meaningless when proxy type is 'direct'.
 	ip = example.org;
 	port = 1080;
 
 
 	// known types: socks4, socks5, http-connect, http-relay
+	// New types: direct, autosocks5
 	type = socks5;
 
 	// login = "foobar";

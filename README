@@ -17,15 +17,20 @@ is RESET/CLOSED immediately for some reason (e.g. by GFW), the connection
 is redirected via socks5 proxy. The same logic is also applied when the
 connection to target fails to establish in certain seconds (13 seconds 
 currently). For such slow connection, no matter it is really a slow 
-connection or the handshake packets are dropped by GFW, let such 
+connection or the handshake packets are dropped by GFW, making such 
 connections go through proxy is not a bad idea. 
    REDSOCKS also maintances a cache for addresses that need to be relayed
 via proxy. So, whenever an address is identified need to be relayed via
-proxy, the susequent connections to those addresses will be relayed via
+proxy, the subsequent connections to those addresses will be relayed via
 proxy immediately unless the addresses are removed from cache by code logic.
    The advantage of this method is that you do not need to set thousands
 entries in iptables for blocked sites manually. It is especially useful
-for proxy Youtube traffic.
+for proxying Youtube which has so many sub-domains for video content cache.
+
+HOW TO BUILD:
+Since this variant of redsocks is customized for running with Openwrt, please
+read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
+to compile.
 
 ---------------------------------------------------------------------
 This tool allows you to redirect any TCP connection to SOCKS or HTTPS
