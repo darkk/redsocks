@@ -40,47 +40,8 @@ void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int 
 
 static void redsocks_relay_relayreadcb(struct bufferevent *from, void *_client);
 static void redsocks_relay_relaywritecb(struct bufferevent *from, void *_client);
-void redsocks_direct_connect_relay(redsocks_client *client);
-static void direct_relay_init(redsocks_client *client)
-{
-      client->state = 0;
-}
 
-static void direct_instance_fini(redsocks_instance *instance)
-{
-}
-static void direct_read_cb(struct bufferevent *buffev, void *_arg)
-{
-	redsocks_client *client = _arg;
-    redsocks_touch_client(client);
-    if (client->state == 0)
-    {
-        client->state = 1;
-        redsocks_start_relay(client);
-    }
-}
-static void direct_write_cb(struct bufferevent *buffev, void *_arg)
-{
-	redsocks_client *client = _arg;
-    redsocks_touch_client(client);
-    if (client->state == 0)
-    {
-        client->state = 1;
-        redsocks_start_relay(client);
-    }
-}
-relay_subsys direct_connect_subsys =
-{
-    .name                 = "direct",
-    .payload_len          = 0,
-    .instance_payload_len = 0,
-	.readcb = direct_read_cb,
-	.writecb = direct_write_cb,
-	.init                 = direct_relay_init,
-	.instance_fini        = direct_instance_fini,
-    .connect_relay = redsocks_direct_connect_relay,
-};
-
+extern relay_subsys direct_connect_subsys;
 extern relay_subsys http_connect_subsys;
 extern relay_subsys http_relay_subsys;
 extern relay_subsys socks4_subsys;
@@ -457,7 +418,7 @@ static int redsocks_socket_geterrno(redsocks_client *client, struct bufferevent 
 	return pseudo_errno;
 }
 
-static void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg)
+void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg)
 {
 	redsocks_client *client = _arg;
 	assert(buffev == client->relay || buffev == client->client);
@@ -591,7 +552,7 @@ int redsocks_write_helper(
 	return redsocks_write_helper_ex(buffev, client, mkmessage, state, wm_only, wm_only);
 }
 
-static void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
+void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 
@@ -622,16 +583,6 @@ void redsocks_connect_relay(redsocks_client *client)
 		redsocks_drop_client(client);
 	}
 }
-void redsocks_direct_connect_relay(redsocks_client *client)
-{
-	client->relay = red_connect_relay(&client->destaddr,
-			                          redsocks_relay_connected, redsocks_event_error, client);
-	if (!client->relay) {
-		redsocks_log_errno(client, LOG_ERR, "red_connect_relay");
-		redsocks_drop_client(client);
-	}
-}
-
 
 static void redsocks_accept_backoff(int fd, short what, void *_arg)
 {
