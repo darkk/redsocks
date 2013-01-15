@@ -35,7 +35,7 @@
 #include "utils.h"
 
 
-#define REDSOCKS_RELAY_HALFBUFF 1024*32 
+#define REDSOCKS_RELAY_HALFBUFF 1024*8 
 void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 
 static void redsocks_relay_relayreadcb(struct bufferevent *from, void *_client);
@@ -336,7 +336,7 @@ static void redsocks_relay_clientwritecb(struct bufferevent *to, void *_client)
 	redsocks_relay_writecb(client, client->relay, client->client);
 }
 
-void redsocks_start_relay(redsocks_client *client)
+int redsocks_start_relay(redsocks_client *client)
 {
 	int error;
 
@@ -368,6 +368,7 @@ void redsocks_start_relay(redsocks_client *client)
 		redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
 		redsocks_drop_client(client);
 	}
+	return error;
 }
 
 void redsocks_drop_client(redsocks_client *client)
