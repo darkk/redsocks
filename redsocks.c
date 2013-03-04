@@ -35,25 +35,29 @@
 #include "utils.h"
 
 
-#define REDSOCKS_RELAY_HALFBUFF 1024*8 
+#define REDSOCKS_RELAY_HALFBUFF 1024*4
 void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 
 static void redsocks_relay_relayreadcb(struct bufferevent *from, void *_client);
 static void redsocks_relay_relaywritecb(struct bufferevent *from, void *_client);
 
+/*
 extern relay_subsys direct_connect_subsys;
 extern relay_subsys http_connect_subsys;
 extern relay_subsys http_relay_subsys;
 extern relay_subsys socks4_subsys;
+*/
 extern relay_subsys socks5_subsys;
 extern relay_subsys autosocks5_subsys;
 static relay_subsys *relay_subsystems[] =
 {
     &autosocks5_subsys,
+/*
     &direct_connect_subsys,
 	&http_connect_subsys,
 	&http_relay_subsys,
 	&socks4_subsys,
+*/
 	&socks5_subsys,
 };
 
