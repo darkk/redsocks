@@ -1,12 +1,12 @@
-OBJS := parser.o main.o redsocks.o log.o direct.o socks5.o autosocks.o base.o base64.o utils.o gen/version.o
+OBJS := parser.o main.o redsocks.o log.o direct.o http-connect.o socks4.o socks5.o autosocks.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks
 VERSION := 0.41
 
-LIBS := -levent_core
-CFLAGS +=-static -flto -fPIC -Os -mips32r2 -mtune=mips32r2 -fno-caller-saves -mno-branch-likely \
+LIBS := -levent
+CFLAGS +=-fPIC -Os -mips32r2 -mtune=mips32r2 -fno-caller-saves -mno-branch-likely \
 	 -I /home/kitty/openwrt/trunk//build_dir/target-mipsel_r2_uClibc-0.9.33.2/libevent-2.0.19-stable/ipkg-install/usr/include/ \
 	-L /home/kitty/openwrt/trunk//build_dir/target-mipsel_r2_uClibc-0.9.33.2/libevent-2.0.19-stable/.libs/  
 override CFLAGS += -std=gnu99 -Wall
