@@ -75,7 +75,7 @@ static char *get_auth_request_header(struct evbuffer *buf)
 	}
 }
 
-static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
+void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 	int dropped = 0;
@@ -254,7 +254,7 @@ fail:
 }
 
 
-static void httpc_write_cb(struct bufferevent *buffev, void *_arg)
+void httpc_write_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 
