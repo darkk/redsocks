@@ -6,9 +6,9 @@ OUT := redsocks
 VERSION := 0.41
 
 LIBS := -levent
-CFLAGS +=-fPIC -Os -mips32r2 -mtune=mips32r2 -fno-caller-saves -mno-branch-likely \
-	 -I /home/kitty/openwrt/trunk//build_dir/target-mipsel_r2_uClibc-0.9.33.2/libevent-2.0.19-stable/ipkg-install/usr/include/ \
-	-L /home/kitty/openwrt/trunk//build_dir/target-mipsel_r2_uClibc-0.9.33.2/libevent-2.0.19-stable/.libs/  
+CFLAGS +=-fPIC -Os \
+	 -I ~/openwrt/trunk/build_dir/target-mipsel_r2_uClibc-0.9.33.2/libevent-2.0.19-stable/ipkg-install/usr/include/ \
+	 -L ~/openwrt/trunk/build_dir/target-mipsel_r2_uClibc-0.9.33.2/libevent-2.0.19-stable/.libs/  
 override CFLAGS += -std=gnu99 -Wall
 #LDFLAGS += -fwhole-program
 
