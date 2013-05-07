@@ -26,6 +26,10 @@ proxy immediately unless the addresses are removed from cache by code logic.
    The advantage of this method is that you do not need to set thousands
 entries in iptables for blocked sites manually. It is especially useful
 for proxying Youtube which has so many sub-domains for video content cache.
+3. new 'autohttp-connect' method.
+   This method behaves similar as 'autoscoks5' method except the proxy
+to be used must support HTTP CONNECT method. This method is useful for
+using redsocks together with GoProxy.
 
 HOW TO BUILD:
 Since this variant of redsocks is customized for running with Openwrt, please
