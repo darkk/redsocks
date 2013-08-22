@@ -49,6 +49,8 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *froma
 
 int fcntl_nonblock(int fd);
 
+size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, size_t skip);
+
 #define event_fmt_str "%s|%s|%s|%s|%s|0x%x"
 #define event_fmt(what) \
 				(what) & EVBUFFER_READ ? "EVBUFFER_READ" : "0", \

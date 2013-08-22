@@ -302,4 +302,50 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
 	return buffer;
 }
 
+/* copy event buffer from source to destination as much as possible. 
+ * If parameter skip is not zero, copy will start from the number of skip bytes.
+ */
+size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, size_t skip)
+{
+	int n, i;
+	size_t written = 0;
+	struct evbuffer_iovec *v;
+	struct evbuffer_iovec quick_v[5];/* a vector with 5 elements is usually enough */
+
+	size_t maxlen = dst->wm_write.high - EVBUFFER_LENGTH(dst->output);
+	maxlen = EVBUFFER_LENGTH(src->input) - skip> maxlen?maxlen: EVBUFFER_LENGTH(src->input)-skip;
+
+	n = evbuffer_peek(src->input, maxlen, NULL, NULL, 0);
+	if (n>sizeof(quick_v)/sizeof(struct evbuffer_iovec))
+		v = malloc(sizeof(struct evbuffer_iovec)*n);
+	else
+		v = quick_v;
+	n = evbuffer_peek(src->input, maxlen, NULL, v, n);
+	for (i=0; i<n; ++i) {
+        size_t len = v[i].iov_len;
+		if (skip >= len)
+		{
+			skip -= len;
+			continue;
+		}
+		else 
+		{
+			len -= skip;
+		}
+        if (written + len > maxlen)
+            len = maxlen - written;
+		if (bufferevent_write(dst, v[i].iov_base+skip, len))
+            break;
+		skip = 0;
+        /* We keep track of the bytes written separately; if we don't,
+		*  we may write more than we need if the last chunk puts	
+		* us over the limit. */
+        written += len;
+    }
+	if (n>sizeof(quick_v)/sizeof(struct evbuffer_iovec))
+		free(v);
+	return written;
+}
+
+
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

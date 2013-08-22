@@ -60,7 +60,8 @@ static void auto_connect_relay(redsocks_client *client);
 static void direct_relay_clientreadcb(struct bufferevent *from, void *_client);
 
 #define CIRCUIT_RESET_SECONDS 1
-#define CONNECT_TIMEOUT_SECONDS 13 
+#define CONNECT_TIMEOUT_SECONDS 10 
+#define SHUTDOWN_TIMEOUT_SECONDS 5 
 #define ADDR_CACHE_BLOCKS 64
 #define ADDR_CACHE_BLOCK_SIZE 16 
 #define block_from_sockaddr_in(addr) (addr->sin_addr.s_addr & 0xFF) / (256/ADDR_CACHE_BLOCKS)
@@ -180,38 +181,6 @@ static void direct_relay_relayreadcb(struct bufferevent *from, void *_client)
 	direct_relay_readcb_helper(client, client->relay, client->client);
 }
 
-static size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src)
-{
-	int n, i;
-	size_t written = 0;
-	struct evbuffer_iovec *v;
-	struct evbuffer_iovec quick_v[5];/* a vector with 5 elements is usually enough */
-
-	size_t maxlen = dst->wm_write.high - EVBUFFER_LENGTH(dst->output);
-	maxlen = EVBUFFER_LENGTH(src->input)> maxlen?maxlen: EVBUFFER_LENGTH(src->input);
-
-	n = evbuffer_peek(src->input, maxlen, NULL, NULL, 0);
-	if (n>sizeof(quick_v)/sizeof(struct evbuffer_iovec))
-		v = malloc(sizeof(struct evbuffer_iovec)*n);
-	else
-		v = quick_v;
-	n = evbuffer_peek(src->input, maxlen, NULL, v, n);
-	for (i=0; i<n; ++i) {
-        size_t len = v[i].iov_len;
-        if (written + len > maxlen)
-            len = maxlen - written;
-		if (bufferevent_write(dst, v[i].iov_base, len))
-            break;
-        /* We keep track of the bytes written separately; if we don't,
- *            we may write more than we need if the last chunk puts
- *                       us over the limit. */
-        written += len;
-    }
-	if (n>sizeof(quick_v)/sizeof(struct evbuffer_iovec))
-		free(v);
-	return written;
-}
-
 static void direct_relay_clientwritecb(struct bufferevent *to, void *_client)
 {
 	redsocks_client *client = _client;
@@ -260,7 +229,7 @@ static void direct_relay_relaywritecb(struct bufferevent *to, void *_client)
 			if (EVBUFFER_LENGTH(from->input))
 			{
 				/* copy data from input to output of relay */
-				socks5->data_sent = copy_evbuffer (to, from);
+				socks5->data_sent = copy_evbuffer (to, from, 0);
 				redsocks_log_error(client, LOG_DEBUG, "not sent, not  got %d", EVBUFFER_LENGTH(from->input));
 			}
 		}
@@ -270,7 +239,7 @@ static void direct_relay_relaywritecb(struct bufferevent *to, void *_client)
 		else if (!socks5->data_sent && socks5->got_data)
 		{
 			redsocks_log_error(client, LOG_DEBUG, "not sent, got");
-			socks5->data_sent = copy_evbuffer(to, from);
+			socks5->data_sent = copy_evbuffer(to, from, 0);
 		}
 		/* client->state = socks5_direct_confirmed; */
 		/* We have writen data to relay, but got nothing until we are requested to 
@@ -285,9 +254,13 @@ static void direct_relay_relaywritecb(struct bufferevent *to, void *_client)
 										 evbuffer_get_length(from->input),
 										 evbuffer_get_length(to->output),
 											to->wm_write.high, socks5->data_sent	);
-			/* TODO: Write more data? */
-			if (EVBUFFER_LENGTH(to->output) < socks5->data_sent /*  data is sent out, more or less */
-				&& EVBUFFER_LENGTH(from->input) == from->wm_read.high /* read buffer is full */
+			/* Write more data util input buffer is full */
+			if (EVBUFFER_LENGTH(from->input)- socks5->data_sent > 0) /* we have more data waiting to be sent  */
+			{
+				socks5->data_sent += copy_evbuffer(to, from, socks5->data_sent);
+			}
+			else if (EVBUFFER_LENGTH(to->output) < socks5->data_sent /*  data is sent out, more or less */
+			/*	&& EVBUFFER_LENGTH(from->input) == from->wm_read.high /* read buffer is full */
 				&& EVBUFFER_LENGTH(from->input) == socks5->data_sent /* all data in read buffer is sent */
 				) 
 			{
@@ -389,7 +362,8 @@ static void auto_retry(redsocks_client * client, int updcache)
 	if (updcache)
 	{
 		add_addr_to_cache(&client->destaddr);
-		redsocks_log_error(client, LOG_DEBUG, "ADD IP to cache: %x", client->destaddr.sin_addr.s_addr);
+		redsocks_log_error(client, LOG_DEBUG, "ADD IP to cache: %s", 
+							inet_ntoa(client->destaddr.sin_addr));
 	}
 	auto_drop_relay(client);
 	client->state = socks5_new;
@@ -460,14 +434,15 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
 		
 	redsocks_touch_client(client);
 			
-	redsocks_log_errno(client, LOG_DEBUG, "Errno: %d, State: %d, what: %x", saved_errno, client->state, what);
+	redsocks_log_errno(client, LOG_DEBUG, "Errno: %d, State: %d, what: " event_fmt_str, saved_errno, client->state, event_fmt(what));
 	if (buffev == client->relay)
 	{
+		
 		if ( client->state == socks5_pre_detect 
 		&& what == (EVBUFFER_WRITE|EVBUFFER_TIMEOUT))
 		{
-			/* In case timeout occurs for connecting relay, we try to connect
-			to target with SOCKS5 proxy. It is possible that the connection to
+			/* In case timeout occurs while connecting relay, we try to connect
+			to target via SOCKS5 proxy. It is possible that the connection to
 			target can be set up a bit longer than the timeout value we set. 
 			However, it is still better to make connection via proxy. */
 			auto_retry(client, 1);
@@ -497,15 +472,21 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
 		
 		if (antiev != NULL && EVBUFFER_LENGTH(antiev->output) == 0)
 			redsocks_shutdown(client, antiev, SHUT_WR);
+		if (antiev != NULL && bufferevent_get_enabled(antiev) & EV_READ)
+		{
+			/* Set up a timer on read so that we can ensure the connection
+				can be taken down when client socket is closed without
+				notification. This is required to prevent from hung half-closed
+				connections.
+			*/
+			redsocks_log_error(client, LOG_DEBUG, "Setup force closing timer" );
+			struct timeval tv;
+			tv.tv_sec = SHUTDOWN_TIMEOUT_SECONDS;
+			tv.tv_usec = 0;
+			bufferevent_set_timeouts(antiev, &tv, NULL);
+		}	
 	}
 	else {
-		
-		/*
-		myerrno = red_socket_geterrno(buffev);
-		redsocks_log_errno(client, LOG_NOTICE, "%s error, code " event_fmt_str,
-				buffev == client->relay ? "relay" : "client",
-				event_fmt(what));
-		*/
 		redsocks_drop_client(client);
 	}
 }																		

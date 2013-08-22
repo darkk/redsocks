@@ -757,13 +757,17 @@ static void redsocks_debug_dump_instance(redsocks_instance *instance, time_t now
 		const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
 		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
-		redsocks_log_error(client, LOG_DEBUG, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %li sec, idle: %li sec.",
+		redsocks_log_error(client, LOG_DEBUG, "client: %i (%s)%s%s input %d output %d, relay: %i (%s)%s%s input %d output %d, age: %li sec, idle: %li sec.",
 			EVENT_FD(&client->client->ev_write),
 				redsocks_event_str(client->client->enabled),
 				s_client_evshut[0] ? " " : "", s_client_evshut,
+				 EVBUFFER_LENGTH(client->client->input),
+				 EVBUFFER_LENGTH(client->client->output),
 			EVENT_FD(&client->relay->ev_write),
 				redsocks_event_str(client->relay->enabled),
 				s_relay_evshut[0] ? " " : "", s_relay_evshut,
+				 EVBUFFER_LENGTH(client->relay->input),
+				 EVBUFFER_LENGTH(client->relay->output),
 			now - client->first_event,
 			now - client->last_event);
 	}
