@@ -315,12 +315,12 @@ size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, s
 	size_t maxlen = dst->wm_write.high - EVBUFFER_LENGTH(dst->output);
 	maxlen = EVBUFFER_LENGTH(src->input) - skip> maxlen?maxlen: EVBUFFER_LENGTH(src->input)-skip;
 
-	n = evbuffer_peek(src->input, maxlen, NULL, NULL, 0);
+	n = evbuffer_peek(src->input, maxlen+skip, NULL, NULL, 0);
 	if (n>sizeof(quick_v)/sizeof(struct evbuffer_iovec))
 		v = malloc(sizeof(struct evbuffer_iovec)*n);
 	else
 		v = quick_v;
-	n = evbuffer_peek(src->input, maxlen, NULL, v, n);
+	n = evbuffer_peek(src->input, maxlen+skip, NULL, v, n);
 	for (i=0; i<n; ++i) {
         size_t len = v[i].iov_len;
 		if (skip >= len)
