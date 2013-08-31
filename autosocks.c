@@ -260,7 +260,7 @@ static void direct_relay_relaywritecb(struct bufferevent *to, void *_client)
 				socks5->data_sent += copy_evbuffer(to, from, socks5->data_sent);
 			}
 			else if (EVBUFFER_LENGTH(to->output) < socks5->data_sent /*  data is sent out, more or less */
-			/*	&& EVBUFFER_LENGTH(from->input) == from->wm_read.high /* read buffer is full */
+				&& EVBUFFER_LENGTH(from->input) == from->wm_read.high /* do not confirm unless read buffer is full */
 				&& EVBUFFER_LENGTH(from->input) == socks5->data_sent /* all data in read buffer is sent */
 				) 
 			{
@@ -384,7 +384,7 @@ static int auto_retry_or_drop(redsocks_client * client)
 			return 0; 
 		}
 	}
-	if ( client->state == socks5_direct)
+	else if ( client->state == socks5_direct)
 	{
 //		if (now - socks5->time_connect_relay <= CIRCUIT_RESET_SECONDS) 
 		{
