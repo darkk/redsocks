@@ -136,12 +136,6 @@ struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb write
 		goto fail;
 	}
 
-	error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
-	if (error && errno != EINPROGRESS) {
-		log_errno(LOG_NOTICE, "connect");
-		goto fail;
-	}
-
 	retval = bufferevent_new(relay_fd, NULL, writecb, errorcb, cbarg);
 	if (!retval) {
 		log_errno(LOG_ERR, "bufferevent_new");
@@ -151,6 +145,12 @@ struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb write
 	error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
 	if (error) {
 		log_errno(LOG_ERR, "bufferevent_enable");
+		goto fail;
+	}
+
+	error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+	if (error && errno != EINPROGRESS) {
+		log_errno(LOG_NOTICE, "connect");
 		goto fail;
 	}
 
@@ -190,23 +190,23 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr, evbuffercb writ
 		goto fail;
 	}
 
-	error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
-	if (error && errno != EINPROGRESS) {
-		log_errno(LOG_NOTICE, "connect");
-		goto fail;
-	}
-
 	retval = bufferevent_new(relay_fd, NULL, writecb, errorcb, cbarg);
 	if (!retval) {
 		log_errno(LOG_ERR, "bufferevent_new");
 		goto fail;
 	}
 
-	bufferevent_set_timeouts(retval, NULL, timeout_write);
-
 	error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
 	if (error) {
 		log_errno(LOG_ERR, "bufferevent_enable");
+		goto fail;
+	}
+
+	bufferevent_set_timeouts(retval, NULL, timeout_write);
+
+	error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+	if (error && errno != EINPROGRESS) {
+		log_errno(LOG_NOTICE, "connect");
 		goto fail;
 	}
 

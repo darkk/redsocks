@@ -36,6 +36,7 @@
 
 
 #define REDSOCKS_RELAY_HALFBUFF 1024*4
+#define REDSOCKS_AUDIT_INTERVAL 60 
 void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 
 static void redsocks_relay_relayreadcb(struct bufferevent *from, void *_client);
@@ -247,6 +248,8 @@ static void redsocks_relay_readcb(redsocks_client *client, struct bufferevent *f
 	if (EVBUFFER_LENGTH(to->output) < to->wm_write.high) {
 		if (bufferevent_write_buffer(to, from->input) == -1)
 			redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
+		if (bufferevent_enable(from, EV_READ) == -1)
+			redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
 	}
 	else {
 		if (bufferevent_disable(from, EV_READ) == -1)
@@ -402,11 +405,6 @@ void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int 
 		redsocks_log_error(client, LOG_DEBUG, "both client and server disconnected");
 		redsocks_drop_client(client);
 	}
-    else
-    {
-        if (how == SHUT_WR && buffev == client->relay && client->relay->enabled == 0)
-		    redsocks_drop_client(client);
-    } 
 }
 
 // I assume that -1 is invalid errno value
@@ -783,6 +781,64 @@ static void redsocks_debug_dump(int sig, short what, void *_arg)
 		redsocks_debug_dump_instance(instance, now);
 }
 
+/* Audit is required to clean up hung connections. 
+ * Not all connections are closed gracefully by both ends. In any case that
+ * either far end of client or far end of relay does not close connection 
+ * gracefully, we got hung connections.
+ */
+static void redsocks_audit_instance(redsocks_instance *instance)
+{
+	redsocks_client *tmp, *client = NULL;
+	time_t now = redsocks_time(NULL);
+	int drop_it = 0;
+
+	log_error(LOG_DEBUG, "Audit client list for instance %p:", instance);
+	list_for_each_entry_safe(client, tmp, &instance->clients, list) {
+		drop_it = 0;
+
+		if (now - client->last_event >= REDSOCKS_AUDIT_INTERVAL){
+			/* Only take actions if no touch of the client for at least an audit cycle.*/
+			/* drop this client if either end disconnected */	
+			if ((client->client_evshut == EV_WRITE && client->relay_evshut == EV_READ)
+				|| (client->client_evshut == EV_READ && client->relay_evshut == EV_WRITE)
+				|| (client->client_evshut == (EV_READ|EV_WRITE) && client->relay_evshut == EV_WRITE))
+				drop_it = 1;
+			if (client->client->enabled == 0 && client->relay->enabled== EV_WRITE 
+				&& client->client_evshut == 0 && client->relay_evshut == 0 )
+			{
+				/* for debug purpose only */
+				redsocks_log_error(client, LOG_DEBUG, "%i connect: %i",EVENT_FD(&client->client->ev_write), red_is_socket_connected_ok(client->relay));
+			}
+		}
+		/* close long connections without activities */
+		if (now - client->last_event >= 3600 * 2)
+			drop_it = 1;
+
+		if (drop_it){
+			const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
+			const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
+
+			redsocks_log_error(client, LOG_DEBUG, "Audit client: %i (%s)%s%s input %d output %d, relay: %i (%s)%s%s input %d output %d, age: %li sec, idle: %li sec.",
+				EVENT_FD(&client->client->ev_write),
+					redsocks_event_str(client->client->enabled),
+					s_client_evshut[0] ? " " : "", s_client_evshut,
+					 EVBUFFER_LENGTH(client->client->input),
+					 EVBUFFER_LENGTH(client->client->output),
+				EVENT_FD(&client->relay->ev_write),
+					redsocks_event_str(client->relay->enabled),
+					s_relay_evshut[0] ? " " : "", s_relay_evshut,
+					 EVBUFFER_LENGTH(client->relay->input),
+					 EVBUFFER_LENGTH(client->relay->output),
+				now - client->first_event,
+				now - client->last_event);
+
+			redsocks_drop_client(client);
+		}
+	}
+	log_error(LOG_DEBUG, "End of auditing client list.");
+}
+
+
 static void redsocks_heartbeat(int sig, short what, void *_arg)
 {
 	time_t now = redsocks_time(NULL);
@@ -794,6 +850,14 @@ static void redsocks_heartbeat(int sig, short what, void *_arg)
         fprintf(tmp, "%d", now);
         fclose(tmp);
     }
+}
+
+static void redsocks_audit(int sig, short what, void *_arg)
+{
+	redsocks_instance * tmp, *instance = NULL;
+
+	list_for_each_entry_safe(instance, tmp, &instances, list)
+		redsocks_audit_instance(instance);
 }
 
 static void redsocks_fini_instance(redsocks_instance *instance);
@@ -906,6 +970,7 @@ static int redsocks_fini();
 
 static struct event debug_dumper;
 static struct event heartbeat_writer;
+static struct event audit_event;
 
 //static void ignore_sig(int t) {}
 
@@ -913,6 +978,9 @@ static int redsocks_init() {
 	struct sigaction sa , sa_old;
 	redsocks_instance *tmp, *instance = NULL;
     void (* old_hdl)(int)= NULL;
+	struct timeval audit_time;
+
+	memset(&audit_event, 0, sizeof(audit_event));
 /*
     old_hdl = signal(SIGPIPE, ignore_sig); 
 	if (old_hdl == -1) {
@@ -938,6 +1006,11 @@ static int redsocks_init() {
 		log_errno(LOG_ERR, "signal_add SIGUSR2");
 		goto fail;
 	}
+	/* Start audit */
+	audit_time.tv_sec = REDSOCKS_AUDIT_INTERVAL;
+	audit_time.tv_usec = 0;
+	event_set(&audit_event, 0, EV_TIMEOUT|EV_PERSIST, redsocks_audit, NULL);
+	evtimer_add(&audit_event, &audit_time);
 
 	list_for_each_entry_safe(instance, tmp, &instances, list) {
 		if (redsocks_init_instance(instance) != 0)
@@ -962,6 +1035,10 @@ static int redsocks_fini()
 
 	list_for_each_entry_safe(instance, tmp, &instances, list)
 		redsocks_fini_instance(instance);
+
+	/* stop audit */
+	if (event_initialized(&audit_event))
+		evtimer_del(&audit_event);
 
 	if (signal_initialized(&debug_dumper)) {
 		if (signal_del(&debug_dumper) != 0)

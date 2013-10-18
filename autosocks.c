@@ -61,7 +61,6 @@ static void direct_relay_clientreadcb(struct bufferevent *from, void *_client);
 
 #define CIRCUIT_RESET_SECONDS 1
 #define CONNECT_TIMEOUT_SECONDS 10 
-#define SHUTDOWN_TIMEOUT_SECONDS 5 
 #define ADDR_CACHE_BLOCKS 64
 #define ADDR_CACHE_BLOCK_SIZE 16 
 #define block_from_sockaddr_in(addr) (addr->sin_addr.s_addr & 0xFF) / (256/ADDR_CACHE_BLOCKS)
@@ -138,6 +137,8 @@ static void direct_relay_readcb_helper(redsocks_client *client, struct buffereve
 	if (EVBUFFER_LENGTH(to->output) < to->wm_write.high) {
 		if (bufferevent_write_buffer(to, from->input) == -1)
 			redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
+		if (bufferevent_enable(from, EV_READ) == -1)
+			redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
 	}
 	else {
 		if (bufferevent_disable(from, EV_READ) == -1)
@@ -472,19 +473,6 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
 		
 		if (antiev != NULL && EVBUFFER_LENGTH(antiev->output) == 0)
 			redsocks_shutdown(client, antiev, SHUT_WR);
-		if (antiev != NULL && bufferevent_get_enabled(antiev) & EV_READ)
-		{
-			/* Set up a timer on read so that we can ensure the connection
-				can be taken down when client socket is closed without
-				notification. This is required to prevent from hung half-closed
-				connections.
-			*/
-			redsocks_log_error(client, LOG_DEBUG, "Setup force closing timer" );
-			struct timeval tv;
-			tv.tv_sec = SHUTDOWN_TIMEOUT_SECONDS;
-			tv.tv_usec = 0;
-			bufferevent_set_timeouts(antiev, &tv, NULL);
-		}	
 	}
 	else {
 		redsocks_drop_client(client);
