@@ -64,8 +64,15 @@ redsocks {
 
 
 	// known types: socks4, socks5, http-connect, http-relay
-	// New types: direct, autosocks5
+	// New types: direct
 	type = socks5;
+
+	// Change this parameter to 1 if you want auto proxy feature. 
+	// When autoproxy is set to non-zero, the connection to target
+	// will be made directly first. If direct connection to target
+	// fails for timeout/connection refuse, redsocks will try to
+	// connect to target via the proxy.
+	autoproxy = 0;
 
 	// login = "foobar";
 	// password = "baz";

@@ -59,6 +59,7 @@ static relay_subsys *relay_subsystems[] =
 	&socks4_subsys,
 	&socks5_subsys,
 };
+extern relay_subsys autoproxy_subsys;
 
 static list_head instances = LIST_HEAD_INIT(instances);
 
@@ -74,6 +75,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "listenq",    .type = pt_uint16 },
 	{ .key = "min_accept_backoff", .type = pt_uint16 },
 	{ .key = "max_accept_backoff", .type = pt_uint16 },
+	{ .key = "autoproxy",  .type = pt_uint16 },
 	{ }
 };
 
@@ -130,6 +132,7 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.listenq = SOMAXCONN;
 	instance->config.min_backoff_ms = 100;
 	instance->config.max_backoff_ms = 60000;
+	instance->config.autoproxy = 0;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
@@ -143,6 +146,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
 			(strcmp(entry->key, "min_accept_backoff") == 0) ? (void*)&instance->config.min_backoff_ms :
 			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
+			(strcmp(entry->key, "autoproxy") == 0) ? (void*)&instance->config.autoproxy :
 			NULL;
 	section->data = instance;
 	return 0;
@@ -678,16 +682,26 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 	}
 
 	// everything seems to be ok, let's allocate some memory
-	client = calloc(1, sizeof(redsocks_client) + self->relay_ss->payload_len);
+	if (self->config.autoproxy)
+		client = calloc(1, sizeof(redsocks_client) + 
+							(self->relay_ss->payload_len>= autoproxy_subsys.payload_len?
+							self->relay_ss->payload_len: autoproxy_subsys.payload_len)
+							);
+	else
+		client = calloc(1, sizeof(redsocks_client) + self->relay_ss->payload_len);
 	if (!client) {
 		log_errno(LOG_ERR, "calloc");
 		goto fail;
 	}
+
 	client->instance = self;
 	memcpy(&client->clientaddr, &clientaddr, sizeof(clientaddr));
 	memcpy(&client->destaddr, &destaddr, sizeof(destaddr));
 	INIT_LIST_HEAD(&client->list);
-	self->relay_ss->init(client);
+	if (self->config.autoproxy)
+		autoproxy_subsys.init(client);
+	else
+		self->relay_ss->init(client);
 
 	if (redsocks_time(&client->first_event) == ((time_t)-1))
 		goto fail;
@@ -711,7 +725,11 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
 	redsocks_log_error(client, LOG_INFO, "accepted");
 
-	if (self->relay_ss->connect_relay)
+	if (self->config.autoproxy && autoproxy_subsys.connect_relay)
+	{
+		autoproxy_subsys.connect_relay(client);
+	}
+	else if (self->relay_ss->connect_relay)
 		self->relay_ss->connect_relay(client);
 	else
 		redsocks_connect_relay(client);

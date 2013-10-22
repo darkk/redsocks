@@ -1,5 +1,27 @@
 This is a modified version of original redsocks.
 This variant is useful for anti-GFW (Great Fire Wall).
+
+Note:
+Method 'autosocks5' and 'autohttp-connect' are removed.
+To use the autoproxy feature, please change the redsocks section in 
+configuration file like this:
+
+redsocks {
+ local_ip = 192.168.1.1;
+ local_port = 1081;
+ ip = 192.168.1.1;
+ port = 9050;
+ type = socks5; // I use socks5 proxy for GFW'ed IP
+ autoproxy = 1; // I want autoproxy feature enabled on this section.
+		// The two lines above have same effect as 
+		//    type = autosocks5;
+		// in previous release.
+ //type = http-connect;
+ //login = username;
+ //password = passwd;
+}
+
+--------------------------------------------------------------------
 It provides the following advanced features:
 1. new 'direct' mehtod. 
    This method is intent to direct any TCP connections directly without
@@ -9,7 +31,7 @@ montioring HTTP/HTTPS traffic. Only one computer has full access to all
 websites. Other computers in local network are limited to some websites.
 By depolying transparent proxy with this method, all your computers can
 access websites without restrictions.
-2. new 'autosocks5' method.
+2. new 'autosocks5' method. (REPLACED BY NEW METHOD!!!!)
    This mehtod is specially customized for fighting against GFW. By
 default, all TCP connections are redirected to connect to target directly
 without going through socks5 proxy. But, in case the connection to target
@@ -26,7 +48,7 @@ proxy immediately unless the addresses are removed from cache by code logic.
    The advantage of this method is that you do not need to set thousands
 entries in iptables for blocked sites manually. It is especially useful
 for proxying Youtube which has so many sub-domains for video content cache.
-3. new 'autohttp-connect' method.
+3. new 'autohttp-connect' method. (REPLACED BY NEW METHOD!!!!)
    This method behaves similar as 'autoscoks5' method except the proxy
 to be used must support HTTP CONNECT method. This method is useful for
 using redsocks together with GoProxy.

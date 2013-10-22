@@ -1,14 +1,14 @@
-OBJS := parser.o main.o redsocks.o log.o direct.o autohttp-connect.o http-connect.o socks4.o socks5.o autosocks.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
+OBJS := parser.o main.o redsocks.o log.o direct.o autoproxy.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks
-VERSION := 0.41
+VERSION := 0.5
 
 LIBS := -levent
 CFLAGS +=-fPIC -Os \
-	 -I ~/openwrt/trunk/build_dir/target-mipsel_r2_uClibc-0.9.33.2/libevent-2.0.19-stable/ipkg-install/usr/include/ \
-	 -L ~/openwrt/trunk/build_dir/target-mipsel_r2_uClibc-0.9.33.2/libevent-2.0.19-stable/.libs/  
+	 -I ~/openwrt/openwrt/staging_dir/target-mipsel_dsp_uClibc-0.9.33.2/usr/include/ \
+	 -L ~/openwrt/openwrt/staging_dir/target-mipsel_dsp_uClibc-0.9.33.2/usr/lib/
 override CFLAGS += -std=gnu99 -Wall
 #LDFLAGS += -fwhole-program
 
