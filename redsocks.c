@@ -72,6 +72,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "min_accept_backoff", .type = pt_uint16 },
 	{ .key = "max_accept_backoff", .type = pt_uint16 },
 	{ .key = "autoproxy",  .type = pt_uint16 },
+	{ .key = "timeout",    .type = pt_uint16 },
 	{ }
 };
 
@@ -129,6 +130,7 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.min_backoff_ms = 100;
 	instance->config.max_backoff_ms = 60000;
 	instance->config.autoproxy = 0;
+	instance->config.timeout =  0;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
@@ -143,6 +145,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "min_accept_backoff") == 0) ? (void*)&instance->config.min_backoff_ms :
 			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
 			(strcmp(entry->key, "autoproxy") == 0) ? (void*)&instance->config.autoproxy :
+			(strcmp(entry->key, "timeout") == 0) ? (void*)&instance->config.timeout:
 			NULL;
 	section->data = instance;
 	return 0;

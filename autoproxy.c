@@ -47,11 +47,18 @@ static void auto_connect_relay(redsocks_client *client);
 static void direct_relay_clientreadcb(struct bufferevent *from, void *_client);
 
 #define CIRCUIT_RESET_SECONDS 1
-#define CONNECT_TIMEOUT_SECONDS 10 
+#define DEFAULT_CONNECT_TIMEOUT_SECONDS 10 
+#define CACHE_ITEM_STALE_SECONDS 60*15
 #define ADDR_CACHE_BLOCKS 64
 #define ADDR_CACHE_BLOCK_SIZE 16 
 #define block_from_sockaddr_in(addr) (addr->sin_addr.s_addr & 0xFF) / (256/ADDR_CACHE_BLOCKS)
-static struct sockaddr_in addr_cache[ADDR_CACHE_BLOCKS][ADDR_CACHE_BLOCK_SIZE];
+
+typedef struct cache_data_t {
+	struct sockaddr_in addr;
+	time_t access_time;
+} cache_data;
+
+static cache_data addr_cache[ADDR_CACHE_BLOCKS][ADDR_CACHE_BLOCK_SIZE];
 static int addr_cache_counters[ADDR_CACHE_BLOCKS];
 static int addr_cache_pointers[ADDR_CACHE_BLOCKS];
 static int cache_init = 0;
@@ -76,35 +83,70 @@ static int is_addr_in_cache(const struct sockaddr_in * addr)
 	int i = 0;
 	/* do reverse search for efficency */
 	for ( i = count - 1; i >= 0; i -- )
-		/*
-		if (0 == memcmp((void *)addr, (void *)&addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE], sizeof(struct sockaddr_in)))
-*/
-		if (addr->sin_addr.s_addr == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].sin_addr.s_addr
-			 && addr->sin_family == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].sin_family
+		if (addr->sin_addr.s_addr == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr.sin_addr.s_addr
+			 && addr->sin_family == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr.sin_family
            )
 			return 1;
 			
 	return 0;
 }
 
-static void add_addr_to_cache(const struct sockaddr_in * addr)
+static time_t * get_addr_time_in_cache(const struct sockaddr_in * addr)
 {
+	/* get block index */
 	int block = block_from_sockaddr_in(addr);
 	int count = addr_cache_counters[block];
 	int first = addr_cache_pointers[block];
+	int i = 0;
+	/* do reverse search for efficency */
+	for ( i = count - 1; i >= 0; i -- )
+		if (addr->sin_addr.s_addr == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr.sin_addr.s_addr
+			 && addr->sin_family == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr.sin_family
+           )
+			return &addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].access_time;
+			
+	return NULL;
+}
+static void add_addr_to_cache(const struct sockaddr_in * addr)
+{
+	int block = block_from_sockaddr_in(addr);
+	int count = addr_cache_counters[block]; 
+	/* use 'first' to index item in cache block when count is equal or greater than block size */
+	int first = addr_cache_pointers[block]; 
 
 	if (count < ADDR_CACHE_BLOCK_SIZE)
 	{
-		memcpy((void *)&addr_cache[block][count], (void *) addr, sizeof(struct sockaddr_in));
+		memcpy((void *)&addr_cache[block][count].addr, (void *) addr, sizeof(struct sockaddr_in));
+	    addr_cache[block][count].access_time = redsocks_time(NULL);
 		addr_cache_counters[block]++;
 	}
 	else
 	{
-		memcpy((void *)&addr_cache[block][first], (void *) addr, sizeof(struct sockaddr_in));
+		memcpy((void *)&addr_cache[block][first].addr, (void *) addr, sizeof(struct sockaddr_in));
+	    addr_cache[block][first].access_time = redsocks_time(NULL);
 		addr_cache_pointers[block]++;
 		addr_cache_pointers[block]%=ADDR_CACHE_BLOCK_SIZE;
 	}	
 }
+
+static void del_addr_from_cache(const struct sockaddr_in * addr)
+{	/* get block index */
+	int block = block_from_sockaddr_in(addr);
+	int count = addr_cache_counters[block];
+	int first = addr_cache_pointers[block];
+	int i = 0;
+	/* do reverse search for efficency */
+	for ( i = count - 1; i >= 0; i -- )
+		if (addr->sin_addr.s_addr == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr.sin_addr.s_addr
+			 && addr->sin_family == addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr.sin_family
+           )
+			/* found. zero this item */
+		{
+			memset((void *)&addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE], 0, sizeof(cache_data));
+			break;
+		}
+}
+
 
 
 void auto_client_init(redsocks_client *client)
@@ -282,9 +324,9 @@ static void direct_relay_relaywritecb(struct bufferevent *to, void *_client)
 
 static void auto_drop_relay(redsocks_client *client)
 {
-	redsocks_log_error(client, LOG_DEBUG, "dropping relay only");
-	
 	if (client->relay) {
+		redsocks_log_error(client, LOG_DEBUG, "dropping relay only");
+
 		redsocks_close(EVENT_FD(&client->relay->ev_write));
 		bufferevent_free(client->relay);
 		client->relay = NULL;
@@ -293,6 +335,8 @@ static void auto_drop_relay(redsocks_client *client)
 
 static void auto_retry(redsocks_client * client, int updcache)
 {
+	autoproxy_client *aclient = (void*)(client + 1);
+
 	if (client->state == AUTOPROXY_CONNECTED)
 		bufferevent_disable(client->client, EV_READ| EV_WRITE); 
 	/* drop relay and update state, then retry with specified relay */
@@ -305,6 +349,7 @@ static void auto_retry(redsocks_client * client, int updcache)
 	auto_drop_relay(client);
 
 	/* init subsytem as ordinary subsystem */
+	memset((void *)aclient, 0, sizeof(aclient));
 	client->instance->relay_ss->init(client);	
 	// enable reading to handle EOF from client
 	bufferevent_enable(client->client, EV_READ); 
@@ -444,16 +489,30 @@ static void auto_connect_relay(redsocks_client *client)
 {
 	autoproxy_client * aclient = (void*)(client + 1);
 	struct timeval tv;
-	tv.tv_sec = CONNECT_TIMEOUT_SECONDS;
+	tv.tv_sec = client->instance->config.timeout;
 	tv.tv_usec = 0;
+	time_t * acc_time = NULL;
+	time_t now = redsocks_time(NULL); 	
+
+	/* use default timeout if timeout is not configured */
+	if (tv.tv_sec == 0)
+		tv.tv_sec = DEFAULT_CONNECT_TIMEOUT_SECONDS; 
 	
 	if (client->state == AUTOPROXY_NEW)
 	{
-		if (is_addr_in_cache(&client->destaddr))
+		acc_time = get_addr_time_in_cache(&client->destaddr);
+		if (acc_time)
 		{
-			redsocks_log_error(client, LOG_DEBUG, "Found in cache");
-			auto_retry(client, 0);
-			return ;
+			if (now - *acc_time < CACHE_ITEM_STALE_SECONDS )
+			{
+				redsocks_log_error(client, LOG_DEBUG, "Found dest IP in cache");
+
+				auto_retry(client, 0);
+				return ;
+			}
+			else
+				/* stale this address in cache */
+				del_addr_from_cache(&client->destaddr);
 		}
 		/* connect to target directly without going through proxy */	
 		client->relay = red_connect_relay2(&client->destaddr,

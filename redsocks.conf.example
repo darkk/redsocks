@@ -73,6 +73,11 @@ redsocks {
 	// fails for timeout/connection refuse, redsocks will try to
 	// connect to target via the proxy.
 	autoproxy = 0;
+	// timeout is meaningful when 'autoproxy' is non-zero.
+	// It specified timeout value when trying to connect to destination
+	// directly. Default is 10 seconds. When it is set to 0, default
+	// timeout value will be used.
+	timeout = 10;
 
 	// login = "foobar";
 	// password = "baz";

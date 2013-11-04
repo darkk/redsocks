@@ -33,6 +33,7 @@ typedef struct redsocks_config_t {
 	uint16_t max_backoff_ms; // backoff capped by 65 seconds is enough :)
 	uint16_t listenq;
 	uint16_t autoproxy;
+	uint16_t timeout;
 } redsocks_config;
 
 struct tracked_event {
