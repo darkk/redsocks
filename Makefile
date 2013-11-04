@@ -2,11 +2,11 @@ OBJS := parser.o main.o redsocks.o log.o direct.o autoproxy.o http-connect.o soc
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
-OUT := redsocks
+OUT := redsocks2
 VERSION := 0.5
 
 LIBS := -levent
-CFLAGS +=-fPIC -Os \
+CFLAGS +=-fPIC -O2 \
 	 -I ~/openwrt/openwrt/staging_dir/target-mipsel_dsp_uClibc-0.9.33.2/usr/include/ \
 	 -L ~/openwrt/openwrt/staging_dir/target-mipsel_dsp_uClibc-0.9.33.2/usr/lib/
 override CFLAGS += -std=gnu99 -Wall
