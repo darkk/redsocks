@@ -683,8 +683,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 	// everything seems to be ok, let's allocate some memory
 	if (self->config.autoproxy)
 		client = calloc(1, sizeof(redsocks_client) + 
-							(self->relay_ss->payload_len>= autoproxy_subsys.payload_len?
-							self->relay_ss->payload_len: autoproxy_subsys.payload_len)
+							self->relay_ss->payload_len + autoproxy_subsys.payload_len
 							);
 	else
 		client = calloc(1, sizeof(redsocks_client) + self->relay_ss->payload_len);
@@ -697,10 +696,9 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 	memcpy(&client->clientaddr, &clientaddr, sizeof(clientaddr));
 	memcpy(&client->destaddr, &destaddr, sizeof(destaddr));
 	INIT_LIST_HEAD(&client->list);
+	self->relay_ss->init(client);
 	if (self->config.autoproxy)
 		autoproxy_subsys.init(client);
-	else
-		self->relay_ss->init(client);
 
 	if (redsocks_time(&client->first_event) == ((time_t)-1))
 		goto fail;
