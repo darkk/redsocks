@@ -379,7 +379,7 @@ static void myproc()
                {
                    last = atol(buf);
                    now = time(NULL);
-                   if (now-last>4)
+                   if (now-last>10)
                    {
                        kill(pid, SIGKILL);
                        sleep(1);
@@ -511,8 +511,9 @@ static int base_init()
 			}
 
 		close(devnull);
+		/* only fork and monitor child process when running as daemon */
+		myproc();
 	}
-    myproc();
 	return 0;
 fail:
 	if (devnull != -1)
