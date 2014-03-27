@@ -163,6 +163,7 @@ void auto_client_init(redsocks_client *client)
 
 static void on_connection_confirmed(redsocks_client *client)
 {
+	del_addr_from_cache(&client->destaddr);
 	redsocks_log_error(client, LOG_DEBUG, "IP Confirmed"); 
 }
 
@@ -529,19 +530,22 @@ static void auto_connect_relay(redsocks_client *client)
 		acc_time = get_addr_time_in_cache(&client->destaddr);
 		if (acc_time)
 		{
-			if (now - *acc_time < CACHE_ITEM_STALE_SECONDS )
-			{
-				redsocks_log_error(client, LOG_DEBUG, "Found dest IP in cache");
-
-				auto_retry(client, 0);
-				return ;
-			}
-			else
+			redsocks_log_error(client, LOG_DEBUG, "Found dest IP in cache");
+			/* update timeout value for quick detection.
+			 * Sometimes, good sites are added into cache due to occasionally
+			 * connection timeout. It is annoying. So, decision is made to
+			 * always try to connect to destination first when the destination
+			 * is found in cache. 
+			 * For most destinations, the connection could be set up correctly
+			 * in short time. And, for most blocked sites, we get connection
+			 * reset almost immediately when connection is set up or when HTTP
+			 * request is sent. 
+			 */
+			tv.tv_sec = QUICK_CONNECT_TIMEOUT_SECONDS;
+			if (now - *acc_time >= CACHE_ITEM_STALE_SECONDS )
 			{
 				/* stale this address in cache */
 				del_addr_from_cache(&client->destaddr);
-				/* update timeout value for quick detection */
-				tv.tv_sec = QUICK_CONNECT_TIMEOUT_SECONDS;
 			}
 		}
 		/* connect to target directly without going through proxy */	
