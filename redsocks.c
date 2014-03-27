@@ -579,8 +579,14 @@ fail:
 
 void redsocks_connect_relay(redsocks_client *client)
 {
-	client->relay = red_connect_relay(&client->instance->config.relayaddr,
-			                          redsocks_relay_connected, redsocks_event_error, client);
+	struct timeval tv;
+	tv.tv_sec = client->instance->config.timeout;
+	tv.tv_usec = 0;
+	if (tv.tv_sec == 0)
+		tv.tv_sec = 10;
+
+	client->relay = red_connect_relay2(&client->instance->config.relayaddr,
+			                          redsocks_relay_connected, redsocks_event_error, client, &tv);
 	if (!client->relay) {
 		redsocks_log_errno(client, LOG_ERR, "red_connect_relay");
 		redsocks_drop_client(client);
