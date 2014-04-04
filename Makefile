@@ -3,7 +3,7 @@ SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks2
-VERSION := 0.5
+VERSION := 0.51
 
 LIBS := -levent
 CFLAGS +=-fPIC -O2 \
