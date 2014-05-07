@@ -63,7 +63,7 @@ parser_context* parser_start(FILE *fd, parser_errhandler errhandler)
 		return NULL;
 	ret->fd = fd;
 	ret->errhandler = errhandler;
-	ret->buffer.size = 128; // should be big enough to fetch whole ``line``
+	ret->buffer.size = 256; // should be big enough to fetch whole ``line``
 	ret->buffer.data = malloc(ret->buffer.size);
 	if (!ret->buffer.data) {
 		free(ret);
