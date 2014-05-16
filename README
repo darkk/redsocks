@@ -7,7 +7,6 @@ I'm not sure from where it comes the original code of the patch, yif you are the
 
 This patch allow you to have a config of this kind:
 
-```
     redsocks {
       local_ip=0.0.0.0;
       local_port=1080;
@@ -19,7 +18,6 @@ This patch allow you to have a config of this kind:
       login="USER";
       password="PASSWORD";
     }
-```
 
 The advantage of having a fall back IP address is that you can connect to a different socks server, when the first one is not available, for instance when you are on a different network that doe not have access to the first socks server...
 
