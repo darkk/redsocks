@@ -477,7 +477,8 @@ int parser_run(parser_context *context)
 					parser_error(context, "expected token before ``{''"); // } - I love folding
 				}
 				else {
-					for (parser_section *p = context->sections; p; p = p->next) {
+					parser_section *p;
+					for (p = context->sections; p; p = p->next) {
 						if (strcmp(p->name, section_token) == 0) {
 							section = p;
 							break;

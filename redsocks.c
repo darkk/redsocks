@@ -125,7 +125,8 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.min_backoff_ms = 100;
 	instance->config.max_backoff_ms = 60000;
 
-	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+	parser_entry *entry;
+	for (entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
 			(strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
 			(strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
@@ -152,7 +153,8 @@ static int redsocks_onexit(parser_section *section)
 	redsocks_instance *instance = section->data;
 
 	section->data = NULL;
-	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+	parser_entry *entry;
+	for (entry = &section->entries[0]; entry->key; entry++)
 		entry->addr = NULL;
 
 	instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);
