@@ -7,7 +7,6 @@ VERSION := 0.4
 
 LIBS := -levent
 CFLAGS += -g -O2
-override CFLAGS += -std=gnu99 -Wall
 
 all: $(OUT)
 
