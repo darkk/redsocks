@@ -122,7 +122,8 @@ static int dnstc_onenter(parser_section *section)
 	instance->config.bindaddr.sin_family = AF_INET;
 	instance->config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+	parser_entry *entry;
+	for (entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
 			(strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
 			(strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
@@ -136,7 +137,8 @@ static int dnstc_onexit(parser_section *section)
 	dnstc_instance *instance = section->data;
 
 	section->data = NULL;
-	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+	parser_entry *entry;
+	for (entry = &section->entries[0]; entry->key; entry++)
 		entry->addr = NULL;
 
 	instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);
