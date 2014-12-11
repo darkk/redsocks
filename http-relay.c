@@ -403,7 +403,8 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 
 	uri = strchr(httpr->firstline, ' ');
 	if (uri)
-		uri += 1; // one char further
+		while (*uri == ' ')
+			uri += 1; // one char further
 	else {
 		redsocks_log_error(client, LOG_NOTICE, "malformed request came");
 		goto fail;
@@ -417,10 +418,12 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 
 	if (httpr_buffer_append(&nbuff, httpr->firstline, uri - httpr->firstline) != 0)
 		goto addition_fail;
-	if (httpr_buffer_append(&nbuff, "http://", 7) != 0)
-		goto addition_fail;
-	if (httpr_buffer_append(&nbuff, host, strlen(host)) != 0)
-		goto addition_fail;
+	if (*uri == '/') {
+		if (httpr_buffer_append(&nbuff, "http://", 7) != 0)
+			goto addition_fail;
+		if (httpr_buffer_append(&nbuff, host, strlen(host)) != 0)
+			goto addition_fail;
+	}
 	if (httpr_buffer_append(&nbuff, uri, strlen(uri)) != 0)
 		goto addition_fail;
 	if (httpr_buffer_append(&nbuff, "\x0d\x0a", 2) != 0)
