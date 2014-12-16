@@ -3,12 +3,10 @@ SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks2
-VERSION := 0.51
+VERSION := 0.60
 
 LIBS := -levent
-CFLAGS +=-fPIC -O2 \
-	 -I ~/openwrt/openwrt/staging_dir/target-mipsel_dsp_uClibc-0.9.33.2/usr/include/ \
-	 -L ~/openwrt/openwrt/staging_dir/target-mipsel_dsp_uClibc-0.9.33.2/usr/lib/
+CFLAGS +=-fPIC -O3 
 override CFLAGS += -std=gnu99 -Wall
 #LDFLAGS += -fwhole-program
 

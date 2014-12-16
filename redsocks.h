@@ -21,6 +21,7 @@ typedef struct relay_subsys_t {
 	void       (*instance_fini)(struct redsocks_instance_t *instance);
 	// connect_relay (if any) is called instead of redsocks_connect_relay after client connection acceptance
 	void       (*connect_relay)(struct redsocks_client_t *client);
+	//void       (*relay_connected)(struct redsocks_client_t *client);
 } relay_subsys;
 
 typedef struct redsocks_config_t {
@@ -34,6 +35,7 @@ typedef struct redsocks_config_t {
 	uint16_t listenq;
 	uint16_t autoproxy;
 	uint16_t timeout;
+	char *interface;// interface of relay
 } redsocks_config;
 
 struct tracked_event {
@@ -70,6 +72,7 @@ void redsocks_drop_client(redsocks_client *client);
 void redsocks_touch_client(redsocks_client *client);
 void redsocks_connect_relay(redsocks_client *client);
 int redsocks_start_relay(redsocks_client *client);
+void redsocks_dump_client(redsocks_client * client);
 
 typedef int (*size_comparator)(size_t a, size_t b);
 int sizes_equal(size_t a, size_t b);

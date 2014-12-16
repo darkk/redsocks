@@ -395,7 +395,7 @@ static void redudp_read_assoc_reply(struct bufferevent *buffev, void *_arg)
 		goto fail;
 	}
 
-	event_set(&client->udprelay, fd, EV_READ | EV_PERSIST, redudp_pkt_from_socks, client);
+	event_assign(&client->udprelay, get_event_base(), fd, EV_READ | EV_PERSIST, redudp_pkt_from_socks, client);
 	error = event_add(&client->udprelay, NULL);
 	if (error) {
 		redudp_log_errno(client, LOG_ERR, "event_add");
@@ -557,7 +557,7 @@ static void redudp_first_pkt_from_client(redudp_instance *self, struct sockaddr_
 
 	client->sender_fd = -1; // it's postponed until socks-server replies to avoid trivial DoS
 
-	client->relay = red_connect_relay(&client->instance->config.relayaddr,
+	client->relay = red_connect_relay(&client->instance->config.relayaddr, NULL, 
 	                                  redudp_relay_connected, redudp_relay_error, client);
 	if (!client->relay)
 		goto fail;
@@ -819,7 +819,7 @@ static int redudp_init_instance(redudp_instance *instance)
 		goto fail;
 	}
 
-	event_set(&instance->listener, fd, EV_READ | EV_PERSIST, redudp_pkt_from_client, instance);
+	event_assign(&instance->listener, get_event_base(), fd, EV_READ | EV_PERSIST, redudp_pkt_from_client, instance);
 	error = event_add(&instance->listener, NULL);
 	if (error) {
 		log_errno(LOG_ERR, "event_add");

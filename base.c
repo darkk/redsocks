@@ -332,6 +332,8 @@ static void myproc()
     size_t len = 0;
     ssize_t dsize ;
 	struct sigaction sa ;
+    char tmp_fname[128];
+    snprintf(tmp_fname, sizeof(tmp_fname), "/tmp/redtime-%d", getpid());
 
     /* Set SIGCHLD handler to ignore death of child. */
 	sa.sa_handler = SIG_IGN;
@@ -369,7 +371,7 @@ static void myproc()
                }
                sleep(1);
                
-           tmp = fopen("/tmp/redtime", "r");
+           tmp = fopen(tmp_fname, "r");
            if (tmp)
            {
                len = 0;

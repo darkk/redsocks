@@ -41,10 +41,11 @@ app_subsys *subsystems[] = {
 
 static const char *confname = "redsocks.conf";
 static const char *pidfile = NULL;
+static struct event_base * g_event_base = NULL;
 
 static void terminate(int sig, short what, void *_arg)
 {
-	if (event_loopbreak() != 0)
+	if (g_event_base && event_base_loopbreak(g_event_base) != 0)
 		log_error(LOG_WARNING, "event_loopbreak");
 }
 
@@ -54,6 +55,11 @@ static void red_srand()
 	gettimeofday(&tv, NULL);
 	// using tv_usec is a bit less predictable than tv_sec
 	srand(tv.tv_sec*1000000+tv.tv_usec);
+}
+
+struct event_base * get_event_base()
+{
+	return g_event_base;
 }
 
 int main(int argc, char **argv)
@@ -119,7 +125,11 @@ int main(int argc, char **argv)
 	if (conftest)
 		return EXIT_SUCCESS;
 
-	event_init();
+	// Initialize global event base
+	g_event_base = event_base_new();
+	if (!g_event_base)
+		return EXIT_FAILURE;
+		
 	memset(terminators, 0, sizeof(terminators));
 
 	FOREACH(ss, subsystems) {
@@ -142,7 +152,7 @@ int main(int argc, char **argv)
 
 	assert(SIZEOF_ARRAY(exit_signals) == SIZEOF_ARRAY(terminators));
 	for (i = 0; i < SIZEOF_ARRAY(exit_signals); i++) {
-		signal_set(&terminators[i], exit_signals[i], terminate, NULL);
+		evsignal_assign(&terminators[i], get_event_base(), exit_signals[i], terminate, NULL);
 		if (signal_add(&terminators[i], NULL) != 0) {
 			log_errno(LOG_ERR, "signal_add");
 			goto shutdown;
@@ -151,7 +161,7 @@ int main(int argc, char **argv)
 
 	log_error(LOG_NOTICE, "redsocks started");
 
-	event_dispatch();
+	event_base_dispatch(g_event_base);
 
 	log_error(LOG_NOTICE, "redsocks goes down");
 
@@ -168,8 +178,9 @@ shutdown:
 		if ((*ss)->fini)
 			(*ss)->fini();
 
-	event_base_free(NULL);
-
+	if (g_event_base)
+		event_base_free(g_event_base);
+	
 	return !error ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

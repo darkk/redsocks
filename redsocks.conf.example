@@ -62,10 +62,14 @@ redsocks {
 	ip = example.org;
 	port = 1080;
 
-
 	// known types: socks4, socks5, http-connect, http-relay
 	// New types: direct
 	type = socks5;
+
+    // Specify interface for outgoing connections when 'direct' type
+    // is used. This is useful when you have multiple connections to
+    // internet or you have VPN connections.
+    // interface = tun0;
 
 	// Change this parameter to 1 if you want auto proxy feature. 
 	// When autoproxy is set to non-zero, the connection to target
