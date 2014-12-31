@@ -890,7 +890,7 @@ static void redsocks_heartbeat(int sig, short what, void *_arg)
     tmp = fopen(tmp_fname, "w");
     if (tmp)
     {
-        fprintf(tmp, "%d", now);
+        fprintf(tmp, "%ld ", (long int)now);
         fclose(tmp);
     }
 }

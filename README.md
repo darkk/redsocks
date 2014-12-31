@@ -1,8 +1,7 @@
 REDSOCKS2
 =========
 This is a modified version of original redsocks.
-The name is changed to be REDSOCKS2 since this release to distinguish
-with original redsocks.
+The name is changed to REDSOCKS2 to distinguish with original redsocks.
 This variant is useful for anti-GFW (Great Fire Wall).
 
 HOW it works
@@ -20,7 +19,6 @@ read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
 to cross compile.
 
 ##Note:
-Method 'autosocks5' and 'autohttp-connect' are removed.
 To use the autoproxy feature, please change the redsocks section in
 configuration file like this:
 
@@ -38,7 +36,7 @@ configuration file like this:
 	 // It specified timeout value when trying to connect to destination
 	 // directly. Default is 10 seconds. When it is set to 0, default
 	 // timeout value will be used.
-	 // NOTE: decrease the timeout value may lead increase of chance for
+	 // NOTE: decreasing the timeout value may lead increase of chance for
 	 // normal IP to be misjudged.
 	 timeout = 13;
 	 //type = http-connect;

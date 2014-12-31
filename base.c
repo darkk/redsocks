@@ -328,9 +328,6 @@ static void myproc()
     FILE * tmp = NULL;
     pid_t pid = -1;
     int stop = 0;
-    char * buf = NULL;
-    size_t len = 0;
-    ssize_t dsize ;
 	struct sigaction sa ;
     char tmp_fname[128];
     snprintf(tmp_fname, sizeof(tmp_fname), "/tmp/redtime-%d", getpid());
@@ -369,37 +366,23 @@ static void myproc()
                    sleep(1);
                    continue;
                }
-               sleep(1);
+               sleep(2);
                
-           tmp = fopen(tmp_fname, "r");
-           if (tmp)
-           {
-               len = 0;
-               buf = NULL;
-               dsize =getline( &buf, &len, tmp);
-               if (dsize != -1)
+               tmp = fopen(tmp_fname, "r");
+               if (tmp)
                {
-                   last = atol(buf);
-                   now = time(NULL);
-                   if (now-last>10)
+                   if (fscanf(tmp, "%ld", &last) > 0)
                    {
-                       kill(pid, SIGKILL);
-                       sleep(1);
-                       stop = 1;
+                       now = time(NULL);
+                       if (now-last>10)
+                       {
+                           kill(pid, SIGKILL);
+                           sleep(1);
+                           stop = 1;
+                       }
                    }
+                   fclose(tmp);
                }
-               free(buf);
-               fclose(tmp);
-           }
-           else
-                   {
-/*
-                       kill(pid, SIGKILL);
-                       sleep(1);
-                       stop = 1;
-*/
-                   }
-
             }
 		}
      }

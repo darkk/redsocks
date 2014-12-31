@@ -294,6 +294,8 @@ static void direct_relay_clientreadcb(struct bufferevent *from, void *_client)
             /* No CONNECTION RESET error occur after sending data, good. */
             auto_confirm_connection(client);
         }
+        if (0 == aclient->data_sent)
+            aclient->data_sent = input_size;
     }
     direct_relay_readcb_helper(client, client->client, client->relay);
 }
