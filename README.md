@@ -18,7 +18,7 @@ Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
 to cross compile.
 
-##Note:
+###Note:
 To use the autoproxy feature, please change the redsocks section in
 configuration file like this:
 
@@ -93,6 +93,26 @@ The configuration for forwarding connections to GoAgent is like below:
 	 // timeout value will be used.
 	 timeout = 13;
 	}
+
+##Redirect UPD based DNS Request via TCP connection
+Sending DNS request via TCP connection is one way to prevent from DNS
+poisoning. You can redirect all UDP based DNS requests via TCP connection
+with the following config section.
+
+    tcpdns {
+    	// Transform UDP DNS requests into TCP DNS requests.
+    	// You can also redirect connections to external TCP DNS server to
+    	// REDSOCKS transparent proxy via iptables.
+    	local_ip = 192.168.1.1; // Local server to act as DNS server
+    	local_port = 1053;      // UDP port to receive UDP DNS requests
+    	tcpdns1 = 8.8.4.4;      // DNS server that supports TCP DNS requests
+    	tcpdns2 = 8.8.8.8;      // DNS server that supports TCP DNS requests
+    	timeout = 4;            // Timeout value for TCP DNS requests
+    }
+
+Then, you can either redirect all your DNS requests to the local IP:port
+configured above by iptables, or just change your system default DNS upstream
+server as the local IP:port configured above.
 
 AUTHOR
 ------
