@@ -590,6 +590,10 @@ void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
         goto fail;
     }
 
+    /* We do not need to detect timeouts any more.
+    The two peers will handle it. */
+    bufferevent_set_timeouts(client->relay, NULL, NULL);
+
     bufferevent_setcb(client->relay, client->instance->relay_ss->readcb,
                                      client->instance->relay_ss->writecb,
                                      redsocks_event_error,
