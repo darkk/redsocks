@@ -68,6 +68,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "listenq",    .type = pt_uint16 },
 	{ .key = "min_accept_backoff", .type = pt_uint16 },
 	{ .key = "max_accept_backoff", .type = pt_uint16 },
+	{ .key = "timeout",    .type = pt_uint16 },
 	{ }
 };
 
@@ -124,6 +125,7 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.listenq = SOMAXCONN;
 	instance->config.min_backoff_ms = 100;
 	instance->config.max_backoff_ms = 60000;
+	instance->config.timeout = 0;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
@@ -137,6 +139,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
 			(strcmp(entry->key, "min_accept_backoff") == 0) ? (void*)&instance->config.min_backoff_ms :
 			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
+			(strcmp(entry->key, "timeout") == 0) ? (void*)&instance->config.timeout :
 			NULL;
 	section->data = instance;
 	return 0;
@@ -572,7 +575,14 @@ void redsocks_connect_relay(redsocks_client *client)
 	if (!client->relay) {
 		redsocks_log_errno(client, LOG_ERR, "red_connect_relay");
 		redsocks_drop_client(client);
-	}
+	}    
+	else {
+        if (client->timeout > 0) {
+            redsocks_log_error(client, LOG_INFO, "settimeout");
+            bufferevent_settimeout(client->relay, client->timeout,client->timeout);
+        }
+    }
+
 }
 
 static void redsocks_accept_backoff(int fd, short what, void *_arg)
@@ -685,6 +695,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
 	redsocks_touch_client(client);
 
+    client->timeout=self->config.timeout;
 	client->client = bufferevent_new(client_fd, NULL, NULL, redsocks_event_error, client);
 	if (!client->client) {
 		log_errno(LOG_ERR, "bufferevent_new");
