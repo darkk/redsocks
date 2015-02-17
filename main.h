@@ -6,6 +6,7 @@
 typedef struct app_subsys_t {
 	int (*init)();
 	int (*fini)();
+	void (*dump)();// Allow subsystem to dump information
 	parser_section* conf_section;
 } app_subsys;
 

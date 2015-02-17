@@ -123,6 +123,23 @@ tcpdns {
 	timeout = 4;            // Timeout value for TCP DNS requests
 }
 
+autoproxy {
+    no_quick_check_seconds = 60; // Directly relay traffic to proxy if an IP
+                                 // is found blocked in cache and it has been
+                                 // added into cache no earlier than this
+                                 // specified number of seconds.
+    quick_connect_timeout = 3;   // Timeout value when performing quick
+                                 // connection check if an IP is found blocked
+                                 // in cache.
+}
+
+ipcache {
+    // Configure IP cache
+    cache_size = 4;   // Maximum number of IP's in 1K. 
+    stale_time = 900; // Seconds to stale an IP in cache since it is added
+                      // into cahce
+    port_check = 1;   // Whether to distinguish port number in address
+}
 
 // you can add more `redsocks' and `redudp' sections if you need.
 

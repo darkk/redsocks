@@ -1,5 +1,5 @@
 /* redsocks2 - transparent TCP-to-proxy redirector
- * Copyright (C) 2013-2014 Zhuofei Wang <semigodking@gmail.com>
+ * Copyright (C) 2013-2015 Zhuofei Wang <semigodking@gmail.com>
  *
  * This code is based on redsocks project developed by Leonid Evdokimov.
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
@@ -26,6 +26,10 @@
 #include "utils.h"
 #include "log.h"
 #include "redsocks.h"
+#include "parser.h"
+#include "list.h"
+#include "main.h"
+#include "ipcache.h"
 
 typedef enum autoproxy_state_t {
     /* Introduce subsystem */
@@ -52,135 +56,112 @@ static void auto_connect_relay(redsocks_client *client);
 static void direct_relay_clientreadcb(struct bufferevent *from, void *_client);
 static void auto_event_error(struct bufferevent *buffev, short what, void *_arg);
 
-#define CIRCUIT_RESET_SECONDS 1
-#define DEFAULT_CONNECT_TIMEOUT_SECONDS 10 
 #define QUICK_CONNECT_TIMEOUT_SECONDS 3 
 #define NO_CHECK_SECONDS 60 
-#define CACHE_ITEM_STALE_SECONDS 60*30
-#define ADDR_CACHE_BLOCKS 256 
-#define ADDR_CACHE_BLOCK_SIZE 16 
-#define ADDR_PORT_CHECK 1
-#define block_from_sockaddr_in(addr) (addr->sin_addr.s_addr & 0xFF) / (256/ADDR_CACHE_BLOCKS)
-#define get_autoproxy_client(client) (void*)(client + 1) + client->instance->relay_ss->payload_len;
 
-typedef struct cache_data_t {
-    struct sockaddr_in addr;
-    time_t access_time;
-} cache_data;
 
-static cache_data addr_cache[ADDR_CACHE_BLOCKS][ADDR_CACHE_BLOCK_SIZE];
-static int addr_cache_counters[ADDR_CACHE_BLOCKS];
-static int addr_cache_pointers[ADDR_CACHE_BLOCKS];
-static int cache_init = 0;
+typedef struct autoproxy_config_t {
+    list_head  list; // Make it a list to support multiple configurations
+    int    quick_connect_timeout;
+    int    no_quick_check_seconds;
+} autoproxy_config;
 
-static void init_addr_cache()
-{           
-    if (!cache_init)
-    {
-        memset((void *)addr_cache, 0, sizeof(addr_cache));
-        memset((void *)addr_cache_counters, 0, sizeof(addr_cache_counters));
-        memset((void *)addr_cache_pointers, 0, sizeof(addr_cache_pointers));
-        cache_init = 1;
-    }
-}
+static autoproxy_config default_config = {
+    .quick_connect_timeout = QUICK_CONNECT_TIMEOUT_SECONDS,
+    .no_quick_check_seconds = NO_CHECK_SECONDS,
+};
 
-static int is_addr_in_cache(const struct sockaddr_in * addr)
+static list_head configs = LIST_HEAD_INIT(configs);
+
+static parser_entry autoproxy_entries[] =
 {
-    /* get block index */
-    int block = block_from_sockaddr_in(addr);
-    int count = addr_cache_counters[block];
-    int first = addr_cache_pointers[block];
-    int i = 0;
-    /* do reverse search for efficency */
-    for ( i = count - 1; i >= 0; i -- )
-    {
-        if (0 == evutil_sockaddr_cmp((const struct sockaddr *)addr,
-                 (const struct sockaddr *)&addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr,
-                 ADDR_PORT_CHECK))
-            return 1;
-    }       
+    { .key = "quick_connect_timeout",  .type = pt_uint16 },
+    { .key = "no_quick_check_seconds",  .type = pt_uint16 },
+    { }
+};
+
+static int autoproxy_onenter(parser_section *section)
+{
+    autoproxy_config * config = malloc(sizeof(*config));
+    if (!config) {
+        parser_error(section->context, "Not enough memory");
+        return -1;
+    }
+
+    INIT_LIST_HEAD(&config->list);
+    /* initialize with default config */
+    memcpy(config, &default_config, sizeof(*config));
+
+    for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+        entry->addr =
+            (strcmp(entry->key, "quick_connect_timeout") == 0) ? (void*)&config->quick_connect_timeout:
+            (strcmp(entry->key, "no_quick_check_seconds") == 0) ? (void*)&config->no_quick_check_seconds:
+            NULL;
+    section->data = config; 
     return 0;
 }
 
-static time_t * get_addr_time_in_cache(const struct sockaddr_in * addr)
+static int autoproxy_onexit(parser_section *section)
 {
-    /* get block index */
-    int block = block_from_sockaddr_in(addr);
-    int count = addr_cache_counters[block];
-    int first = addr_cache_pointers[block];
-    int i = 0;
-    /* do reverse search for efficency */
-    for ( i = count - 1; i >= 0; i -- )
-    {
-        if (0 == evutil_sockaddr_cmp((const struct sockaddr *)addr,
-                 (const struct sockaddr *)&addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr,
-                 ADDR_PORT_CHECK))
-            return &addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].access_time;
-    }       
-    return NULL;
+    /* FIXME: Rewrite in bullet-proof style. There are memory leaks if config
+     *        file is not correct, so correct on-the-fly config reloading is
+     *        currently impossible.
+     */
+    const char *err = NULL;
+    autoproxy_config * config = section->data;
+
+    section->data = NULL;
+    for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+        entry->addr = NULL;
+
+    /* Check and update values here */
+    if (!config->quick_connect_timeout)
+        err = "Timeout value for quick check can not be 0. Default: 3";
+
+    if (err)
+        parser_error(section->context, err);
+    else
+        // Add config to config list
+        list_add(&config->list, &configs);
+
+    return err ? -1 : 0;
 }
 
-void set_addr_time_in_cache(const struct sockaddr_in * addr, time_t time)
+static parser_section autoproxy_conf_section =
 {
-    /* get block index */
-    int block = block_from_sockaddr_in(addr);
-    int count = addr_cache_counters[block];
-    int first = addr_cache_pointers[block];
-    int i = 0;
-    /* do reverse search for efficency */
-    for ( i = count - 1; i >= 0; i -- )
-    {
-        if (0 == evutil_sockaddr_cmp((const struct sockaddr *)addr,
-                 (const struct sockaddr *)&addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr,
-                 ADDR_PORT_CHECK))
-        {
-             addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].access_time = time;
-             return;
-        }
-    }       
-}
+    .name    = "autoproxy",
+    .entries = autoproxy_entries,
+    .onenter = autoproxy_onenter,
+    .onexit  = autoproxy_onexit
+};
 
-static void add_addr_to_cache(const struct sockaddr_in * addr)
+app_subsys autoproxy_app_subsys =
 {
-    int block = block_from_sockaddr_in(addr);
-    int count = addr_cache_counters[block]; 
-    /* use 'first' to index item in cache block when count is equal or greater than block size */
-    int first = addr_cache_pointers[block]; 
+//    .init = autoproxy_init,
+//    .fini = autoproxy_fini,
+    .conf_section = &autoproxy_conf_section,
+};
 
-    if (count < ADDR_CACHE_BLOCK_SIZE)
+
+static autoproxy_config * get_config(redsocks_client * client)
+{
+    // TODO: By far, only the first configuration section takes effect.
+    // We need to find a proper way to let user specify which config section
+    // to associate with.
+    autoproxy_config * config = NULL;
+    if (!list_empty(&configs))
     {
-        memcpy((void *)&addr_cache[block][count].addr, (void *) addr, sizeof(struct sockaddr_in));
-        addr_cache[block][count].access_time = redsocks_time(NULL);
-        addr_cache_counters[block]++;
+        list_for_each_entry(config, &configs, list)
+            break;
+        return config;
     }
     else
     {
-        memcpy((void *)&addr_cache[block][first].addr, (void *) addr, sizeof(struct sockaddr_in));
-        addr_cache[block][first].access_time = redsocks_time(NULL);
-        addr_cache_pointers[block]++;
-        addr_cache_pointers[block]%=ADDR_CACHE_BLOCK_SIZE;
-    }   
-}
-
-static void del_addr_from_cache(const struct sockaddr_in * addr)
-{   /* get block index */
-    int block = block_from_sockaddr_in(addr);
-    int count = addr_cache_counters[block];
-    int first = addr_cache_pointers[block];
-    int i = 0;
-    /* do reverse search for efficency */
-    for ( i = count - 1; i >= 0; i -- )
-    {
-        if (0 == evutil_sockaddr_cmp((const struct sockaddr *)addr,
-                 (const struct sockaddr *)&addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE].addr,
-                 ADDR_PORT_CHECK))
-            /* found. zero this item */
-        {
-            memset((void *)&addr_cache[block][(first+i)%ADDR_CACHE_BLOCK_SIZE], 0, sizeof(cache_data));
-            break;
-        }
+        return &default_config;
     }
 }
+
+#define get_autoproxy_client(client) (void*)(client + 1) + client->instance->relay_ss->payload_len;
 
 void auto_client_init(redsocks_client *client)
 {
@@ -188,7 +169,6 @@ void auto_client_init(redsocks_client *client)
 
     memset((void *) aclient, 0, sizeof(autoproxy_client));
     aclient->state = AUTOPROXY_NEW;
-    init_addr_cache();
 }
 
 void auto_client_fini(redsocks_client *client)
@@ -207,7 +187,7 @@ static void on_connection_confirmed(redsocks_client *client)
 {
     redsocks_log_error(client, LOG_DEBUG, "IP Confirmed"); 
 
-    del_addr_from_cache(&client->destaddr);
+    cache_del_addr(&client->destaddr);
 }
 
 static void on_connection_blocked(redsocks_client *client)
@@ -475,9 +455,9 @@ static void auto_retry(redsocks_client * client, int updcache)
     if (updcache)
     {
         /* only add IP to cache when the IP is not in cache */
-        if (get_addr_time_in_cache(&client->destaddr) == NULL)
+        if (cache_get_addr_time(&client->destaddr) == NULL)
         {
-            add_addr_to_cache(&client->destaddr);
+            cache_add_addr(&client->destaddr);
             redsocks_log_error(client, LOG_DEBUG, "ADD IP to cache: %s", 
                             inet_ntoa(client->destaddr.sin_addr));
         }
@@ -508,27 +488,14 @@ static void auto_retry(redsocks_client * client, int updcache)
 static int auto_retry_or_drop(redsocks_client * client)
 {
     autoproxy_client * aclient = get_autoproxy_client(client);
-    time_t now = redsocks_time(NULL);
     
-    if (aclient->state == AUTOPROXY_NEW)
+    if (aclient->state == AUTOPROXY_NEW || aclient->state == AUTOPROXY_CONNECTED)
     {
-        if (now - aclient->time_connect_relay <= CIRCUIT_RESET_SECONDS) 
-        {
-            on_connection_blocked(client);  
-            auto_retry(client, 0);
-            return 0; 
-        }
+        on_connection_blocked(client);  
+        auto_retry(client, 0);
+        return 0; 
     }
-    else if ( aclient->state == AUTOPROXY_CONNECTED)
-    {
-//      if (now - aclient->time_connect_relay <= CIRCUIT_RESET_SECONDS) 
-        {
-            on_connection_blocked(client);  
-            auto_retry(client, 0);
-            return 0; 
-        }
-    }
-    
+
     /* drop */
     return 1;
 }
@@ -541,7 +508,6 @@ static void auto_relay_connected(struct bufferevent *buffev, void *_arg)
     assert(buffev == client->relay);
         
     redsocks_touch_client(client);
-            
 
     if (!red_is_socket_connected_ok(buffev)) {
         if (aclient->state == AUTOPROXY_NEW && !auto_retry_or_drop(client))
@@ -609,7 +575,7 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
         {
             // Update access time for IP fails again.
             if (aclient->quick_check)
-                set_addr_time_in_cache(&client->destaddr, redsocks_time(NULL)); 
+                cache_touch_addr(&client->destaddr);
 
             on_connection_blocked(client);  
             /* In case timeout occurs while connecting relay, we try to connect
@@ -664,6 +630,7 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
 static void auto_connect_relay(redsocks_client *client)
 {
     autoproxy_client * aclient = get_autoproxy_client(client);
+    autoproxy_config * config = NULL;
     struct timeval tv;
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
@@ -672,22 +639,22 @@ static void auto_connect_relay(redsocks_client *client)
 
     /* use default timeout if timeout is not configured */
     if (tv.tv_sec == 0)
-        tv.tv_sec = DEFAULT_CONNECT_TIMEOUT_SECONDS; 
+        tv.tv_sec = DEFAULT_CONNECT_TIMEOUT; 
     
     if (aclient->state == AUTOPROXY_NEW)
     {
-        acc_time = get_addr_time_in_cache(&client->destaddr);
+        acc_time = cache_get_addr_time(&client->destaddr);
         if (acc_time)
         {
             redsocks_log_error(client, LOG_DEBUG, "Found dest IP in cache");
+            config = get_config(client);
             // No quick check when the time passed since IP is added to cache is 
             // less than NO_CHECK_SECONDS. Just let it go via proxy.
-            if (now - *acc_time < NO_CHECK_SECONDS)
+            if (now - *acc_time < config->no_quick_check_seconds)
             {
                 auto_retry(client, 0);
                 return;
             }
-
             /* update timeout value for quick detection.
              * Sometimes, good sites are added into cache due to occasionally
              * connection timeout. It is annoying. So, decision is made to
@@ -698,13 +665,8 @@ static void auto_connect_relay(redsocks_client *client)
              * reset almost immediately when connection is set up or when HTTP
              * request is sent. 
              */
-            tv.tv_sec = QUICK_CONNECT_TIMEOUT_SECONDS;
+            tv.tv_sec = config->quick_connect_timeout;
             aclient->quick_check = 1;
-            if (now - *acc_time >= CACHE_ITEM_STALE_SECONDS )
-            {
-                /* stale this address in cache */
-                del_addr_from_cache(&client->destaddr);
-            }
         }
         /* connect to target directly without going through proxy */    
         client->relay = red_connect_relay2(&client->destaddr,

@@ -7,6 +7,8 @@
 #include "list.h"
 
 
+#define DEFAULT_CONNECT_TIMEOUT 10 
+
 struct redsocks_client_t;
 struct redsocks_instance_t;
 
@@ -18,6 +20,7 @@ typedef struct relay_subsys_t {
 	evbuffercb writecb;
 	void       (*init)(struct redsocks_client_t *client);
 	void       (*fini)(struct redsocks_client_t *client);
+	int        (*instance_init)(struct redsocks_instance_t *instance);
 	void       (*instance_fini)(struct redsocks_instance_t *instance);
 	// connect_relay (if any) is called instead of redsocks_connect_relay after client connection acceptance
 	void       (*connect_relay)(struct redsocks_client_t *client);
@@ -72,7 +75,8 @@ void redsocks_drop_client(redsocks_client *client);
 void redsocks_touch_client(redsocks_client *client);
 void redsocks_connect_relay(redsocks_client *client);
 int redsocks_start_relay(redsocks_client *client);
-void redsocks_dump_client(redsocks_client * client);
+void redsocks_dump_client(redsocks_client * client, int loglevel);
+void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 
 typedef int (*size_comparator)(size_t a, size_t b);
 int sizes_equal(size_t a, size_t b);

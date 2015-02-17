@@ -18,7 +18,12 @@ Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
 to cross compile.
 
-###Note:
+Configurations
+--------------
+Please see 'redsocks.conf.example' for whole picture of configuration file.
+Below are additional sample configuration sections for different usage.
+
+##Redirect Blocked Traffic via Proxy Automatically
 To use the autoproxy feature, please change the redsocks section in
 configuration file like this:
 
@@ -116,4 +121,4 @@ server as the local IP:port configured above.
 
 AUTHOR
 ------
-Zhuofei Wang <semigodking@gmail.com>
+Zhuofei Wang <semigodking@gmail.com> **Accept donations by AliPay with this email**

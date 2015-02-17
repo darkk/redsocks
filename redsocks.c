@@ -1,5 +1,5 @@
 /* redsocks2 - transparent TCP-to-proxy redirector
- * Copyright (C) 2013-2014 Zhuofei Wang <semigodking@gmail.com>
+ * Copyright (C) 2013-2015 Zhuofei Wang <semigodking@gmail.com>
  *
  * This code is based on redsocks project developed by Leonid Evdokimov.
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -319,9 +319,6 @@ int redsocks_start_relay(redsocks_client *client)
     int error;
     bufferevent_event_cb event_cb;
 
-    if (client->instance->relay_ss->fini)
-        client->instance->relay_ss->fini(client);
-
     bufferevent_setwatermark(client->client, EV_READ|EV_WRITE, 0, REDSOCKS_RELAY_HALFBUFF);
     bufferevent_setwatermark(client->relay, EV_READ|EV_WRITE, 0, REDSOCKS_RELAY_HALFBUFF);
 #ifdef bufferevent_getcb
@@ -359,7 +356,7 @@ int redsocks_start_relay(redsocks_client *client)
 
 void redsocks_drop_client(redsocks_client *client)
 {
-    redsocks_log_error(client, LOG_INFO, "dropping client");
+    redsocks_log_error(client, LOG_DEBUG, "dropping client");
 
     if (client->instance->config.autoproxy && autoproxy_subsys.fini)
         autoproxy_subsys.fini(client);
@@ -614,7 +611,7 @@ void redsocks_connect_relay(redsocks_client *client)
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
     if (tv.tv_sec == 0)
-        tv.tv_sec = 10;
+        tv.tv_sec = DEFAULT_CONNECT_TIMEOUT;
 
 
     client->relay = red_connect_relay2(&client->instance->config.relayaddr,
@@ -801,14 +798,14 @@ static const char *redsocks_event_str(unsigned short what)
         "???";
 }
 
-void redsocks_dump_client(redsocks_client * client)
+void redsocks_dump_client(redsocks_client * client, int loglevel)
 {
     time_t now = redsocks_time(NULL);
 
     const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
     const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
-    redsocks_log_error(client, LOG_DEBUG, "client: %i (%s)%s%s input %d output %d, relay: %i (%s)%s%s input %d output %d, age: %li sec, idle: %li sec.",
+    redsocks_log_error(client, loglevel, "client: %i (%s)%s%s input %d output %d, relay: %i (%s)%s%s input %d output %d, age: %li sec, idle: %li sec.",
         bufferevent_getfd(client->client),
             redsocks_event_str(bufferevent_get_enabled(client->client)),
             s_client_evshut[0] ? " " : "", s_client_evshut,
@@ -823,23 +820,24 @@ void redsocks_dump_client(redsocks_client * client)
             now - client->last_event);
 }
 
-static void redsocks_debug_dump_instance(redsocks_instance *instance)
+static void redsocks_dump_instance(redsocks_instance *instance)
 {
     redsocks_client *client = NULL;
 
-    log_error(LOG_DEBUG, "Dumping client list for instance %p:", instance);
+    log_error(LOG_INFO, "Dumping client list for instance %p(%s):", instance,
+                        instance->relay_ss->name);
     list_for_each_entry(client, &instance->clients, list)
-        redsocks_dump_client(client);
+        redsocks_dump_client(client, LOG_INFO);
     
-    log_error(LOG_DEBUG, "End of client list.");
+    log_error(LOG_INFO, "End of client list.");
 }
 
-static void redsocks_debug_dump(int sig, short what, void *_arg)
+static void redsocks_debug_dump()
 {
     redsocks_instance *instance = NULL;
 
     list_for_each_entry(instance, &instances, list)
-        redsocks_debug_dump_instance(instance);
+        redsocks_dump_instance(instance);
 }
 
 /* Audit is required to clean up hung connections. 
@@ -853,7 +851,8 @@ static void redsocks_audit_instance(redsocks_instance *instance)
     time_t now = redsocks_time(NULL);
     int drop_it = 0;
 
-    log_error(LOG_DEBUG, "Audit client list for instance %p:", instance);
+    log_error(LOG_DEBUG, "Audit client list for instance %p(%s):", instance,
+                        instance->relay_ss->name);
     list_for_each_entry_safe(client, tmp, &instance->clients, list) {
         drop_it = 0;
 
@@ -876,7 +875,7 @@ static void redsocks_audit_instance(redsocks_instance *instance)
             drop_it = 1;
 
         if (drop_it){
-            redsocks_dump_client(client);
+            redsocks_dump_client(client, LOG_DEBUG);
             redsocks_drop_client(client);
         }
     }
@@ -917,6 +916,12 @@ static int redsocks_init_instance(redsocks_instance *instance)
      */
     int error;
     evutil_socket_t fd = -1;
+
+    if (instance->relay_ss->instance_init 
+        && instance->relay_ss->instance_init(instance)) {
+        log_errno(LOG_ERR, "Failed to init relay subsystem.");
+        goto fail;
+    } 
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
@@ -1014,7 +1019,6 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 
 static int redsocks_fini();
 
-static struct event debug_dumper;
 static struct event heartbeat_writer;
 static struct event audit_event;
 
@@ -1044,11 +1048,6 @@ static int redsocks_init() {
         return -1;
     }
 
-    evsignal_assign(&debug_dumper, base, SIGUSR1, redsocks_debug_dump, NULL);
-    if (evsignal_add(&debug_dumper, NULL) != 0) {
-        log_errno(LOG_ERR, "evsignal_add");
-        goto fail;
-    }
     evsignal_assign(&heartbeat_writer, base, SIGUSR2, redsocks_heartbeat, NULL);
     if (evsignal_add(&heartbeat_writer, NULL) != 0) {
         log_errno(LOG_ERR, "evsignal_add SIGUSR2");
@@ -1088,12 +1087,6 @@ static int redsocks_fini()
     if (event_initialized(&audit_event))
         evtimer_del(&audit_event);
 
-    if (evsignal_initialized(&debug_dumper)) {
-        if (evsignal_del(&debug_dumper) != 0)
-            log_errno(LOG_WARNING, "evsignal_del");
-        memset(&debug_dumper, 0, sizeof(debug_dumper));
-    }
-
     return 0;
 }
 
@@ -1101,6 +1094,7 @@ app_subsys redsocks_subsys =
 {
     .init = redsocks_init,
     .fini = redsocks_fini,
+    .dump = redsocks_debug_dump,
     .conf_section = &redsocks_conf_section,
 };
 
