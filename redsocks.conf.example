@@ -63,7 +63,7 @@ redsocks {
 	port = 1080;
 
 	// known types: socks4, socks5, http-connect, http-relay
-	// New types: direct
+	// New types: direct, shadowsocks
 	type = socks5;
 
     // Specify interface for outgoing connections when 'direct' type
@@ -83,7 +83,8 @@ redsocks {
 	// timeout value will be used.
 	timeout = 10;
 
-	// login = "foobar";
+	// login = "foobar";// field 'login' is reused as encryption
+					   // method of shadowsocks
 	// password = "baz";
 }
 

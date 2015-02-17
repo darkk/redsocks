@@ -1,4 +1,4 @@
-OBJS := parser.o main.o redsocks.o log.o direct.o ipcache.o autoproxy.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o tcpdns.o gen/version.o
+OBJS := parser.o main.o redsocks.o log.o direct.o ipcache.o autoproxy.o encrypt.o shadowsocks.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o tcpdns.o gen/version.o
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
@@ -6,9 +6,18 @@ OUT := redsocks2
 VERSION := 0.60
 
 LIBS := -levent
-CFLAGS +=-fPIC -O3 
+CFLAGS +=-fPIC -O3
 override CFLAGS += -std=gnu99 -Wall
 #LDFLAGS += -fwhole-program
+ifdef USE_CRYPTO_POLARSSL
+override LIBS += -lpolarssl
+override CFLAGS += -DUSE_CRYPTO_POLARSSL 
+$(info Compile with PolarSSL.)
+else
+override LIBS += -lssl -lcrypto
+override CFLAGS += -DUSE_CRYPTO_OPENSSL
+$(info Compile with OpenSSL by default. To compile with PolarSSL, run 'make USE_CRYPTO_POLARSSL=true' instead.)
+endif
 
 all: $(OUT)
 

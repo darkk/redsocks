@@ -2,17 +2,38 @@ REDSOCKS2
 =========
 This is a modified version of original redsocks.
 The name is changed to REDSOCKS2 to distinguish with original redsocks.
-This variant is useful for anti-GFW (Great Fire Wall).
+This variant is useful for anti-GFW (Great Fire Wall). REDSOCKS2 contains
+several new features.
+
+1. Redirect TCP connections which are blocked via proxy automatically without
+need of blacklist.
+2. Redirect UDP based DNS requests via TCP connection.
+3. Integrated [shadowsocks](http://shadowsocks.org/) proxy support(IPv4 Only).
+4. Redirect TCP connections without proxy.
+5. Redirect TCP connections via specified network interface.
+
+If you feel my work done is helpful, please consider donation. Thanks.
+**Accept donations by AliPay with account <semigodking@gmail.com>**
 
 HOW it works
 ------------
-Anyone can help me to complete this part? -_-
+Anyone can help me to complete this part?
 
 HOW TO BUILD
 ------------
-On general linux, simply run command below to build.
+###Prerequisites
+The following libraries are required.
+
+* OpenSSL or PolarSSL
+
+###Steps
+On general linux, simply run command below to build with OpenSSL.
 
 	make
+
+To compile with PolarSSL
+
+	make USE_CRYPTO_POLARSSL=true
 
 Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
@@ -23,7 +44,7 @@ Configurations
 Please see 'redsocks.conf.example' for whole picture of configuration file.
 Below are additional sample configuration sections for different usage.
 
-##Redirect Blocked Traffic via Proxy Automatically
+###Redirect Blocked Traffic via Proxy Automatically
 To use the autoproxy feature, please change the redsocks section in
 configuration file like this:
 
@@ -34,9 +55,6 @@ configuration file like this:
 	 port = 9050;
 	 type = socks5; // I use socks5 proxy for GFW'ed IP
 	 autoproxy = 1; // I want autoproxy feature enabled on this section.
-	                // The two lines above have same effect as
-	                //    type = autosocks5;
-	                // in previous release.
 	 // timeout is meaningful when 'autoproxy' is non-zero.
 	 // It specified timeout value when trying to connect to destination
 	 // directly. Default is 10 seconds. When it is set to 0, default
@@ -49,8 +67,7 @@ configuration file like this:
 	 //password = passwd;
 	}
 
-
-##Redirect Blocked Traffic via VPN Automatically
+###Redirect Blocked Traffic via VPN Automatically
 Suppose you have VPN connection setup with interface tun0. You want all 
 all blocked traffic pass through via VPN connection while normal traffic
 pass through via default internet connection.
@@ -64,8 +81,55 @@ pass through via default internet connection.
 		autoproxy = 1;
 	}
 
+###Redirect Blocked Traffic via shadowsocks proxy
+Similar like other redsocks section. The encryption method is specified
+by field 'login'.
 
-##Work with GoAgent
+	redsocks {
+		local_ip = 192.168.1.1;
+		local_port = 1080;
+		type = shadowsocks;
+	 	ip = 192.168.1.1;
+		port = 8388;
+		timeout = 13;
+		autoproxy = 1;
+		login = 'aes-128-cfb'; // field 'login' is reused as encryption
+							   // method of shadowsocks
+		password = 'your password'; // Your shadowsocks password
+	}
+
+List of supported encryption methods(Compiled with OpenSSL):
+
+	table
+	rc4
+	rc4-md5
+	aes-128-cfb
+	aes-192-cfb
+	aes-256-cfb
+	bf-cfb
+	camellia-128-cfb
+	camellia-192-cfb
+	camellia-256-cfb
+	cast5-cfb
+	des-cfb
+	idea-cfb
+	rc2-cfb
+	seed-cfb
+
+List of supported encryption methods(Compiled with PolarSSL):
+
+	table
+	ARC4-128
+	ARC4-128
+	AES-128-CFB128
+	AES-192-CFB128
+	AES-256-CFB128
+	BLOWFISH-CFB64
+	CAMELLIA-128-CFB128
+	CAMELLIA-192-CFB128
+	CAMELLIA-256-CFB128
+
+###Work with GoAgent
 To make redsocks2 works with GoAgent proxy, you need to set proxy type as
 'http-relay' for HTTP protocol and 'http-connect' for HTTPS protocol  
 respectively.
@@ -99,7 +163,7 @@ The configuration for forwarding connections to GoAgent is like below:
 	 timeout = 13;
 	}
 
-##Redirect UPD based DNS Request via TCP connection
+###Redirect UPD based DNS Request via TCP connection
 Sending DNS request via TCP connection is one way to prevent from DNS
 poisoning. You can redirect all UDP based DNS requests via TCP connection
 with the following config section.
@@ -121,4 +185,5 @@ server as the local IP:port configured above.
 
 AUTHOR
 ------
-Zhuofei Wang <semigodking@gmail.com> **Accept donations by AliPay with this email**
+[Zhuofei Wang](mailto:semigodking.com) semigodking@gmail.com
+

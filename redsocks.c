@@ -54,6 +54,7 @@ extern relay_subsys http_connect_subsys;
 extern relay_subsys http_relay_subsys;
 extern relay_subsys socks4_subsys;
 extern relay_subsys socks5_subsys;
+extern relay_subsys shadowsocks_subsys;
 static relay_subsys *relay_subsystems[] =
 {
     &direct_connect_subsys,
@@ -61,6 +62,7 @@ static relay_subsys *relay_subsystems[] =
     &http_relay_subsys,
     &socks4_subsys,
     &socks5_subsys,
+    &shadowsocks_subsys,
 };
 extern relay_subsys autoproxy_subsys;
 
