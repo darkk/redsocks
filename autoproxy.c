@@ -479,7 +479,18 @@ static void auto_retry(redsocks_client * client, int updcache)
 
     /* connect to relay */
     if (client->instance->relay_ss->connect_relay)
+    {
         client->instance->relay_ss->connect_relay(client);
+        // In case the underline relay system does not connect relay,
+        // it maybe is waiting for client read event.
+        // Take 'http-relay' for example.
+        if (!client->relay && evbuffer_get_length(bufferevent_get_input(client->client)))
+#ifdef bufferevent_trigger_event
+            bufferevent_trigger_event(client->client, EV_READ, 0);
+#else
+            client->client->readcb(client->client, client);
+#endif
+    }
     else
         redsocks_connect_relay(client);
 }

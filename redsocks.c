@@ -597,10 +597,7 @@ void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
                                      client->instance->relay_ss->writecb,
                                      redsocks_event_error,
                                      client);
-    if (evbuffer_get_length(bufferevent_get_input(client->client)))
-        client->instance->relay_ss->writecb(client->relay, client);
-//    else
-//        bufferevent_enable(client->relay, EV_READ); 
+    client->instance->relay_ss->writecb(client->relay, client);
     return;
 
 fail:
