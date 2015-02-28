@@ -734,7 +734,10 @@ size_t ss_calc_buffer_size(int method, size_t ilen)
     const cipher_kt_t *cipher = get_cipher_type(method);
     return EVP_CIPHER_iv_length(cipher) + ilen + EVP_CIPHER_block_size(cipher); 
 #elif defined(USE_CRYPTO_POLARSSL)
-    // TODO: implement
+    if (cipher == NULL) {
+        return 0;
+    }
+    return cipher->iv_size + ilen + cipher_get_block_size(cipher); 
 #endif
 }
 
@@ -974,10 +977,9 @@ int enc_init(enc_info * info, const char *pass, const char *method)
                 break;
             }
         }
-        if (m >= CIPHER_NUM) {
-            //LOGE("Invalid cipher name: %s, use table instead", method);
-            m = TABLE;
-        }
+        if (m >= CIPHER_NUM)
+            // Invalid encryption method
+            return -1;
     }
     if (m == TABLE) {
         enc_table_init(info, pass);

@@ -84,19 +84,23 @@ void ss_client_fini(redsocks_client *client)
     enc_ctx_free(&sclient->d_ctx);
 }
 
-static void get_shared_buffer(redsocks_client *client, size_t in_size, void **buff, size_t *buff_size)
+static int get_shared_buffer(redsocks_client *client, size_t in_size, void **buff, size_t *buff_size)
 {
     ss_instance * ss = (ss_instance *)(client->instance+1);
+    void * tmp;
 
-    size_t required = max(ss_calc_buffer_size(ss->method, in_size), 
-                          ss_calc_buffer_size(ss->method, in_size));
+    size_t required = ss_calc_buffer_size(ss->method, in_size); 
     if (ss->buff_size < required)
     {
-        ss->buff = realloc(buff, required);
+        tmp = realloc(buff, required);
+        if (!tmp)
+            return -1;
+        ss->buff = tmp;
         ss->buff_size = required; 
     }
     *buff = ss->buff;
     *buff_size = ss->buff_size;
+    return 0;
 }
 
 static void encrypt_mem(redsocks_client * client,
@@ -108,8 +112,8 @@ static void encrypt_mem(redsocks_client * client,
     char * buff;
     int rc;
 
-    get_shared_buffer(client, len, (void **)&buff, &buff_len);
-    if (! data || !len)
+    rc = get_shared_buffer(client, len, (void **)&buff, &buff_len);
+    if (rc || !data || !len)
         return;
     rc = ss_encrypt(&sclient->e_ctx, data, len, buff, &buff_len); 
     if (rc)
@@ -123,7 +127,8 @@ static void encrypt_buffer(redsocks_client *client,
                            struct bufferevent * from,
                            struct bufferevent * to)
 {
-    size_t input_size = evbuffer_get_length(bufferevent_get_input(from));
+    // To reduce memory copy, just encrypt one block a time
+    size_t input_size = evbuffer_get_contiguous_space(bufferevent_get_input(from));
     char * input;
 
     if (!input_size)
@@ -140,14 +145,15 @@ static void decrypt_buffer(redsocks_client * client,
 {
     ss_client *sclient = (void*)(client + 1);
     struct enc_ctx * ctx = &sclient->d_ctx; 
-    size_t input_size = evbuffer_get_length(bufferevent_get_input(from));
+    // To reduce memory copy, just decrypt one block a time
+    size_t input_size = evbuffer_get_contiguous_space(bufferevent_get_input(from));
     size_t buff_len;
     char * buff;
     char * input;
     int    rc;
 
-    get_shared_buffer(client, input_size, (void **)&buff, &buff_len);
-    if (!buff || !input_size)
+    rc = get_shared_buffer(client, input_size, (void **)&buff, &buff_len);
+    if (rc || !buff || !input_size)
         return;
 
     input = (char *)evbuffer_pullup(bufferevent_get_input(from), input_size);
@@ -166,7 +172,7 @@ static void ss_client_writecb(struct bufferevent *buffev, void *_arg)
     struct bufferevent * from = client->relay;
     struct bufferevent * to   = buffev;
     char from_eof = client->relay_evshut & EV_READ;
-    size_t input_size = evbuffer_get_length(bufferevent_get_input(from));
+    size_t input_size = evbuffer_get_contiguous_space(bufferevent_get_input(from));
     size_t output_size = evbuffer_get_length(bufferevent_get_output(to));
 
     assert(buffev == client->client);
@@ -233,7 +239,7 @@ static void ss_relay_writecb(struct bufferevent *buffev, void *_arg)
     struct bufferevent * from = client->client;
     struct bufferevent * to   = buffev;
     char from_eof = client->client_evshut & EV_READ;
-    size_t input_size = evbuffer_get_length(bufferevent_get_input(from));
+    size_t input_size = evbuffer_get_contiguous_space(bufferevent_get_input(from));
     size_t output_size = evbuffer_get_length(bufferevent_get_output(to));
 
     assert(buffev == client->relay);
@@ -267,7 +273,7 @@ static void ss_relay_readcb(struct bufferevent *buffev, void *_arg)
     redsocks_client *client = _arg;
     struct bufferevent * from = buffev;
     struct bufferevent * to   = client->client;
-    size_t input_size = evbuffer_get_length(bufferevent_get_input(from));
+    size_t input_size = evbuffer_get_contiguous_space(bufferevent_get_input(from));
     size_t output_size = evbuffer_get_length(bufferevent_get_output(to));
 
     assert(buffev == client->relay);
@@ -335,7 +341,7 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
     }
 
     /* build and send header */
-    // TODO:
+    // TODO: Better implementation and IPv6 Support
     buff[len] = ss_addrtype_ipv4;
     len += 1;
     memcpy(&buff[len], &client->destaddr.sin_addr, sizeof(client->destaddr.sin_addr));
@@ -388,7 +394,7 @@ static int ss_instance_init(struct redsocks_instance_t *instance)
     }
     else
     {
-        log_error(LOG_INFO, "using encryption method: %d", ss->method);
+        log_error(LOG_INFO, "using encryption method: %s", config->login);
     }
     /* Setting up shared buffer */
     ss->buff = malloc(INITIAL_BUFFER_SIZE); 
