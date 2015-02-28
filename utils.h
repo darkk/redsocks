@@ -70,7 +70,7 @@ size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, s
 #if INET6_ADDRSTRLEN < INET_ADDRSTRLEN
 #	error Impossible happens: INET6_ADDRSTRLEN < INET_ADDRSTRLEN
 #else
-#	define RED_INET_ADDRSTRLEN (INET6_ADDRSTRLEN + 1 + 5 + 1) // addr + : + port + \0
+#	define RED_INET_ADDRSTRLEN (1 + INET6_ADDRSTRLEN + 1 + 1 + 5 + 1) // [ + addr + ] + : + port + \0
 #endif
 char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_size);
 

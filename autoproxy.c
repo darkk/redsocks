@@ -661,7 +661,8 @@ static void auto_connect_relay(redsocks_client *client)
             config = get_config(client);
             // No quick check when the time passed since IP is added to cache is 
             // less than NO_CHECK_SECONDS. Just let it go via proxy.
-            if (now - *acc_time < config->no_quick_check_seconds)
+            if (config->no_quick_check_seconds == 0
+              || now - *acc_time < config->no_quick_check_seconds)
             {
                 auto_retry(client, 0);
                 return;

@@ -323,13 +323,17 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
         port = ((struct sockaddr_in*)sa)->sin_port;
     }
     else if (sa->sin_family == AF_INET6) {
-        retval = inet_ntop(AF_INET6, &((const struct sockaddr_in6*)sa)->sin6_addr, buffer, buffer_size);
+        buffer[0] = '[';
+        retval = inet_ntop(AF_INET6, &((const struct sockaddr_in6*)sa)->sin6_addr, buffer+1, buffer_size-1);
         port = ((struct sockaddr_in6*)sa)->sin6_port;
     }
     if (retval) {
         assert(retval == buffer);
         len = strlen(retval);
-        snprintf(buffer + len, buffer_size - len, ":%d", ntohs(port));
+        if (sa->sin_family == AF_INET6)
+            snprintf(buffer + len, buffer_size - len, "]:%d", ntohs(port));
+        else
+            snprintf(buffer + len, buffer_size - len, ":%d", ntohs(port));
     }
     else {
         strcpy(buffer, placeholder);
