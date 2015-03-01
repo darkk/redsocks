@@ -99,7 +99,7 @@ static void encrypt_mem(redsocks_client * client,
     if (required && evbuffer_reserve_space(buf_out, required, &vec, 1) == 1)
     {
         if (decrypt)
-            rc = ss_decrypt(&sclient->e_ctx, data, len, vec.iov_base, &vec.iov_len);
+            rc = ss_decrypt(&sclient->d_ctx, data, len, vec.iov_base, &vec.iov_len);
         else
             rc = ss_encrypt(&sclient->e_ctx, data, len, vec.iov_base, &vec.iov_len);
         if (!rc)
