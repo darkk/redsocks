@@ -12,8 +12,10 @@ need of blacklist.
 4. Redirect TCP connections without proxy.
 5. Redirect TCP connections via specified network interface.
 
-If you feel my work done is helpful, please consider donation. Thanks.
+If you feel my work done is helpful, please consider donation. Thanks. 
 **Accept donations by AliPay with account <semigodking@gmail.com>**
+
+[Chinese Reference](https://github.com/semigodking/redsocks/wiki)
 
 HOW it works
 ------------
