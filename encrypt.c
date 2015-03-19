@@ -728,16 +728,23 @@ static int cipher_context_update(cipher_ctx_t *ctx, uint8_t *output, int *olen,
 }
 
 /* Calculate buffer size required for encrypt/decrypt data */
-size_t ss_calc_buffer_size(int method, size_t ilen)
+size_t ss_calc_buffer_size(struct enc_ctx * ctx, size_t ilen)
 {
-#if defined(USE_CRYPTO_OPENSSL)
+    int method = ctx->info->method;
     const cipher_kt_t *cipher = get_cipher_type(method);
-    return EVP_CIPHER_iv_length(cipher) + ilen + EVP_CIPHER_block_size(cipher); 
+#if defined(USE_CRYPTO_OPENSSL)
+    if (ctx->init)
+        return ilen + EVP_CIPHER_block_size(cipher); 
+    else
+        return EVP_CIPHER_iv_length(cipher) + ilen + EVP_CIPHER_block_size(cipher); 
 #elif defined(USE_CRYPTO_POLARSSL)
     if (cipher == NULL) {
-        return 0;
+        return ilen;
     }
-    return cipher->iv_size + ilen + cipher_get_block_size(cipher); 
+    if (ctx->init)
+        return ilen + cipher_get_block_size(cipher); 
+    else
+        return cipher->iv_size + ilen + cipher_get_block_size(cipher); 
 #endif
 }
 
@@ -886,7 +893,6 @@ int ss_decrypt(struct enc_ctx *ctx, char *ciphertext, size_t clen,
     }
 }
 
-
 void enc_ctx_init(enc_info * info, struct enc_ctx *ctx, int enc)
 {
     memset(ctx, 0, sizeof(struct enc_ctx));
@@ -957,6 +963,7 @@ static int enc_key_init(enc_info * info, int method, const char *pass)
     info->key_len = bytes_to_key(cipher, md, (const uint8_t *)pass, info->key, iv);
     if (info->key_len == 0) {
         //FATAL("Cannot generate key and IV");
+        return -1;
     }
     if (method == RC4_MD5) {
         info->iv_len = 16;

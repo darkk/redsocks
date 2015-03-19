@@ -23,12 +23,9 @@
 #include "log.h"
 #include "redsocks.h"
 #include "encrypt.h"
+#include "shadowsocks.h"
 
 #define INITIAL_BUFFER_SIZE 8192
-
-static const int ss_addrtype_ipv4 = 1;
-static const int ss_addrtype_domain = 3;
-static const int ss_addrtype_ipv6 = 4;
 
 typedef enum ss_state_t {
     ss_new,
@@ -86,7 +83,6 @@ static void encrypt_mem(redsocks_client * client,
                       struct bufferevent * to, int decrypt)
 {
     ss_client *sclient = (void*)(client + 1);
-    ss_instance * ss = (ss_instance *)(client->instance+1);
     struct evbuffer_iovec vec;
     struct evbuffer * buf_out = bufferevent_get_output(to);
     size_t required;
@@ -95,7 +91,10 @@ static void encrypt_mem(redsocks_client * client,
     if (!len || !data)
         return;
 
-    required = ss_calc_buffer_size(ss->method, len);
+    if (decrypt)
+        required = ss_calc_buffer_size(&sclient->d_ctx, len);
+    else
+        required = ss_calc_buffer_size(&sclient->e_ctx, len);
     if (required && evbuffer_reserve_space(buf_out, required, &vec, 1) == 1)
     {
         if (decrypt)
@@ -282,7 +281,7 @@ static void ss_relay_readcb(struct bufferevent *buffev, void *_arg)
 static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
 {
     redsocks_client *client = _arg;
-    char buff[512] ; 
+    ss_header_ipv4 header;
     size_t len = 0;
 
     assert(buffev == client->relay);
@@ -320,13 +319,11 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
 
     /* build and send header */
     // TODO: Better implementation and IPv6 Support
-    buff[len] = ss_addrtype_ipv4;
-    len += 1;
-    memcpy(&buff[len], &client->destaddr.sin_addr, sizeof(client->destaddr.sin_addr));
-    len += sizeof(client->destaddr.sin_addr);
-    memcpy(&buff[len], &client->destaddr.sin_port, sizeof(client->destaddr.sin_port));
-    len += sizeof(client->destaddr.sin_port);
-    encrypt_mem(client, &buff[0], len, client->relay, 0);
+    header.addr_type = ss_addrtype_ipv4;
+    header.addr = client->destaddr.sin_addr.s_addr;
+    header.port = client->destaddr.sin_port;
+    len += sizeof(header);
+    encrypt_mem(client, (char *)&header, len, client->relay, 0);
 
     client->state = ss_connected; 
 
