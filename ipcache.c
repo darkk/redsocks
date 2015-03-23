@@ -158,9 +158,9 @@ static int load_cache(const char * path)
     FILE * f;
     char line[256];
     char * pline = 0;
+    // TODO: IPv6 Support
     struct sockaddr_in addr;
-    unsigned long int port;
-    char * end;
+    int addr_size;
 
     if (!path)
         return -1;
@@ -173,28 +173,11 @@ static int load_cache(const char * path)
         pline = fgets(line, sizeof(line), f);
         if (!pline)
             break;
-        memset(&addr, 0, sizeof(addr));
-        if (pline[0] == '[')
-            addr.sin_family = AF_INET6;
+        addr_size = sizeof(addr);
+        if (evutil_parse_sockaddr_port(pline, (struct sockaddr *)&addr, &addr_size))
+            log_error(LOG_INFO, "Invalid IP address: %s", line);
         else
-            addr.sin_family = AF_INET;
-        pline = strrchr(line, ':');
-        if (pline)
-        {
-            * pline = 0;
-            pline ++;
-            port = strtoul(pline, &end, 0);
-            if (port <= 0xFFFF)
-                addr.sin_port = htons(port);
-            else
-                log_error(LOG_INFO, "Invalid port number in cache file: %s", pline);
-        }
-        // TODO: IPv6 Support
-        if (inet_aton(line, &addr.sin_addr) != 0)
             cache_add_addr(&addr);
-        else
-            // Invalid address
-            log_error(LOG_INFO, "Invalid IP address in cache file: %s", line);
     }
     fclose(f);
     return 0;

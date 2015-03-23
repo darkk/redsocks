@@ -35,10 +35,10 @@ extern app_subsys autoproxy_app_subsys;
 extern app_subsys cache_app_subsys;
 
 app_subsys *subsystems[] = {
-	&redsocks_subsys,
 	&base_subsys,
+	&redsocks_subsys,
 	&autoproxy_app_subsys,
-    &cache_app_subsys,
+	&cache_app_subsys,
 	&redudp_subsys,
 	&tcpdns_subsys,
 };
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
 	if (!g_event_base)
 		return EXIT_FAILURE;
 		
-    memset(&dumper, 0, sizeof(dumper));
+	memset(&dumper, 0, sizeof(dumper));
 	memset(terminators, 0, sizeof(terminators));
 
 	FOREACH(ss, subsystems) {
