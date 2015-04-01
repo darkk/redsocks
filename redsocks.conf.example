@@ -101,6 +101,9 @@ redudp {
 	login = username;
 	password = pazzw0rd;
 
+	// know types: socks5
+	type = socks5;
+
 	// kernel does not give us this information, so we have to duplicate it
 	// in both iptables rules and configuration file.  By the way, you can
 	// set `local_ip' to 127.45.67.89 if you need more than 65535 ports to
@@ -109,8 +112,11 @@ redudp {
 	dest_ip = 8.8.8.8;
 	dest_port = 53;
 
+        // Do not set it large if this section is for DNS requests. Otherwise,
+        // you may encounter out of file descriptor problem. For DNS requests,
+        // 10s is adequate.
 	udp_timeout = 30;
-	udp_timeout_stream = 180;
+	// udp_timeout_stream = 180;
 }
 
 tcpdns {

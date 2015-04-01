@@ -271,26 +271,6 @@ int red_socket_geterrno(struct bufferevent *buffev)
     return pseudo_errno;
 }
 
-/** simple fcntl(2) wrapper, provides errno and all logging to caller
- * I have to use it in event-driven code because of accept(2) (see NOTES)
- * and connect(2) (see ERRORS about EINPROGRESS)
- */
-int fcntl_nonblock(int fd)
-{
-    int error;
-    int flags;
-
-    flags = fcntl(fd, F_GETFL);
-    if (flags == -1)
-        return -1;
-
-    error = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    if (error)
-        return -1;
-
-    return 0;
-}
-
 int red_is_socket_connected_ok(struct bufferevent *buffev)
 {
     int pseudo_errno = red_socket_geterrno(buffev);
