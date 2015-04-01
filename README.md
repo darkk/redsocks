@@ -95,9 +95,9 @@ by field 'login'.
 		port = 8388;
 		timeout = 13;
 		autoproxy = 1;
-		login = 'aes-128-cfb'; // field 'login' is reused as encryption
+		login = "aes-128-cfb"; // field 'login' is reused as encryption
 							   // method of shadowsocks
-		password = 'your password'; // Your shadowsocks password
+		password = "your password"; // Your shadowsocks password
 	}
 
 List of supported encryption methods(Compiled with OpenSSL):
