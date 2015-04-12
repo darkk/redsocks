@@ -198,17 +198,14 @@ void redudp_drop_client(redudp_client *client)
         if (event_del(&client->timeout) == -1)
             redudp_log_errno(client, LOG_ERR, "event_del");
     }
-    redudp_log_error(client, LOG_DEBUG, "Dropping...2");
     if (client->sender_fd != -1)
         bound_udp4_put(&client->destaddr);
     list_for_each_entry_safe(q, tmp, &client->queue, list) {
         list_del(&q->list);
         free(q);
     }
-    redudp_log_error(client, LOG_DEBUG, "Dropping...3");
     list_del(&client->list);
     free(client);
-    redudp_log_error(client, LOG_DEBUG, "Dropping...4");
 }
 
 void redudp_bump_timeout(redudp_client *client)

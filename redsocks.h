@@ -64,6 +64,7 @@ typedef struct redsocks_client_t {
 	struct sockaddr_in  clientaddr;
 	struct sockaddr_in  destaddr;
 	int                 state;         // it's used by bottom layer
+	int                 relay_connected;
 	unsigned short      client_evshut;
 	unsigned short      relay_evshut;
 	time_t              first_event;
@@ -115,6 +116,9 @@ void redsocks_log_write_plain(
 	__attribute__ (( format (printf, 8, 9) ))
 #endif
 ;
+/* unsafe internal functions. Only use them when you know exactly what
+you are doing with */
+int process_shutdown_on_write_(redsocks_client *client, struct bufferevent *from, struct bufferevent *to);
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */

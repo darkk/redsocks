@@ -3,7 +3,7 @@ REDSOCKS2
 This is a modified version of original redsocks.
 The name is changed to REDSOCKS2 to distinguish with original redsocks.
 This variant is useful for anti-GFW (Great Fire Wall). REDSOCKS2 contains
-several new features.
+several new features besides many bug fixes to original redsocks.
 
 1. Redirect TCP connections which are blocked via proxy automatically without
 need of blacklist.
@@ -11,15 +11,12 @@ need of blacklist.
 3. Integrated [shadowsocks](http://shadowsocks.org/) proxy support(IPv4 Only).
 4. Redirect TCP connections without proxy.
 5. Redirect TCP connections via specified network interface.
+6. UDP transparent proxy via shadowsocks proxy.
 
 If you feel my work done is helpful, please consider donation. Thanks. 
 **Accept donations by AliPay with account <semigodking@gmail.com>**
 
 [Chinese Reference](https://github.com/semigodking/redsocks/wiki)
-
-HOW it works
-------------
-Anyone can help me to complete this part?
 
 HOW TO BUILD
 ------------

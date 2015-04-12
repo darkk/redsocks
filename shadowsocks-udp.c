@@ -98,7 +98,6 @@ static void ss_forward_pkt(redudp_client *client, void *data, size_t pktlen)
         redudp_log_error(client, LOG_ERR, "Shadowsocks UDP failed to initialize encryption context.");
         return;
     }
-
     rc = ss_encrypt(&ss->e_ctx, (char *)&header, sizeof(header), ss->buff, &len);
     if (rc)
     {

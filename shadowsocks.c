@@ -150,18 +150,14 @@ static void ss_client_writecb(struct bufferevent *buffev, void *_arg)
     redsocks_client *client = _arg;
     struct bufferevent * from = client->relay;
     struct bufferevent * to   = buffev;
-    char from_eof = client->relay_evshut & EV_READ;
     size_t input_size = evbuffer_get_contiguous_space(bufferevent_get_input(from));
     size_t output_size = evbuffer_get_length(bufferevent_get_output(to));
 
     assert(buffev == client->client);
     redsocks_touch_client(client);
 
-    if (input_size == 0 && from_eof)
-    {
-        redsocks_shutdown(client, to, SHUT_WR);
+    if (process_shutdown_on_write_(client, from, to))
         return;
-    }
 
     if (client->state == ss_connected) 
     {
@@ -217,18 +213,14 @@ static void ss_relay_writecb(struct bufferevent *buffev, void *_arg)
     redsocks_client *client = _arg;
     struct bufferevent * from = client->client;
     struct bufferevent * to   = buffev;
-    char from_eof = client->client_evshut & EV_READ;
     size_t input_size = evbuffer_get_contiguous_space(bufferevent_get_input(from));
     size_t output_size = evbuffer_get_length(bufferevent_get_output(to));
 
     assert(buffev == client->relay);
     redsocks_touch_client(client);
 
-    if (input_size == 0 && from_eof)
-    {
-        redsocks_shutdown(client, to, SHUT_WR);
+    if (process_shutdown_on_write_(client, from, to))
         return;
-    }
 
     if (client->state == ss_connected) 
     {
@@ -296,6 +288,7 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
         return;
     }
 
+    client->relay_connected = 1;
     /* We do not need to detect timeouts any more.
     The two peers will handle it. */
     bufferevent_set_timeouts(client->relay, NULL, NULL);
