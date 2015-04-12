@@ -40,11 +40,11 @@
 //----------------------------------------------------------------------------------------
 typedef struct cache_config_t {
     // Values to be read from config file
-    unsigned int    cache_size;
-    unsigned int    port_check;
-    unsigned int    stale_time;
+    uint16_t    cache_size;
+    uint16_t    port_check;
+    uint16_t    stale_time;
     char *          cache_file;
-    unsigned int    autosave_interval;
+    uint16_t    autosave_interval;
     // Dynamically calculated values.
     unsigned int    block_size;
     unsigned int    block_count;
