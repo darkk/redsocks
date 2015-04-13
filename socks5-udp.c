@@ -16,6 +16,7 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <assert.h>
 #include <sys/socket.h>
@@ -89,13 +90,13 @@ static void socks5_client_fini(redudp_client *client)
 		fd = EVENT_FD(&socks5client->udprelay);
 		if (event_del(&socks5client->udprelay) == -1)
 			redudp_log_errno(client, LOG_ERR, "event_del");
-		redsocks_close(fd);
+		close(fd);
 	}
     if (socks5client->relay) {
         fd = EVENT_FD(&socks5client->relay->ev_read);
         bufferevent_free(socks5client->relay);
         shutdown(fd, SHUT_RDWR);
-        redsocks_close(fd);
+        close(fd);
     }
 }
 
@@ -257,7 +258,7 @@ static void socks5_read_assoc_reply(struct bufferevent *buffev, void *_arg)
 
 fail:
 	if (fd != -1)
-		redsocks_close(fd);
+		close(fd);
 	redudp_drop_client(client);
 }
 

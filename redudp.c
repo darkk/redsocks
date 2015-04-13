@@ -59,9 +59,11 @@ struct bound_udp4 {
 };
 
 extern udprelay_subsys socks5_udp_subsys;
+extern udprelay_subsys shadowsocks_udp_subsys;
 static udprelay_subsys *relay_subsystems[] =
 {
     &socks5_udp_subsys,
+    &shadowsocks_udp_subsys,
 };
 /***********************************************************************
  * Helpers
@@ -130,7 +132,7 @@ static int bound_udp4_get(const struct sockaddr_in *addr)
 fail:
     if (node) {
         if (node->fd != -1)
-            redsocks_close(node->fd);
+            close(node->fd);
         free(node);
     }
     return -1;
@@ -155,7 +157,7 @@ static void bound_udp4_put(const struct sockaddr_in *addr)
     parent = tdelete(node, &root_bound_udp4, bound_udp4_cmp);
     assert(parent);
 
-    redsocks_close(node->fd); // expanding `pnode` to avoid use after free
+    close(node->fd); // expanding `pnode` to avoid use after free
     free(node);
 }
 
@@ -320,10 +322,10 @@ static void redudp_first_pkt_from_client(redudp_instance *self, struct sockaddr_
     client->last_client_event = client->first_event;
     redudp_bump_timeout(client);
 
+    list_add(&client->list, &self->clients);
+
     if (redudp_enqeue_pkt(client, buf, pktlen) == -1)
         goto fail;
-
-    list_add(&client->list, &self->clients);
 
     if (self->relay_ss->connect_relay)
         self->relay_ss->connect_relay(client);
@@ -544,7 +546,7 @@ fail:
     redudp_fini_instance(instance);
 
     if (fd != -1) {
-        redsocks_close(fd);
+        close(fd);
     }
 
     return -1;
@@ -567,7 +569,7 @@ static void redudp_fini_instance(redudp_instance *instance)
     if (event_initialized(&instance->listener)) {
         if (event_del(&instance->listener) != 0)
             log_errno(LOG_WARNING, "event_del");
-        redsocks_close(EVENT_FD(&instance->listener));
+        close(EVENT_FD(&instance->listener));
         memset(&instance->listener, 0, sizeof(instance->listener));
     }
 

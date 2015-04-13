@@ -45,6 +45,7 @@ Configurations
 --------------
 Please see 'redsocks.conf.example' for whole picture of configuration file.
 Below are additional sample configuration sections for different usage.
+Operations required to iptables are not listed here.
 
 ###Redirect Blocked Traffic via Proxy Automatically
 To use the autoproxy feature, please change the redsocks section in
@@ -99,6 +100,20 @@ by field 'login'.
 							   // method of shadowsocks
 		password = "your password"; // Your shadowsocks password
 	}
+	
+	redudp {
+		local_ip = 127.0.0.1;
+		local_port = 1053;
+		ip = your.ss-server.com;
+		port = 443;
+		type = shadowsocks;
+		login = rc4-md5;
+		password = "ss server password";
+		dest_ip = 8.8.8.8;
+		dest_port = 53;
+		udp_timeout = 3;
+	}
+
 
 List of supported encryption methods(Compiled with OpenSSL):
 
@@ -121,7 +136,6 @@ List of supported encryption methods(Compiled with OpenSSL):
 List of supported encryption methods(Compiled with PolarSSL):
 
 	table
-	ARC4-128
 	ARC4-128
 	AES-128-CFB128
 	AES-192-CFB128

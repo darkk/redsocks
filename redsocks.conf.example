@@ -98,10 +98,11 @@ redudp {
 	// `ip' and `port' of socks5 proxy server.
 	ip = 10.0.0.1;
 	port = 1080;
-	login = username;
+	login = username;// field 'login' is reused as encryption
+					   // method of shadowsocks
 	password = pazzw0rd;
 
-	// know types: socks5
+	// know types: socks5, shadowsocks
 	type = socks5;
 
 	// kernel does not give us this information, so we have to duplicate it

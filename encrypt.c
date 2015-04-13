@@ -893,11 +893,11 @@ int ss_decrypt(struct enc_ctx *ctx, char *ciphertext, size_t clen,
     }
 }
 
-void enc_ctx_init(enc_info * info, struct enc_ctx *ctx, int enc)
+int enc_ctx_init(enc_info * info, struct enc_ctx *ctx, int enc)
 {
     memset(ctx, 0, sizeof(struct enc_ctx));
     ctx->info = info;
-    cipher_context_init(info, &ctx->evp, enc);
+    return cipher_context_init(info, &ctx->evp, enc);
 }
 
 void enc_ctx_free(struct enc_ctx *ctx)

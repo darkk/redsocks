@@ -144,7 +144,7 @@ struct enc_ctx {
 
 int enc_init(enc_info * info, const char *pass, const char *method);
 void enc_free(enc_info * info);
-void enc_ctx_init(enc_info * info, struct enc_ctx *ctx, int enc);
+int enc_ctx_init(enc_info * info, struct enc_ctx *ctx, int enc);
 void enc_ctx_free(struct enc_ctx *ctx);
 int ss_encrypt(struct enc_ctx *ctx, char *plaintext, size_t plen,
                   char * ciphertext, size_t * clen);

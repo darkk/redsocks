@@ -61,17 +61,19 @@ int ss_is_valid_cred(const char *method, const char *password)
     return 1;
 }
 
-void ss_client_init(redsocks_client *client)
+static void ss_client_init(redsocks_client *client)
 {
     ss_client *sclient = (void*)(client + 1);
     ss_instance * ss = (ss_instance *)(client->instance+1);
 
     client->state = ss_new;
-    enc_ctx_init(&ss->info, &sclient->e_ctx, 1);
-    enc_ctx_init(&ss->info, &sclient->d_ctx, 0);
+    if (enc_ctx_init(&ss->info, &sclient->e_ctx, 1))
+        log_error(LOG_ERR, "Shadowsocks failed to initialize encryption context.");
+    if (enc_ctx_init(&ss->info, &sclient->d_ctx, 0))
+        log_error(LOG_ERR, "Shadowsocks failed to initialize decryption context.");
 }
 
-void ss_client_fini(redsocks_client *client)
+static void ss_client_fini(redsocks_client *client)
 {
     ss_client *sclient = (void*)(client + 1);
     enc_ctx_free(&sclient->e_ctx);
