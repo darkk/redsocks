@@ -23,7 +23,8 @@ typedef struct relay_subsys_t {
 	int        (*instance_init)(struct redsocks_instance_t *instance);
 	void       (*instance_fini)(struct redsocks_instance_t *instance);
 	// connect_relay (if any) is called instead of redsocks_connect_relay after client connection acceptance
-	void       (*connect_relay)(struct redsocks_client_t *client);
+	// It must returns 0 on success, returns -1 or error code on failures.
+	int        (*connect_relay)(struct redsocks_client_t *client);
 	//void       (*relay_connected)(struct redsocks_client_t *client);
 } relay_subsys;
 
@@ -74,7 +75,7 @@ typedef struct redsocks_client_t {
 
 void redsocks_drop_client(redsocks_client *client);
 void redsocks_touch_client(redsocks_client *client);
-void redsocks_connect_relay(redsocks_client *client);
+int  redsocks_connect_relay(redsocks_client *client);
 int redsocks_start_relay(redsocks_client *client);
 void redsocks_dump_client(redsocks_client * client, int loglevel);
 void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);

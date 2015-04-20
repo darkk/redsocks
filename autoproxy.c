@@ -52,7 +52,6 @@ typedef struct autoproxy_client_t {
 void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg);
 static int auto_retry_or_drop(redsocks_client * client);
-static void auto_connect_relay(redsocks_client *client);
 static void direct_relay_clientreadcb(struct bufferevent *from, void *_client);
 static void auto_event_error(struct bufferevent *buffev, short what, void *_arg);
 
@@ -480,9 +479,10 @@ static void auto_drop_relay(redsocks_client *client)
     client->relay_connected = 0;
 }
 
-static void auto_retry(redsocks_client * client, int updcache)
+static int auto_retry(redsocks_client * client, int updcache)
 {
     autoproxy_client * aclient = get_autoproxy_client(client);
+    int rc;
 
     if (aclient->state == AUTOPROXY_CONNECTED)
         bufferevent_disable(client->client, EV_READ| EV_WRITE); 
@@ -516,11 +516,11 @@ static void auto_retry(redsocks_client * client, int updcache)
     /* connect to relay */
     if (client->instance->relay_ss->connect_relay)
     {
-        client->instance->relay_ss->connect_relay(client);
+        rc = client->instance->relay_ss->connect_relay(client);
         // In case the underline relay system does not connect relay,
         // it maybe is waiting for client read event.
         // Take 'http-relay' for example.
-        if (!client->relay && evbuffer_get_length(bufferevent_get_input(client->client)))
+        if (!rc && !client->relay && evbuffer_get_length(bufferevent_get_input(client->client)))
 #ifdef bufferevent_trigger_event
             bufferevent_trigger_event(client->client, EV_READ, 0);
 #else
@@ -528,7 +528,8 @@ static void auto_retry(redsocks_client * client, int updcache)
 #endif
     }
     else
-        redsocks_connect_relay(client);
+        rc = redsocks_connect_relay(client);
+    return rc;
 }
 
 /* return 1 for drop, 0 for retry. */
@@ -684,7 +685,7 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
 }                                                                       
 
 
-static void auto_connect_relay(redsocks_client *client)
+static int auto_connect_relay(redsocks_client *client)
 {
     autoproxy_client * aclient = get_autoproxy_client(client);
     autoproxy_config * config = NULL;
@@ -709,10 +710,7 @@ static void auto_connect_relay(redsocks_client *client)
             // less than NO_CHECK_SECONDS. Just let it go via proxy.
             if (config->no_quick_check_seconds == 0
               || now - *acc_time < config->no_quick_check_seconds)
-            {
-                auto_retry(client, 0);
-                return;
-            }
+                return auto_retry(client, 0);
             /* update timeout value for quick detection.
              * Sometimes, good sites are added into cache due to occasionally
              * connection timeout. It is annoying. So, decision is made to
@@ -736,13 +734,16 @@ static void auto_connect_relay(redsocks_client *client)
         if (!client->relay) {
             redsocks_log_errno(client, LOG_ERR, "auto_connect_relay");
             redsocks_drop_client(client);
+            return -1;
         }
     }
     else
     {
         redsocks_log_errno(client, LOG_ERR, "invalid state: %d", aclient->state);
         redsocks_drop_client(client);
+        return -1;
     }
+    return 0;
 }
                                                     
 

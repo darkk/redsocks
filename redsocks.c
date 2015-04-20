@@ -43,8 +43,6 @@
 
 #define REDSOCKS_RELAY_HALFBUFF 1024*32
 #define REDSOCKS_AUDIT_INTERVAL 60*2
-void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
-
 static void redsocks_relay_relayreadcb(struct bufferevent *from, void *_client);
 static void redsocks_relay_relaywritecb(struct bufferevent *from, void *_client);
 void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg);
@@ -637,7 +635,7 @@ fail:
     redsocks_drop_client(client);
 }
 
-void redsocks_connect_relay(redsocks_client *client)
+int redsocks_connect_relay(redsocks_client *client)
 {
     struct timeval tv;
     tv.tv_sec = client->instance->config.timeout;
@@ -653,7 +651,9 @@ void redsocks_connect_relay(redsocks_client *client)
     if (!client->relay) {
         redsocks_log_errno(client, LOG_ERR, "red_connect_relay failed!!!");
         redsocks_drop_client(client);
+        return -1;
     }
+    return 0;
 }
 
 static void redsocks_accept_backoff(int fd, short what, void *_arg)

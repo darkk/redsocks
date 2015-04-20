@@ -230,7 +230,7 @@ static void ss_relay_writecb(struct bufferevent *buffev, void *_arg)
             if (input_size)
                 encrypt_buffer(client, from, to);
             if (bufferevent_enable(from, EV_READ) == -1)
-                    redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
+                redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
         }
     }
     else
@@ -330,7 +330,7 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
 }
 
 
-static void ss_connect_relay(redsocks_client *client)
+static int ss_connect_relay(redsocks_client *client)
 {
     struct timeval tv;
 
@@ -347,7 +347,9 @@ static void ss_connect_relay(redsocks_client *client)
     if (!client->relay) {
         redsocks_log_errno(client, LOG_ERR, "ss_connect_relay");
         redsocks_drop_client(client);
+        return -1;
     }
+    return 0;
 }
 
 static int ss_instance_init(struct redsocks_instance_t *instance)

@@ -62,7 +62,7 @@ static void direct_write_cb(struct bufferevent *buffev, void *_arg)
     }
 }
 
-void direct_connect_relay(redsocks_client *client)
+static int direct_connect_relay(redsocks_client *client)
 {
     char * interface = client->instance->config.interface;
     // Allowing binding relay socket to specified IP for outgoing connections
@@ -79,7 +79,9 @@ void direct_connect_relay(redsocks_client *client)
     {
         redsocks_log_errno(client, LOG_ERR, "red_connect_relay");
         redsocks_drop_client(client);
+        return -1;
     }
+    return 0;
 }
 
 relay_subsys direct_connect_subsys =
