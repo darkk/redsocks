@@ -297,6 +297,7 @@ int process_shutdown_on_write_(redsocks_client *client, struct bufferevent *from
 
 static void redsocks_relay_writecb(redsocks_client *client, struct bufferevent *from, struct bufferevent *to)
 {
+    unsigned short from_evshut = from == client->client ? client->client_evshut : client->relay_evshut;
     assert(from == client->client || from == client->relay);
 
     if (process_shutdown_on_write_(client, from, to))
@@ -304,7 +305,7 @@ static void redsocks_relay_writecb(redsocks_client *client, struct bufferevent *
     if (evbuffer_get_length(to->output) < to->wm_write.high) {
         if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
-        if (bufferevent_enable(from, EV_READ) == -1)
+        if (!(from_evshut & EV_READ) && bufferevent_enable(from, EV_READ) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
     }
 }

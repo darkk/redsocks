@@ -235,7 +235,7 @@ static void auto_recv_timeout_cb(evutil_socket_t fd, short events, void * arg)
     {
         if (bufferevent_write_buffer(client->relay, bufferevent_get_input(client->client)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
-        if (bufferevent_enable(client->client, EV_READ) == -1)
+        if (!(client->client_evshut & EV_READ) && bufferevent_enable(client->client, EV_READ) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
     }
 }
@@ -407,7 +407,7 @@ static void direct_relay_clientwritecb(struct bufferevent *to, void *_client)
     {
         if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
-        if (bufferevent_enable(from, EV_READ) == -1)
+        if (!(client->relay_evshut & EV_READ) && bufferevent_enable(from, EV_READ) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
     }
 }
@@ -459,7 +459,7 @@ static void direct_relay_relaywritecb(struct bufferevent *to, void *_client)
         {
             if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
                 redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
-            if (bufferevent_enable(from, EV_READ) == -1)
+            if (!(client->client_evshut & EV_READ) && bufferevent_enable(from, EV_READ) == -1)
                 redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
         }   
     }

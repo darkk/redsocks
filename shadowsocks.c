@@ -166,7 +166,7 @@ static void ss_client_writecb(struct bufferevent *buffev, void *_arg)
         {
             if (input_size)
                 decrypt_buffer(client, from, to);
-            if (bufferevent_enable(from, EV_READ) == -1)
+            if (!(client->relay_evshut & EV_READ) && bufferevent_enable(from, EV_READ) == -1)
                 redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
         }
     }
@@ -229,7 +229,7 @@ static void ss_relay_writecb(struct bufferevent *buffev, void *_arg)
         {
             if (input_size)
                 encrypt_buffer(client, from, to);
-            if (bufferevent_enable(from, EV_READ) == -1)
+            if (!(client->client_evshut & EV_READ) && bufferevent_enable(from, EV_READ) == -1)
                 redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
         }
     }
