@@ -115,6 +115,11 @@ static int bound_udp4_get(const struct sockaddr_in *addr)
     if (0 != redudp_transparent(node->fd))
         goto fail;
 
+    if (evutil_make_listen_socket_reuseable(node->fd)) {
+        log_errno(LOG_ERR, "evutil_make_listen_socket_reuseable");
+        goto fail;
+    }
+
     if (0 != bind(node->fd, (struct sockaddr*)addr, sizeof(*addr))) {
         log_errno(LOG_ERR, "bind");
         goto fail;
