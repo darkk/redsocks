@@ -1,16 +1,25 @@
-OBJS := parser.o main.o redsocks.o log.o direct.o autoproxy.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
+OBJS := parser.o main.o redsocks.o log.o direct.o ipcache.o autoproxy.o encrypt.o shadowsocks.o http-connect.o \
+        socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o socks5-udp.o shadowsocks-udp.o \
+        tcpdns.o gen/version.o
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks2
-VERSION := 0.5
+VERSION := 0.60
 
 LIBS := -levent
-CFLAGS +=-fPIC -O2 \
-	 -I ~/openwrt/openwrt/staging_dir/target-mipsel_dsp_uClibc-0.9.33.2/usr/include/ \
-	 -L ~/openwrt/openwrt/staging_dir/target-mipsel_dsp_uClibc-0.9.33.2/usr/lib/
+CFLAGS +=-fPIC -O3
 override CFLAGS += -std=gnu99 -Wall
 #LDFLAGS += -fwhole-program
+ifdef USE_CRYPTO_POLARSSL
+override LIBS += -lpolarssl
+override CFLAGS += -DUSE_CRYPTO_POLARSSL 
+$(info Compile with PolarSSL.)
+else
+override LIBS += -lssl -lcrypto
+override CFLAGS += -DUSE_CRYPTO_OPENSSL
+$(info Compile with OpenSSL by default. To compile with PolarSSL, run 'make USE_CRYPTO_POLARSSL=true' instead.)
+endif
 
 all: $(OUT)
 
