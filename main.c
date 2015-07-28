@@ -82,6 +82,33 @@ struct event_base * get_event_base()
 	return g_event_base;
 }
 
+static void wait_for_network()
+{
+    struct evutil_addrinfo hints;
+    struct evutil_addrinfo *answer = NULL;
+    int err;
+
+    /* Build the hints to tell getaddrinfo how to act. */
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC; /* v4 or v6 is fine. */
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP; /* We want a TCP socket */
+    /* Only return addresses we can use. */
+    hints.ai_flags = EVUTIL_AI_ADDRCONFIG;
+
+    /* Look up the hostname. */
+    do {
+        err = evutil_getaddrinfo("www.google.com", NULL, &hints, &answer);
+        if (err)
+            sleep(2);
+        /* If there was no error, we should have at least one answer. */
+        if (answer) {
+            evutil_freeaddrinfo(answer);
+            answer = NULL;
+        }
+    } while (err != 0);
+}
+
 int main(int argc, char **argv)
 {
 	int error;
@@ -92,12 +119,16 @@ int main(int argc, char **argv)
 	bool conftest = false;
 	int opt;
 	int i;
+	bool wait = false;
 
 	evutil_secure_rng_init();
-	while ((opt = getopt(argc, argv, "h?vtc:p:")) != -1) {
+	while ((opt = getopt(argc, argv, "h?wvtc:p:")) != -1) {
 		switch (opt) {
 		case 't':
 			conftest = true;
+			break;
+		case 'w':
+			wait = true;
 			break;
 		case 'c':
 			confname = optarg;
@@ -110,8 +141,9 @@ int main(int argc, char **argv)
 			return EXIT_SUCCESS;
 		default:
 			printf(
-				"Usage: %s [-?hvt] [-c config] [-p pidfile]\n"
+				"Usage: %s [-?hwvt] [-c config] [-p pidfile]\n"
 				"  -h, -?       this message\n"
+				"  -w           wait util network ready\n"
 				"  -v           print version\n"
 				"  -t           test config syntax\n"
 				"  -p           write pid to pidfile\n",
@@ -120,6 +152,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	// Wait for network ready before further initializations so that
+	// parser can resolve domain names.
+	if (wait)
+		wait_for_network();
 
 	FILE *f = fopen(confname, "r");
 	if (!f) {
