@@ -7,7 +7,7 @@ VERSION := 0.4
 
 LIBS := -levent
 CFLAGS += -g -O2
-override CFLAGS += -std=gnu99 -Wall
+override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
 
 all: $(OUT)
 
