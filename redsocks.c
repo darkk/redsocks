@@ -640,11 +640,13 @@ fail:
 
 int redsocks_connect_relay(redsocks_client *client)
 {
+    char * interface = client->instance->config.interface;
     struct timeval tv;
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
 
-    client->relay = red_connect_relay2(&client->instance->config.relayaddr,
+    // Allowing binding relay socket to specified IP for outgoing connections
+    client->relay = red_connect_relay(interface, &client->instance->config.relayaddr,
                                       NULL, 
                                       redsocks_relay_connected,
                                       redsocks_event_error, client, &tv);
@@ -968,6 +970,7 @@ static int redsocks_init_instance(redsocks_instance *instance)
         goto fail;
     }
 
+    apply_tcp_fastopen(fd);
     error = listen(fd, instance->config.listenq);
     if (error) {
         log_errno(LOG_ERR, "listen");

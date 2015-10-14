@@ -73,9 +73,9 @@ redsocks {
 	// New types: direct, shadowsocks
 	type = socks5;
 
-    // Specify interface for outgoing connections when 'direct' type
-    // is used. This is useful when you have multiple connections to
-    // internet or you have VPN connections.
+    // Specify interface for outgoing connections.
+    // This is useful when you have multiple connections to
+    // internet or when you have VPN connections.
     // interface = tun0;
 
 	// Change this parameter to 1 if you want auto proxy feature. 
@@ -142,6 +142,11 @@ tcpdns {
 }
 
 autoproxy {
+    // Specify interface for outgoing connections.
+    // This is useful when you have multiple connections to
+    // internet or when you have VPN connections.
+    // interface = wlan0;
+
     no_quick_check_seconds = 60; // Directly relay traffic to proxy if an IP
                                  // is found blocked in cache and it has been
                                  // added into cache no earlier than this

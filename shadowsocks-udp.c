@@ -64,9 +64,10 @@ static void ss_client_fini(redudp_client *client)
 {
     ss_client *ssclient = (void*)(client + 1);
     if (event_initialized(&ssclient->udprelay)) {
-        close(event_get_fd(&ssclient->udprelay));
+        int fd = event_get_fd(&ssclient->udprelay);
         if (event_del(&ssclient->udprelay) == -1)
             redudp_log_errno(client, LOG_ERR, "event_del");
+        close(fd);
     }
 }
 

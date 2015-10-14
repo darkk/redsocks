@@ -51,20 +51,25 @@ struct sockaddr_in;
 uint32_t red_randui32();
 time_t redsocks_time(time_t *t);
 char *redsocks_evbuffer_readline(struct evbuffer *buf);
-struct bufferevent* red_connect_relay_if(const char *ifname,
-                                struct sockaddr_in *addr,
+struct bufferevent* red_prepare_relay(const char *ifname,
                                 evbuffercb readcb,
                                 evbuffercb writecb,
                                 everrorcb errorcb,
                                 void *cbarg);
-struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb readcb, evbuffercb writecb, everrorcb errorcb, void *cbarg);
-struct bufferevent* red_connect_relay2(struct sockaddr_in *addr, evbuffercb readcb, evbuffercb writecb, everrorcb errorcb, void *cbarg, const struct timeval *timeout_write);
+struct bufferevent* red_connect_relay(const char *ifname,
+                                struct sockaddr_in *addr,
+                                evbuffercb readcb,
+                                evbuffercb writecb,
+                                everrorcb errorcb,
+                                void *cbarg,
+                                const struct timeval *timeout_write);
 int red_socket_geterrno(struct bufferevent *buffev);
 int red_is_socket_connected_ok(struct bufferevent *buffev);
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *fromaddr, struct sockaddr_in *toaddr);
 
 size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, size_t skip);
 int make_socket_transparent(int fd);
+int apply_tcp_fastopen(int fd);
 
 #define event_fmt_str "%s|%s|%s|%s|%s|%s|0x%x"
 #define event_fmt(what) \

@@ -340,11 +340,12 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
 
 static int ss_connect_relay(redsocks_client *client)
 {
+    char * interface = client->instance->config.interface;
     struct timeval tv;
 
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
-    client->relay = red_connect_relay2(&client->instance->config.relayaddr,
+    client->relay = red_connect_relay(interface, &client->instance->config.relayaddr,
                     NULL, ss_relay_connected, redsocks_event_error, client, 
                     &tv);
 

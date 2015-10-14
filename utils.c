@@ -116,8 +116,7 @@ char *redsocks_evbuffer_readline(struct evbuffer *buf)
 #endif
 }
 
-struct bufferevent* red_connect_relay_if(const char *ifname,
-                                struct sockaddr_in *addr,
+struct bufferevent* red_prepare_relay(const char *ifname,
                                 evbuffercb readcb,
                                 evbuffercb writecb,
                                 everrorcb errorcb,
@@ -132,14 +131,14 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
         log_errno(LOG_ERR, "socket");
         goto fail;
     }
-    if (ifname) {
+    if (ifname && strlen(ifname)) {
 #ifdef USE_PF // BSD
         error = setsockopt(relay_fd, SOL_SOCKET, IP_RECVIF, ifname, strlen(ifname));
 #else // Linux
         error = setsockopt(relay_fd, SOL_SOCKET, SO_BINDTODEVICE, ifname, strlen(ifname));
 #endif
         if (error) {
-            log_errno(LOG_ERR, "bind");
+            log_errno(LOG_ERR, "setsockopt");
             goto fail;
         }
     }
@@ -165,14 +164,6 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
     if (apply_tcp_keepalive(relay_fd))
         goto fail;
 
-//  error = bufferevent_socket_connect(retval, (struct sockaddr*)addr, sizeof(*addr));
-//  if (error) {
-    error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
-    if (error && errno != EINPROGRESS) {
-        log_errno(LOG_NOTICE, "connect");
-        goto fail;
-    }
-
     return retval;
 
 fail:
@@ -185,18 +176,8 @@ fail:
     return NULL;
 }
 
-
-struct bufferevent* red_connect_relay(struct sockaddr_in *addr,
-                                    evbuffercb readcb,
-                                    evbuffercb writecb,
-                                    everrorcb errorcb,
-                                    void *cbarg)
-{
-    return red_connect_relay_if(NULL, addr, readcb, writecb, errorcb, cbarg);
-}
-
-
-struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
+struct bufferevent* red_connect_relay(const char *ifname,
+                                    struct sockaddr_in *addr,
                                     evbuffercb readcb,
                                     evbuffercb writecb,
                                     everrorcb errorcb,
@@ -207,44 +188,20 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
     int relay_fd = -1;
     int error;
 
-    relay_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (relay_fd == -1) {
-        log_errno(LOG_ERR, "socket");
-        goto fail;
+    retval = red_prepare_relay(ifname, readcb, writecb, errorcb, cbarg);
+    if (retval) {
+        relay_fd = bufferevent_getfd(retval);
+        if (timeout_write)
+            bufferevent_set_timeouts(retval, NULL, timeout_write);
+
+        //  error = bufferevent_socket_connect(retval, (struct sockaddr*)addr, sizeof(*addr));
+        //  if (error) {
+        error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+        if (error && errno != EINPROGRESS) {
+            log_errno(LOG_NOTICE, "connect");
+            goto fail;
+        }
     }
-
-    error = evutil_make_socket_nonblocking(relay_fd);
-    if (error) {
-        log_errno(LOG_ERR, "evutil_make_socket_nonblocking");
-        goto fail;
-    }
-
-    retval = bufferevent_socket_new(get_event_base(), relay_fd, 0);
-    if (!retval) {
-        log_errno(LOG_ERR, "bufferevent_socket_new");
-        goto fail;
-    }
-
-    bufferevent_setcb(retval, readcb, writecb, errorcb, cbarg);
-
-    error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
-    if (error) {
-        log_errno(LOG_ERR, "bufferevent_enable");
-        goto fail;
-    }
-    bufferevent_set_timeouts(retval, NULL, timeout_write);
-
-    if (apply_tcp_keepalive(relay_fd))
-        goto fail;
-
-//  error = bufferevent_socket_connect(retval, (struct sockaddr*)addr, sizeof(*addr));
-//  if (error) {
-    error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
-    if (error && errno != EINPROGRESS) {
-        log_errno(LOG_NOTICE, "connect");
-        goto fail;
-    }
-
     return retval;
 
 fail:
@@ -375,6 +332,23 @@ int make_socket_transparent(int fd)
     if (error)
         log_errno(LOG_ERR, "setsockopt(..., SOL_IP, IP_TRANSPARENT)");
     return error;
+}
+
+int apply_tcp_fastopen(int fd)
+{
+#ifdef TCP_FASTOPEN
+#ifdef __APPLE__
+    int opt = 1;
+#else
+    int opt = 5;
+#endif
+    int rc = setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &opt, sizeof(opt));
+    if (rc == -1)
+        log_errno(LOG_ERR, "setsockopt");
+    return rc;
+#else
+    return -1;
+#endif
 }
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

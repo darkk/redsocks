@@ -59,6 +59,7 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
 
 typedef struct autoproxy_config_t {
     list_head  list; // Make it a list to support multiple configurations
+    char *     interface; // interface to be used for relay
     uint16_t   quick_connect_timeout;
     uint16_t   no_quick_check_seconds;
 } autoproxy_config;
@@ -72,6 +73,7 @@ static list_head configs = LIST_HEAD_INIT(configs);
 
 static parser_entry autoproxy_entries[] =
 {
+    { .key = "interface",  .type = pt_pchar },
     { .key = "quick_connect_timeout",  .type = pt_uint16 },
     { .key = "no_quick_check_seconds",  .type = pt_uint16 },
     { }
@@ -91,6 +93,7 @@ static int autoproxy_onenter(parser_section *section)
 
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
         entry->addr =
+            (strcmp(entry->key, "interface") == 0)  ? (void*)&config->interface :
             (strcmp(entry->key, "quick_connect_timeout") == 0) ? (void*)&config->quick_connect_timeout:
             (strcmp(entry->key, "no_quick_check_seconds") == 0) ? (void*)&config->no_quick_check_seconds:
             NULL;
@@ -673,10 +676,8 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
 static int auto_connect_relay(redsocks_client *client)
 {
     autoproxy_client * aclient = get_autoproxy_client(client);
-    autoproxy_config * config = NULL;
-    struct timeval tv;
-    tv.tv_sec = client->instance->config.timeout;
-    tv.tv_usec = 0;
+    autoproxy_config * config = get_config(client);
+    struct timeval tv = {client->instance->config.timeout, 0};
     time_t * acc_time = NULL;
     time_t now = redsocks_time(NULL);   
 
@@ -686,7 +687,6 @@ static int auto_connect_relay(redsocks_client *client)
         if (acc_time)
         {
             redsocks_log_error(client, LOG_DEBUG, "Found dest IP in cache");
-            config = get_config(client);
             // No quick check when the time passed since IP is added to cache is 
             // less than NO_CHECK_SECONDS. Just let it go via proxy.
             if (config->no_quick_check_seconds == 0
@@ -706,14 +706,12 @@ static int auto_connect_relay(redsocks_client *client)
             aclient->quick_check = 1;
         }
         /* connect to target directly without going through proxy */    
-        client->relay = red_connect_relay2(&client->destaddr,
+        client->relay = red_connect_relay(config->interface, &client->destaddr,
                         NULL, auto_relay_connected, auto_event_error, client, 
                         &tv);
-    
         if (!client->relay) {
-            redsocks_log_errno(client, LOG_ERR, "auto_connect_relay");
-            redsocks_drop_client(client);
-            return -1;
+            // Failed to connect to destination directly, try again via proxy.
+            return auto_retry(client, 0);
         }
     }
     else

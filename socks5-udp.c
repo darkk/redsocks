@@ -385,8 +385,8 @@ static void socks5_relay_error(struct bufferevent *buffev, short what, void *_ar
 static void socks5_connect_relay(redudp_client *client)
 {
 	socks5_client *socks5client = (void*)(client + 1);
-	socks5client->relay = red_connect_relay(&client->instance->config.relayaddr, NULL, 
-	                                  socks5_relay_connected, socks5_relay_error, client);
+	socks5client->relay = red_connect_relay(NULL, &client->instance->config.relayaddr, NULL, 
+	                                  socks5_relay_connected, socks5_relay_error, client, NULL);
 	if (!socks5client->relay)
 		redudp_drop_client(client);
 }
