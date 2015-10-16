@@ -174,7 +174,7 @@ The configuration for forwarding connections to GoAgent is like below:
 	 timeout = 13;
 	}
 
-###Redirect UPD based DNS Request via TCP connection
+###Redirect UDP based DNS Request via TCP connection
 Sending DNS request via TCP connection is one way to prevent from DNS
 poisoning. You can redirect all UDP based DNS requests via TCP connection
 with the following config section.
