@@ -2,8 +2,8 @@ REDSOCKS2
 =========
 This is a modified version of original redsocks.
 The name is changed to REDSOCKS2 to distinguish with original redsocks.
-This variant is useful for anti-GFW (Great Fire Wall). REDSOCKS2 contains
-several new features besides many bug fixes to original redsocks.
+REDSOCKS2 contains several new features besides many bug fixes to original
+redsocks.
 
 1. Redirect TCP connections which are blocked via proxy automatically without
 need of blacklist.
@@ -13,9 +13,6 @@ need of blacklist.
 5. Redirect TCP connections via specified network interface.
 6. UDP transparent proxy via shadowsocks proxy.
 
-If you feel my work done is helpful, please consider donation. Thanks. 
-**Accept donations by AliPay with account <semigodking@gmail.com>**
-
 [Chinese Reference](https://github.com/semigodking/redsocks/wiki)
 
 HOW TO BUILD
@@ -23,6 +20,7 @@ HOW TO BUILD
 ###Prerequisites
 The following libraries are required.
 
+* libevent2
 * OpenSSL or PolarSSL
 
 ###Steps
