@@ -12,6 +12,7 @@ need of blacklist.
 4. Redirect TCP connections without proxy.
 5. Redirect TCP connections via specified network interface.
 6. UDP transparent proxy via shadowsocks proxy.
+7. Support Ful-cone NAT Traversal when working with shadowsocks proxy.
 
 [Chinese Reference](https://github.com/semigodking/redsocks/wiki)
 

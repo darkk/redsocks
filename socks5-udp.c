@@ -53,13 +53,13 @@ static struct evbuffer* socks5_mkassociate(void *p)
 	return socks5_mkcommand_plain(socks5_cmd_udp_associate, &sa);
 }
 
-static void socks5_fill_preamble(socks5_udp_preabmle *preamble, redudp_client *client)
+static void socks5_fill_preamble(socks5_udp_preabmle *preamble, struct sockaddr_in * addr)
 {
 	preamble->reserved = 0;
 	preamble->frag_no = 0; /* fragmentation is not supported */
 	preamble->addrtype = socks5_addrtype_ipv4;
-	preamble->ip.addr = get_destaddr(client)->sin_addr.s_addr;
-	preamble->ip.port = get_destaddr(client)->sin_port;
+	preamble->ip.addr = addr->sin_addr.s_addr;
+	preamble->ip.port = addr->sin_port;
 }
 
 
@@ -106,7 +106,7 @@ static int socks5_ready_to_fwd(struct redudp_client_t *client)
 	return socks5client->ready_fwd; 
 }
 
-static void socks5_forward_pkt(redudp_client *client, void *buf, size_t pktlen)
+static void socks5_forward_pkt(redudp_client *client, struct sockaddr *destaddr, void *buf, size_t pktlen)
 {
 	socks5_client *socks5client = (void*)(client + 1);
 	socks5_udp_preabmle req;
@@ -114,7 +114,7 @@ static void socks5_forward_pkt(redudp_client *client, void *buf, size_t pktlen)
 	struct iovec io[2];
 	ssize_t outgoing, fwdlen = pktlen + sizeof(req);
 
-	socks5_fill_preamble(&req, client);
+	socks5_fill_preamble(&req, (struct sockaddr_in *)destaddr);
 
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_name = &socks5client->udprelayaddr;
@@ -175,22 +175,14 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
 		return;
 	}
 
-	if (pkt.header.ip.port != get_destaddr(client)->sin_port ||
-	    pkt.header.ip.addr != get_destaddr(client)->sin_addr.s_addr)
-	{
-		char buf[RED_INET_ADDRSTRLEN];
-		struct sockaddr_in pktaddr = {
-			.sin_family = AF_INET,
-			.sin_addr   = { pkt.header.ip.addr },
-			.sin_port   = pkt.header.ip.port,
-		};
-		redudp_log_error(client, LOG_NOTICE, "Socks5 server relayed packet from unexpected address %s.",
-		                 red_inet_ntop(&pktaddr, buf, sizeof(buf)));
-		return;
-	}
+	struct sockaddr_in pktaddr = {
+		.sin_family = AF_INET,
+		.sin_addr   = { pkt.header.ip.addr },
+		.sin_port   = pkt.header.ip.port,
+	};
 
 	fwdlen = pktlen - sizeof(pkt.header);
-    redudp_fwd_pkt_to_sender(client, pkt.buf + sizeof(pkt.header), fwdlen);
+    redudp_fwd_pkt_to_sender(client, pkt.buf + sizeof(pkt.header), fwdlen, &pktaddr);
 }
 
 

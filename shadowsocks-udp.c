@@ -74,12 +74,11 @@ static void ss_client_fini(redudp_client *client)
     }
 }
 
-static void ss_forward_pkt(redudp_client *client, void *data, size_t pktlen)
+static void ss_forward_pkt(redudp_client *client, struct sockaddr * destaddr, void *data, size_t pktlen)
 {
     ss_client *ssclient = (void*)(client + 1);
     ss_instance * ss = (ss_instance *)(client->instance+1);
     struct sockaddr_in * relayaddr = &client->instance->config.relayaddr;
-    struct sockaddr_in * destaddr = get_destaddr(client);
     struct msghdr msg;
     struct iovec io[1];
     ssize_t outgoing;
@@ -91,8 +90,8 @@ static void ss_forward_pkt(redudp_client *client, void *data, size_t pktlen)
     /* build and send header */
     // TODO: Better implementation and IPv6 Support
     header.addr_type = ss_addrtype_ipv4;
-    header.addr = destaddr->sin_addr.s_addr;
-    header.port = destaddr->sin_port;
+    header.addr = ((struct sockaddr_in *)destaddr)->sin_addr.s_addr;
+    header.port = ((struct sockaddr_in *)destaddr)->sin_port;
 
     if (enc_ctx_init(&ss->info, &ss->e_ctx, 1)) {
         redudp_log_error(client, LOG_ERR, "Shadowsocks UDP failed to initialize encryption context.");
@@ -157,40 +156,30 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
     }
     rc = ss_decrypt(&ss->d_ctx, ss->buff, pktlen, ss->buff2, &fwdlen);
     enc_ctx_free(&ss->d_ctx);
-    if (!rc)
-    {
+    if (!rc) {
         redudp_log_error(client, LOG_DEBUG, "Can't decrypt packet, dropping it");
         return;
     }
     header = (ss_header_ipv4 *)ss->buff2;
+    // We do not verify src address, but at least, we need to ensure address type is correct.
     if (header->addr_type != ss_addrtype_ipv4) {
         redudp_log_error(client, LOG_DEBUG, "Got address type #%u instead of expected #%u (IPv4).",
                         header->addr_type, ss_addrtype_ipv4);
         return;
     }
 
-    if (header->port != get_destaddr(client)->sin_port ||
-        header->addr != get_destaddr(client)->sin_addr.s_addr)
-    {
-        char addrbuf[RED_INET_ADDRSTRLEN];
-        struct sockaddr_in pktaddr = {
-            .sin_family = AF_INET,
-            .sin_addr   = { header->addr },
-            .sin_port   = header->port,
-        };
-        redudp_log_error(client, LOG_NOTICE, "Shadowsocks server relayed packet from unexpected address %s.",
-                         red_inet_ntop(&pktaddr, addrbuf, sizeof(addrbuf)));
-        return;
-    }
+    struct sockaddr_in pktaddr = {
+        .sin_family = AF_INET,
+        .sin_addr   = { header->addr },
+        .sin_port   = header->port,
+    };
 
-    if (fwdlen < sizeof(*header))
-    {
+    if (fwdlen < sizeof(*header)) {
         redudp_log_error(client, LOG_DEBUG, "Packet too short.");
         return;
     }
-
     fwdlen -= sizeof(*header);
-    redudp_fwd_pkt_to_sender(client, ss->buff2 + sizeof(*header), fwdlen);
+    redudp_fwd_pkt_to_sender(client, ss->buff2 + sizeof(*header), fwdlen, &pktaddr);
 }
 
 static int ss_ready_to_fwd(struct redudp_client_t *client)
@@ -249,10 +238,11 @@ static int ss_instance_init(struct redudp_instance_t *instance)
     {
         log_error(LOG_INFO, "using encryption method: %s", config->login);
     }
+    // Two buffers are allocated for each instance. One is for receiving plain
+    // data, one is for encryption/decrption.
     ss->buff = malloc(SHARED_BUFF_SIZE);
     ss->buff2 = malloc(SHARED_BUFF_SIZE);
-    if (!ss->buff || !ss->buff2)
-    {
+    if (!ss->buff || !ss->buff2) {
         log_error(LOG_ERR, "Out of memory.");
         return -1;
     }
@@ -263,13 +253,11 @@ static int ss_instance_init(struct redudp_instance_t *instance)
 static void ss_instance_fini(struct redudp_instance_t *instance)
 {
     ss_instance * ss = (ss_instance *)(instance+1);
-    if (ss->buff)
-    {
+    if (ss->buff) {
         free(ss->buff);
         ss->buff = NULL;
     }
-    if (ss->buff2)
-    {
+    if (ss->buff2) {
         free(ss->buff2);
         ss->buff2 = NULL;
     }
