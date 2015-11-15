@@ -413,10 +413,12 @@ static int base_init()
 	log_open(); // child has nothing to do with TTY
 
 	if (instance.daemon) {
+#if 0
 		if (setsid() < 0) {
 			log_errno(LOG_ERR, "setsid()");
 			goto fail;
 		}
+#endif
 
 		int fds[] = { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO };
 		int *pfd;
