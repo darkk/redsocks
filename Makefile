@@ -1,20 +1,35 @@
-OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
+LIBHTTP_VERSION := 2.6.0
+LIBHTTP_NAME := http-parser-$(LIBHTTP_VERSION)
+LIBHTTP_CFLAGS := -I./http-parser-$(LIBHTTP_VERSION) -L./http-parser-$(LIBHTTP_VERSION)
+
+OBJS := tls.o parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks
-VERSION := 0.4
+VERSION := 0.4.1-adallom
 
-LIBS := -levent
+LIBS := -levent -lhttp_parser
+CFLAGS += $(LIBHTTP_CFLAGS)
 CFLAGS += -g -O2
 override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
 
 all: $(OUT)
 
-.PHONY: all clean distclean
+.PHONY: all clean distclean http-parser
 
 tags: *.c *.h
 	ctags -R
+
+$(LIBHTTP_NAME):
+	wget https://github.com/nodejs/http-parser/archive/v$(LIBHTTP_VERSION).tar.gz
+	tar -zxf v$(LIBHTTP_VERSION).tar.gz
+	rm -f v$(LIBHTTP_VERSION).tar.gz
+
+$(LIBHTTP_NAME)/libhttp_parser.o:
+	cd $(LIBHTTP_NAME) && make package
+
+http-parser: $(LIBHTTP_NAME) $(LIBHTTP_NAME)/libhttp_parser.o
 
 $(CONF):
 	@case `uname` in \
@@ -78,8 +93,8 @@ $(DEPS): $(SRCS)
 
 -include $(DEPS)
 
-$(OUT): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+$(OUT): http-parser $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
 
 clean:
 	$(RM) $(OUT) $(CONF) $(OBJS)
@@ -87,3 +102,4 @@ clean:
 distclean: clean
 	$(RM) tags $(DEPS)
 	$(RM) -r gen
+	$(RM) -rf $(LIBHTTP_NAME)
