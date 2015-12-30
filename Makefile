@@ -20,6 +20,10 @@ override LIBS += -lssl -lcrypto
 override CFLAGS += -DUSE_CRYPTO_OPENSSL
 $(info Compile with OpenSSL by default. To compile with PolarSSL, run 'make USE_CRYPTO_POLARSSL=true' instead.)
 endif
+ifdef ENABLE_STATIC
+override LIBS += -ldl -lz
+override LDFLAGS += -Wl,-static -static -static-libgcc
+endif
 
 all: $(OUT)
 

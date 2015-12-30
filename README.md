@@ -34,6 +34,10 @@ To compile with PolarSSL
 
 	make USE_CRYPTO_POLARSSL=true
 
+To compile static binaries (with Tomatoware)
+
+	make ENABLE_STATIC=true
+
 Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
 to cross compile.
