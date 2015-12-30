@@ -18,7 +18,7 @@ typedef struct udprelay_subsys_t {
 	// connect_relay (if any) is called instead of redudp_connect_relay after client connection acceptance
 	void       (*connect_relay)(struct redudp_client_t *client);
 	//void       (*relay_connected)(struct redudp_client_t *client);
-	void       (*forward_pkt)(struct redudp_client_t *client, void * data, size_t len);
+	void       (*forward_pkt)(struct redudp_client_t *client, struct sockaddr * destaddr, void * data, size_t len);
 	int	       (*ready_to_fwd)(struct redudp_client_t *client);
 } udprelay_subsys;
 
@@ -49,7 +49,6 @@ typedef struct redudp_client_t {
 	redudp_instance    *instance;
 	struct sockaddr_in  clientaddr;
 	struct sockaddr_in  destaddr;
-	int                 sender_fd; // shared between several clients socket (bound to `destaddr`)
 	struct event        timeout;
 	int                 state;         // it's used by bottom layer
 	time_t              first_event;
@@ -61,6 +60,7 @@ typedef struct redudp_client_t {
 
 typedef struct enqueued_packet_t {
 	list_head  list;
+	struct sockaddr_in destaddr;
 	size_t     len;
 	char       data[1];
 } enqueued_packet;
@@ -68,7 +68,7 @@ typedef struct enqueued_packet_t {
 struct sockaddr_in* get_destaddr(redudp_client *client);
 void redudp_drop_client(redudp_client *client);
 void redudp_flush_queue(redudp_client *client);
-void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len);
+void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len, struct sockaddr_in * srcaddr);
 void redudp_bump_timeout(redudp_client *client);
 
 #define redudp_log_error(client, prio, msg...) \

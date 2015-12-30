@@ -1,4 +1,4 @@
-/* redsocks2 - transparent TCP-to-proxy redirector
+/* redsocks2 - transparent TCP/UDP-to-proxy redirector
  * Copyright (C) 2013-2015 Zhuofei Wang <semigodking@gmail.com>
  *
  * This code is based on redsocks project developed by Leonid Evdokimov.

@@ -1,4 +1,11 @@
-/* redsocks - transparent TCP-to-proxy redirector
+/* redsocks2 - transparent TCP/UDP-to-proxy redirector
+ * Copyright (C) 2013-2015 Zhuofei Wang <semigodking@gmail.com>
+ *
+ * This code is based on redsocks project developed by Leonid Evdokimov.
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * 
+ * 
+ * redsocks - transparent TCP-to-proxy redirector
  * Copyright (C) 2007-2011 Leonid Evdokimov <leon@darkk.net.ru>
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
@@ -40,6 +47,10 @@
 #define IP_RECVORIGDSTADDR   IP_ORIGDSTADDR
 #endif
 
+#define DEFAULT_MAX_PKTQUEUE  5
+#define DEFAULT_UDP_TIMEOUT   30
+#define REDUDP_AUDIT_INTERVAL 10
+
 // Multiple instances share the same buffer for message receiving
 static char recv_buff[64*1024];// max size of UDP packet is less than 64K
 
@@ -56,6 +67,7 @@ struct bound_udp4 {
     struct bound_udp4_key key;
     int ref;
     int fd;
+    time_t t_last_rx;
 };
 
 extern udprelay_subsys socks5_udp_subsys;
@@ -95,6 +107,7 @@ static int bound_udp4_get(const struct sockaddr_in *addr)
     if (pnode) {
         assert((*pnode)->ref > 0);
         (*pnode)->ref++;
+        (*pnode)->t_last_rx = redsocks_time(NULL);
         return (*pnode)->fd;
     }
 
@@ -107,6 +120,7 @@ static int bound_udp4_get(const struct sockaddr_in *addr)
     node->key = key;
     node->ref = 1;
     node->fd = socket(AF_INET, SOCK_DGRAM, 0);
+    node->t_last_rx = redsocks_time(NULL);
     if (node->fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;
@@ -166,6 +180,41 @@ static void bound_udp4_put(const struct sockaddr_in *addr)
     free(node);
 }
 
+/*
+ * This procedure is ued to audit tree items for destination addresses.
+ * For each destination address, if no packet received from it for a certain period,
+ * it is removed and the corresponding FD is closed.
+ */
+static void bound_udp4_action(const void *nodep, const VISIT which, const int depth)
+{
+    time_t now;
+    struct bound_udp4 *datap;
+    void *parent;
+    char buf[RED_INET_ADDRSTRLEN];
+
+    switch (which) {
+        case preorder:
+        case postorder:
+            break;
+        case endorder:
+        case leaf:
+            now = redsocks_time(NULL);
+            datap = *(struct bound_udp4 **) nodep;
+            // TODO: find a proper way to make timeout configurable for each instance.
+            if (datap->t_last_rx + 20 < now) {
+                parent = tdelete(datap, &root_bound_udp4, bound_udp4_cmp);
+                assert(parent);
+
+                inet_ntop(AF_INET, &datap->key.sin_addr, &buf[0], sizeof(buf));
+                log_error(LOG_DEBUG, "Close UDP socket %d to %s:%u", datap->fd,
+                                     &buf[0], datap->key.sin_port);
+                close(datap->fd);
+                free(datap);
+            }
+            break;
+    }
+}
+
 static int redudp_transparent(int fd)
 {
     int on = 1;
@@ -193,7 +242,7 @@ struct sockaddr_in* get_destaddr(redudp_client *client)
  */
 void redudp_drop_client(redudp_client *client)
 {
-    redudp_log_error(client, LOG_DEBUG, "Dropping...");
+    redudp_log_error(client, LOG_DEBUG, "Dropping UDP client");
     enqueued_packet *q, *tmp;
 
     if (client->instance->relay_ss->fini)
@@ -203,8 +252,6 @@ void redudp_drop_client(redudp_client *client)
         if (event_del(&client->timeout) == -1)
             redudp_log_errno(client, LOG_ERR, "event_del");
     }
-    if (client->sender_fd != -1)
-        bound_udp4_put(&client->destaddr);
     list_for_each_entry_safe(q, tmp, &client->queue, list) {
         list_del(&q->list);
         free(q);
@@ -225,34 +272,34 @@ void redudp_bump_timeout(redudp_client *client)
     }
 }
 
-void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len)
+void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len, 
+                              struct sockaddr_in * srcaddr)
 {
     size_t sent;
+    int fd;
     redsocks_time(&client->last_relay_event);
     redudp_bump_timeout(client);
 
-    if (do_tproxy(client->instance) && client->sender_fd == -1) {
-        client->sender_fd = bound_udp4_get(&client->destaddr);
-        if (client->sender_fd == -1) {
-            redudp_log_error(client, LOG_WARNING, "bound_udp4_get failure");
-            return;
-        }
+    // When working with TPROXY, we have to get sender FD from tree on
+    // receipt of each packet from relay.
+    fd = do_tproxy(client->instance) ? bound_udp4_get(srcaddr)
+                                     : EVENT_FD(&client->instance->listener);
+    if (fd == -1) {
+        redudp_log_error(client, LOG_WARNING, "bound_udp4_get failure");
+        return;
     }
+    // TODO: record remote address in client
 
-    sent = sendto(do_tproxy(client->instance)
-                          ? client->sender_fd
-                          : EVENT_FD(&client->instance->listener),
-                       buf, len, 0,
-                      (struct sockaddr*)&client->clientaddr, sizeof(client->clientaddr));
+    sent = sendto(fd, buf, len, 0,
+                  (struct sockaddr*)&client->clientaddr, sizeof(client->clientaddr));
     if (sent != len) {
         redudp_log_error(client, LOG_WARNING, "sendto: I was sending %zd bytes, but only %zd were sent.",
                          len, sent);
         return;
     }
-
 }
 
-static int redudp_enqeue_pkt(redudp_client *client, char *buf, size_t pktlen)
+static int redudp_enqeue_pkt(redudp_client *client, struct sockaddr_in * destaddr, char *buf, size_t pktlen)
 {
     enqueued_packet *q = NULL;
 
@@ -269,6 +316,7 @@ static int redudp_enqeue_pkt(redudp_client *client, char *buf, size_t pktlen)
     }
 
     INIT_LIST_HEAD(&q->list);
+    memcpy(&q->destaddr, destaddr, sizeof(*destaddr));
     q->len = pktlen;
     memcpy(q->data, buf, pktlen);
     client->queue_len += 1;
@@ -283,14 +331,13 @@ void redudp_flush_queue(redudp_client *client)
 
     redudp_log_error(client, LOG_DEBUG, "Starting UDP relay");
     list_for_each_entry_safe(q, tmp, &client->queue, list) {
-        client->instance->relay_ss->forward_pkt(client, q->data, q->len);
+        client->instance->relay_ss->forward_pkt(client, (struct sockaddr *)&q->destaddr, q->data, q->len);
         list_del(&q->list);
         free(q);
     }
     client->queue_len = 0;
     assert(list_empty(&client->queue));
 }
-
 
 static void redudp_timeout(int fd, short what, void *_arg)
 {
@@ -303,7 +350,6 @@ static void redudp_timeout(int fd, short what, void *_arg)
 static void redudp_first_pkt_from_client(redudp_instance *self, struct sockaddr_in *clientaddr, struct sockaddr_in *destaddr, char *buf, size_t pktlen)
 {
     redudp_client *client = calloc(1, sizeof(*client)+self->relay_ss->payload_len);
-
     if (!client) {
         log_errno(LOG_WARNING, "calloc");
         return;
@@ -313,12 +359,11 @@ static void redudp_first_pkt_from_client(redudp_instance *self, struct sockaddr_
     INIT_LIST_HEAD(&client->queue);
     client->instance = self;
     memcpy(&client->clientaddr, clientaddr, sizeof(*clientaddr));
+    // TODO: remove client->destaddr
     if (destaddr)
         memcpy(&client->destaddr, destaddr, sizeof(client->destaddr));
     evtimer_assign(&client->timeout, get_event_base(), redudp_timeout, client);
     self->relay_ss->init(client);
-
-    client->sender_fd = -1; // it's postponed until proxy replies to avoid trivial DoS
 
     redsocks_time(&client->first_event);
     client->last_client_event = client->first_event;
@@ -326,13 +371,13 @@ static void redudp_first_pkt_from_client(redudp_instance *self, struct sockaddr_
 
     list_add(&client->list, &self->clients);
 
-    if (redudp_enqeue_pkt(client, buf, pktlen) == -1)
+    redudp_log_error(client, LOG_DEBUG, "got 1st packet from client");
+
+    if (redudp_enqeue_pkt(client, destaddr, buf, pktlen) == -1)
         goto fail;
 
     if (self->relay_ss->connect_relay)
         self->relay_ss->connect_relay(client);
-
-    redudp_log_error(client, LOG_DEBUG, "got 1st packet from client");
     return;
 
 fail:
@@ -349,13 +394,16 @@ static void redudp_pkt_from_client(int fd, short what, void *_arg)
     pdestaddr = do_tproxy(self) ? &destaddr : NULL;
 
     assert(fd == EVENT_FD(&self->listener));
+    // destaddr will be filled with true destination if it is available
     pktlen = red_recv_udp_pkt(fd, recv_buff, sizeof(recv_buff), &clientaddr, pdestaddr);
     if (pktlen == -1)
         return;
+    if (!pdestaddr)
+        // In case tproxy is not used, use configured destination address instead.
+        pdestaddr = &self->config.destaddr;
 
     // TODO: this lookup may be SLOOOOOW.
     list_for_each_entry(tmp, &self->clients, list) {
-        // TODO: check destaddr
         if (0 == memcmp(&clientaddr, &tmp->clientaddr, sizeof(clientaddr))) {
             client = tmp;
             break;
@@ -365,11 +413,12 @@ static void redudp_pkt_from_client(int fd, short what, void *_arg)
     if (client) {
         redsocks_time(&client->last_client_event);
         redudp_bump_timeout(client);
+
         if (self->relay_ss->ready_to_fwd(client)) {
-            self->relay_ss->forward_pkt(client, recv_buff, pktlen);
+            self->relay_ss->forward_pkt(client, (struct sockaddr *)pdestaddr, recv_buff, pktlen);
         }
         else {
-            redudp_enqeue_pkt(client, recv_buff, pktlen);
+            redudp_enqeue_pkt(client, pdestaddr, recv_buff, pktlen);
         }
     }
     else {
@@ -393,6 +442,7 @@ static parser_entry redudp_entries[] =
     { .key = "dest_port",  .type = pt_uint16 },
     { .key = "udp_timeout", .type = pt_uint16 },
     { .key = "udp_timeout_stream", .type = pt_uint16 },
+    { .key = "max_pktqueue", .type = pt_uint16 },
     { }
 };
 
@@ -420,8 +470,8 @@ static int redudp_onenter(parser_section *section)
     instance->config.relayaddr.sin_family = AF_INET;
     instance->config.relayaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     instance->config.destaddr.sin_family = AF_INET;
-    instance->config.max_pktqueue = 5;
-    instance->config.udp_timeout = 30;
+    instance->config.max_pktqueue = DEFAULT_MAX_PKTQUEUE;
+    instance->config.udp_timeout = DEFAULT_UDP_TIMEOUT;
     instance->config.udp_timeout_stream = 180;
 
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
@@ -472,8 +522,17 @@ static int redudp_onexit(parser_section *section)
         err = "no `type` for redudp";
     }
 
+
+    if (instance->config.max_pktqueue == 0) {
+        parser_error(section->context, "max_pktqueue must be greater than 0.");
+        return -1;
+    }
+    if (instance->config.udp_timeout == 0) {
+        parser_error(section->context, "udp_timeout must be greater than 0.");
+        return -1;
+    }
     if (instance->config.udp_timeout_stream < instance->config.udp_timeout) {
-        parser_error(section->context, "udp_timeout_stream should be not less then udp_timeout");
+        parser_error(section->context, "udp_timeout_stream should be not less than udp_timeout");
         return -1;
     }
 
@@ -488,6 +547,7 @@ static int redudp_init_instance(redudp_instance *instance)
      */
     int error;
     int fd = -1;
+    char buf1[RED_INET_ADDRSTRLEN], buf2[RED_INET_ADDRSTRLEN];
 
     if (instance->relay_ss->instance_init 
         && instance->relay_ss->instance_init(instance)) {
@@ -503,7 +563,6 @@ static int redudp_init_instance(redudp_instance *instance)
 
     if (do_tproxy(instance)) {
         int on = 1;
-        char buf[RED_INET_ADDRSTRLEN];
         // iptables TPROXY target does not send packets to non-transparent sockets
         if (0 != redudp_transparent(fd))
             goto fail;
@@ -514,11 +573,10 @@ static int redudp_init_instance(redudp_instance *instance)
             goto fail;
         }
 
-        log_error(LOG_DEBUG, "redudp @ %s: TPROXY", red_inet_ntop(&instance->config.bindaddr, buf, sizeof(buf)));
+        log_error(LOG_INFO, "redudp @ %s: TPROXY", red_inet_ntop(&instance->config.bindaddr, buf1, sizeof(buf1)));
     }
     else {
-        char buf1[RED_INET_ADDRSTRLEN], buf2[RED_INET_ADDRSTRLEN];
-        log_error(LOG_DEBUG, "redudp @ %s: destaddr=%s",
+        log_error(LOG_INFO, "redudp @ %s: destaddr=%s",
             red_inet_ntop(&instance->config.bindaddr, buf1, sizeof(buf1)),
             red_inet_ntop(&instance->config.destaddr, buf2, sizeof(buf2)));
     }
@@ -587,16 +645,30 @@ static void redudp_fini_instance(redudp_instance *instance)
     free(instance);
 }
 
+static struct event audit_event;
+
+static void redudp_audit(int sig, short what, void *_arg)
+{
+    twalk(root_bound_udp4, bound_udp4_action);
+}
+
 static int redudp_init()
 {
     redudp_instance *tmp, *instance = NULL;
-
-    // TODO: init debug_dumper
+    struct timeval audit_time;
+    struct event_base * base = get_event_base();
 
     list_for_each_entry_safe(instance, tmp, &instances, list) {
         if (redudp_init_instance(instance) != 0)
             goto fail;
     }
+
+    memset(&audit_event, 0, sizeof(audit_event));
+    /* Start audit */
+    audit_time.tv_sec = REDUDP_AUDIT_INTERVAL;
+    audit_time.tv_usec = 0;
+    event_assign(&audit_event, base, 0, EV_TIMEOUT|EV_PERSIST, redudp_audit, NULL);
+    evtimer_add(&audit_event, &audit_time);
 
     return 0;
 
@@ -608,6 +680,10 @@ fail:
 static int redudp_fini()
 {
     redudp_instance *tmp, *instance = NULL;
+
+    /* stop audit */
+    if (event_initialized(&audit_event))
+        evtimer_del(&audit_event);
 
     list_for_each_entry_safe(instance, tmp, &instances, list)
         redudp_fini_instance(instance);

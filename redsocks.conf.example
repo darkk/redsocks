@@ -110,12 +110,13 @@ redudp {
 	// set `local_ip' to 127.45.67.89 if you need more than 65535 ports to
 	// forward ;-)
 	// This limitation may be relaxed in future versions using contrack-tools.
+	// Comment out the two lines below if you use TPROXY for UDP redirection!
 	dest_ip = 8.8.8.8;
 	dest_port = 53;
 
-        // Do not set it large if this section is for DNS requests. Otherwise,
-        // you may encounter out of file descriptor problem. For DNS requests,
-        // 10s is adequate.
+	// Do not set it large if this section is for DNS requests. Otherwise,
+	// you may encounter out of file descriptor problem. For DNS requests,
+	// 10s is adequate.
 	udp_timeout = 30;
 	// udp_timeout_stream = 180;
 }
