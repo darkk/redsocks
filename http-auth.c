@@ -197,7 +197,7 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 	md5_append(&ctx, (md5_byte_t*)realm, strlen(realm));
 	md5_append(&ctx, (md5_byte_t*)":", 1);
 	md5_append(&ctx, (md5_byte_t*)passwd, strlen(passwd));
-	md5_finish(&ctx, hash);
+	md5_finish_rs(&ctx, hash);
 	dump_hash(a1buf, hash);
 
 	/* A2 = Method ":" digest-uri-value */
@@ -205,7 +205,7 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 	md5_append(&ctx, (md5_byte_t*)method, strlen(method));
 	md5_append(&ctx, (md5_byte_t*)":", 1);
 	md5_append(&ctx, (md5_byte_t*)path, strlen(path));
-	md5_finish(&ctx, hash);
+	md5_finish_rs(&ctx, hash);
 	dump_hash(a2buf, hash);
 
 	/* qop set: request-digest = H(A1) ":" nonce-value ":" nc-value ":" cnonce-value ":" qop-value ":" H(A2) */
@@ -224,7 +224,7 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 		md5_append(&ctx, (md5_byte_t*)":", 1);
 	}
 	md5_append(&ctx, (md5_byte_t*)a2buf, strlen(a2buf));
-	md5_finish(&ctx, hash);
+	md5_finish_rs(&ctx, hash);
 	dump_hash(response, hash);
 
 	/* prepare the final string */
