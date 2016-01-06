@@ -909,22 +909,6 @@ static void redsocks_audit_instance(redsocks_instance *instance)
     log_error(LOG_DEBUG, "End of auditing client list.");
 }
 
-
-static void redsocks_heartbeat(int sig, short what, void *_arg)
-{
-    time_t now = redsocks_time(NULL);
-    FILE * tmp = NULL;
-    char tmp_fname[128];
-
-    snprintf(tmp_fname, sizeof(tmp_fname), "/tmp/redtime-%d", getppid());
-    tmp = fopen(tmp_fname, "w");
-    if (tmp)
-    {
-        fprintf(tmp, "%ld ", (long int)now);
-        fclose(tmp);
-    }
-}
-
 static void redsocks_audit(int sig, short what, void *_arg)
 {
     redsocks_instance * tmp, *instance = NULL;
@@ -1046,7 +1030,6 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 
 static int redsocks_fini();
 
-static struct event heartbeat_writer;
 static struct event audit_event;
 
 //static void ignore_sig(int t) {}
@@ -1075,11 +1058,6 @@ static int redsocks_init() {
         return -1;
     }
 
-    evsignal_assign(&heartbeat_writer, base, SIGUSR2, redsocks_heartbeat, NULL);
-    if (evsignal_add(&heartbeat_writer, NULL) != 0) {
-        log_errno(LOG_ERR, "evsignal_add SIGUSR2");
-        goto fail;
-    }
     /* Start audit */
     audit_time.tv_sec = REDSOCKS_AUDIT_INTERVAL;
     audit_time.tv_usec = 0;

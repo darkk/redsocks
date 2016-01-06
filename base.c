@@ -321,74 +321,6 @@ static parser_section base_conf_section =
 /***********************************************************************
  * `base` initialization
  */
-static void myproc()
-{
-    time_t now;
-    time_t last;
-    FILE * tmp = NULL;
-    pid_t pid = -1;
-    int stop = 0;
-	struct sigaction sa ;
-    char tmp_fname[128];
-    snprintf(tmp_fname, sizeof(tmp_fname), "/tmp/redtime-%d", getpid());
-
-    /* Set SIGCHLD handler to ignore death of child. */
-	sa.sa_handler = SIG_IGN;
-	sa.sa_flags = SA_RESTART;
-
-	if (sigaction(SIGCHLD, &sa, NULL)  == -1) {
-		log_errno(LOG_ERR, "sigaction SIGCHLD");
-        return ;
-    }
-    for(;;)
-    {
-        pid = fork();
-		switch (pid) {
-		case -1: // error
-			log_errno(LOG_ERR, "fork()");
-			return ;
-		case 0:  // child
-			return;
-		default: // parent, pid is returned
-            /* let's monitor child process */
-            sleep(5);/* give child process 5 seconds for initialization */
-            stop = 0;
-            for(;stop==0;)
-            {
-               if (kill(pid, SIGUSR2) == -1)
-               {
-                   if (errno == ESRCH)
-                   {
-                      /* process is dead ? */
-                      stop = 1;
-                   }
-                   log_error(LOG_NOTICE, "Failed to send SIGUSR2 to pid %d", pid);
-                   sleep(1);
-                   continue;
-               }
-               sleep(2);
-               
-               tmp = fopen(tmp_fname, "r");
-               if (tmp)
-               {
-                   if (fscanf(tmp, "%ld", &last) > 0)
-                   {
-                       now = time(NULL);
-                       if (now-last>10)
-                       {
-                           kill(pid, SIGKILL);
-                           sleep(1);
-                           stop = 1;
-                       }
-                   }
-                   fclose(tmp);
-               }
-            }
-		}
-     }
-}
-
-
 static int base_fini();
 
 static int base_init()
@@ -496,8 +428,6 @@ static int base_init()
 			}
 
 		close(devnull);
-		/* only fork and monitor child process when running as daemon */
-		myproc();
 	}
 	return 0;
 fail:
