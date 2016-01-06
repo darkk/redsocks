@@ -71,6 +71,20 @@ static void red_srand()
 	srand(tv.tv_sec*1000000+tv.tv_usec);
 }
 
+/* Setup signals not to be handled with libevent */
+static int setup_signals()
+{
+    struct sigaction sa/* , sa_old*/;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &sa, NULL)  == -1) {
+        log_errno(LOG_ERR, "sigaction");
+        return -1;
+    }
+    return 0;
+}
+
 struct event_base * get_event_base()
 {
 	return g_event_base;
@@ -139,6 +153,9 @@ int main(int argc, char **argv)
 
 	if (conftest)
 		return EXIT_SUCCESS;
+
+    if (setup_signals())
+        return EXIT_SUCCESS;
 
 	// Initialize global event base
 	g_event_base = event_base_new();

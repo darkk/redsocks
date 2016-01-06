@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <signal.h>
 #include <time.h>
 #include <errno.h>
 #include <assert.h>
@@ -1032,32 +1031,12 @@ static int redsocks_fini();
 
 static struct event audit_event;
 
-//static void ignore_sig(int t) {}
-
 static int redsocks_init() {
-    struct sigaction sa/* , sa_old*/;
     redsocks_instance *tmp, *instance = NULL;
-//    void (* old_hdl)(int)= NULL;
     struct timeval audit_time;
     struct event_base * base = get_event_base();
 
     memset(&audit_event, 0, sizeof(audit_event));
-/*
-    old_hdl = signal(SIGPIPE, ignore_sig); 
-    if (old_hdl == -1) {
-        log_errno(LOG_ERR, "sigaction");
-        return -1;
-    }
-*/
-    memset(&sa, 0, sizeof(struct sigaction));
-    sa.sa_handler = SIG_IGN;
-    //sa.sa_flags = SA_RESTART;
-
-    if (sigaction(SIGPIPE, &sa, NULL)  == -1) {
-        log_errno(LOG_ERR, "sigaction");
-        return -1;
-    }
-
     /* Start audit */
     audit_time.tv_sec = REDSOCKS_AUDIT_INTERVAL;
     audit_time.tv_usec = 0;
@@ -1073,9 +1052,6 @@ static int redsocks_init() {
 
 fail:
     // that was the first resource allocation, it return's on failure, not goto-fail's
-/*  sigaction(SIGPIPE, &sa_old, NULL); */
-//    signal(SIGPIPE, old_hdl);
-
     redsocks_fini();
 
     return -1;
