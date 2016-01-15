@@ -136,12 +136,17 @@ void log_open()
 	log_msg_next = NULL;
 }
 
+int log_level_enabled(int priority)
+{
+    return (log_mask & LOG_MASK(priority));
+}
+
 void _log_vwrite(const char *file, int line, const char *func, int do_errno, int priority, const char *fmt, va_list ap)
 {
 	int saved_errno = errno;
 	char message[MAX_LOG_LENGTH+1];
 
-	if (!(log_mask & LOG_MASK(priority)))
+	if (!log_level_enabled(priority))
 		return;
 	vsnprintf(&message[0], sizeof(message), fmt, ap);
 	log_msg(file, line, func, priority, &message[0], do_errno ? strerror(saved_errno) : NULL);

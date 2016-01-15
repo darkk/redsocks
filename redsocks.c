@@ -223,28 +223,21 @@ void redsocks_log_write_plain(
         int priority, const char *orig_fmt, ...
 ) {
     int saved_errno = errno;
-    struct evbuffer *fmt = evbuffer_new();
     va_list ap;
     char clientaddr_str[RED_INET_ADDRSTRLEN], destaddr_str[RED_INET_ADDRSTRLEN];
+    char fmt[MAX_LOG_LENGTH+1];
 
-    if (!fmt) {
-        log_errno(LOG_ERR, "evbuffer_new()");
-        // no return, as I have to call va_start/va_end
-    }
+    if (!log_level_enabled(priority))
+        return;
 
-    if (fmt) {
-        evbuffer_add_printf(fmt, "[%s->%s]: %s",
+    snprintf(fmt, sizeof(fmt),  "[%s->%s]: %s",
                 red_inet_ntop(clientaddr, clientaddr_str, sizeof(clientaddr_str)),
                 red_inet_ntop(destaddr, destaddr_str, sizeof(destaddr_str)),
                 orig_fmt);
-    }
 
     va_start(ap, orig_fmt);
-    if (fmt) {
-        errno = saved_errno;
-        _log_vwrite(file, line, func, do_errno, priority, (const char*)EVBUFFER_DATA(fmt), ap);
-        evbuffer_free(fmt);
-    }
+    errno = saved_errno;
+    _log_vwrite(file, line, func, do_errno, priority, &fmt[0], ap);
     va_end(ap);
 }
 
@@ -285,9 +278,8 @@ int process_shutdown_on_write_(redsocks_client *client, struct bufferevent *from
                                 evbuffer_get_length(bufferevent_get_output(from)),
                                 evbuffer_get_length(bufferevent_get_input(to)));
 
-    if (evbuffer_get_length(bufferevent_get_input(from)) == 0
-            && (from_evshut & EV_READ)
-            && !(to_evshut & EV_WRITE)) {
+    if ((from_evshut & EV_READ) && !(to_evshut & EV_WRITE)
+        &&  evbuffer_get_length(bufferevent_get_input(from)) == 0) {
         redsocks_shutdown(client, to, SHUT_WR);
         return 1;
     }
@@ -296,8 +288,8 @@ int process_shutdown_on_write_(redsocks_client *client, struct bufferevent *from
 
 static void redsocks_relay_writecb(redsocks_client *client, struct bufferevent *from, struct bufferevent *to)
 {
-    unsigned short from_evshut = from == client->client ? client->client_evshut : client->relay_evshut;
     assert(from == client->client || from == client->relay);
+    unsigned short from_evshut = from == client->client ? client->client_evshut : client->relay_evshut;
 
     if (process_shutdown_on_write_(client, from, to))
         return;
