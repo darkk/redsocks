@@ -139,6 +139,11 @@ static int bound_udp4_get(const struct sockaddr_in *addr)
         goto fail;
     }
 
+    if (0 != evutil_make_socket_nonblocking(node->fd)) {
+        log_errno(LOG_ERR, "evutil_make_socket_nonblocking");
+        goto fail;
+    }
+
     pnode = tsearch(node, &root_bound_udp4, bound_udp4_cmp);
     if (!pnode) {
         log_errno(LOG_ERR, "tsearch(%p) == %p", node, pnode);

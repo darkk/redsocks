@@ -229,6 +229,13 @@ static void socks5_read_assoc_reply(struct bufferevent *buffev, void *_arg)
 		goto fail;
 	}
 
+    error = evutil_make_socket_nonblocking(fd);
+    if (error) {
+        redudp_log_errno(client, LOG_ERR, "evutil_make_socket_nonblocking");
+        goto fail;
+    }
+
+
 	error = connect(fd, (struct sockaddr*)&socks5client->udprelayaddr, sizeof(socks5client->udprelayaddr));
 	if (error) {
 		redudp_log_errno(client, LOG_NOTICE, "connect");
