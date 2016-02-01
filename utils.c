@@ -53,7 +53,8 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
 
 	if (toaddr) {
 		memset(toaddr, 0, sizeof(*toaddr));
-		for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+		struct cmsghdr* cmsg;
+		for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 			if (
 				cmsg->cmsg_level == SOL_IP &&
 				cmsg->cmsg_type == IP_ORIGDSTADDR &&

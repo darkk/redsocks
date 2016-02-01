@@ -62,6 +62,8 @@ static parser_entry redsocks_entries[] =
 	{ .key = "local_port", .type = pt_uint16 },
 	{ .key = "ip",         .type = pt_in_addr },
 	{ .key = "port",       .type = pt_uint16 },
+	{ .key = "fip",        .type = pt_in_addr },
+	{ .key = "fport",      .type = pt_uint16 },
 	{ .key = "type",       .type = pt_pchar },
 	{ .key = "login",      .type = pt_pchar },
 	{ .key = "password",   .type = pt_pchar },
@@ -118,6 +120,9 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	instance->config.relayaddr.sin_family = AF_INET;
 	instance->config.relayaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	instance->config.relay2addr.sin_family = AF_INET;
+	instance->config.relay2addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	instance->config.relay2addr.sin_port = 0;
 	/* Default value can be checked in run-time, but I doubt anyone needs that.
 	 * Linux:   sysctl net.core.somaxconn
 	 * FreeBSD: sysctl kern.ipc.somaxconn */
@@ -125,12 +130,15 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.min_backoff_ms = 100;
 	instance->config.max_backoff_ms = 60000;
 
-	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+	parser_entry *entry;
+	for (entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
 			(strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
 			(strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
 			(strcmp(entry->key, "ip") == 0)         ? (void*)&instance->config.relayaddr.sin_addr :
 			(strcmp(entry->key, "port") == 0)       ? (void*)&instance->config.relayaddr.sin_port :
+			(strcmp(entry->key, "fip") == 0)        ? (void*)&instance->config.relay2addr.sin_addr :
+			(strcmp(entry->key, "fport") == 0)      ? (void*)&instance->config.relay2addr.sin_port :
 			(strcmp(entry->key, "type") == 0)       ? (void*)&instance->config.type :
 			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
@@ -152,11 +160,13 @@ static int redsocks_onexit(parser_section *section)
 	redsocks_instance *instance = section->data;
 
 	section->data = NULL;
-	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+	parser_entry *entry;
+	for (entry = &section->entries[0]; entry->key; entry++)
 		entry->addr = NULL;
 
 	instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);
 	instance->config.relayaddr.sin_port = htons(instance->config.relayaddr.sin_port);
+	instance->config.relay2addr.sin_port = htons(instance->config.relay2addr.sin_port);
 
 	if (instance->config.type) {
 		relay_subsys **ss;
@@ -545,6 +555,7 @@ int redsocks_write_helper(
 
 static void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
 {
+	struct sockaddr_in addr;
 	redsocks_client *client = _arg;
 
 	assert(buffev == client->relay);
@@ -553,6 +564,21 @@ static void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
 
 	if (!red_is_socket_connected_ok(buffev)) {
 		redsocks_log_errno(client, LOG_NOTICE, "red_is_socket_connected_ok");
+        if ( client->relay_switched==0 ) {
+			if ( client->instance->config.relay2addr.sin_port != 0 ) {
+				client->relay_switched=1;
+				redsocks_log_errno(client, LOG_NOTICE, "failed -> change to fallback relay");
+				addr = client->instance->config.relayaddr;
+				client->instance->config.relayaddr = client->instance->config.relay2addr;
+				client->instance->config.relay2addr = addr;
+				redsocks_connect_relay(client);
+                return;
+			}
+		    else {
+				redsocks_log_errno(client, LOG_NOTICE, "failed -> relay not changed");		
+				goto fail;
+			}
+		}
 		goto fail;
 	}
 
@@ -675,6 +701,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		goto fail;
 	}
 	client->instance = self;
+	client->relay_switched=0;
 	memcpy(&client->clientaddr, &clientaddr, sizeof(clientaddr));
 	memcpy(&client->destaddr, &destaddr, sizeof(destaddr));
 	INIT_LIST_HEAD(&client->list);

@@ -707,7 +707,8 @@ static int redudp_onenter(parser_section *section)
 	instance->config.udp_timeout = 30;
 	instance->config.udp_timeout_stream = 180;
 
-	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+	parser_entry *entry;
+	for (entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
 			(strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
 			(strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
@@ -730,7 +731,8 @@ static int redudp_onexit(parser_section *section)
 	redudp_instance *instance = section->data;
 
 	section->data = NULL;
-	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+	parser_entry *entry;
+	for (entry = &section->entries[0]; entry->key; entry++)
 		entry->addr = NULL;
 
 	instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);

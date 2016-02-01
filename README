@@ -1,3 +1,40 @@
+DISCLAIMER
+==========
+
+This is a patched version of the original redsocks (http://darkk.net.ru/redsocks/) , maintained by Leonid Evdokimov.
+
+I'm not sure from where it comes the original code of the patch, yif you are the real author and you can prove it, please contact me.
+
+This patch allow you to have a config of this kind:
+
+    redsocks {
+      local_ip=0.0.0.0;
+      local_port=1080;
+      ip=192.168.10.10;
+      port=1080;
+      fip=10.10.10.10;
+      fport=1080;
+      type=socks5;
+      login="USER";
+      password="PASSWORD";
+    }
+
+The advantage of having a fall back IP address is that you can connect to a different socks server, when the first one is not available, for instance when you are on a different network that doe not have access to the first socks server...
+
+Client ---> RAS ---> iptables --> NAT to 127.0.0.1:1080 (redsocks)
+
+1) first attempt to 192.168.10.10:1080 (not reachable from a RAS connection)
+2) Fall back to 10.10.10.10 (that works from RAS)
+
+Client --> LAN --> iptables --> NAT to 127.0.0.1:1080 (redsocks)
+
+1) first attempt to 192.168.10.10:1080 (That work form the office LAN network)
+2) No fallback needed
+
+
+ORIGINAL README
+===============
+
 This tool allows you to redirect any TCP connection to SOCKS or HTTPS
 proxy using your firewall, so redirection is system-wide.
 

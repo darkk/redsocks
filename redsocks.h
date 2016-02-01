@@ -26,6 +26,7 @@ typedef struct relay_subsys_t {
 typedef struct redsocks_config_t {
 	struct sockaddr_in bindaddr;
 	struct sockaddr_in relayaddr;
+	struct sockaddr_in relay2addr;
 	char *type;
 	char *login;
 	char *password;
@@ -57,6 +58,7 @@ typedef struct redsocks_client_t {
 	struct sockaddr_in  clientaddr;
 	struct sockaddr_in  destaddr;
 	int                 state;         // it's used by bottom layer
+	int		    relay_switched;
 	unsigned short      client_evshut;
 	unsigned short      relay_evshut;
 	time_t              first_event;

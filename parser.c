@@ -63,7 +63,7 @@ parser_context* parser_start(FILE *fd, parser_errhandler errhandler)
 		return NULL;
 	ret->fd = fd;
 	ret->errhandler = errhandler;
-	ret->buffer.size = 128; // should be big enough to fetch whole ``line``
+	ret->buffer.size = 256; // should be big enough to fetch whole ``line``
 	ret->buffer.data = malloc(ret->buffer.size);
 	if (!ret->buffer.data) {
 		free(ret);
@@ -477,7 +477,8 @@ int parser_run(parser_context *context)
 					parser_error(context, "expected token before ``{''"); // } - I love folding
 				}
 				else {
-					for (parser_section *p = context->sections; p; p = p->next) {
+					parser_section *p;
+					for (p = context->sections; p; p = p->next) {
 						if (strcmp(p->name, section_token) == 0) {
 							section = p;
 							break;
