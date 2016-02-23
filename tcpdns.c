@@ -248,9 +248,13 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
     gettimeofday(&req->req_time, 0);
     pktlen = red_recv_udp_pkt(fd, req->data.raw, sizeof(req->data.raw), &req->client_addr, NULL);
     if (pktlen == -1)
+    {
+        free(req);
         return;
+    }
     if (pktlen <= sizeof(dns_header)) 
     {
+        free(req);
         tcpdns_log_error(LOG_INFO, "incomplete DNS request");
         return;
     }
@@ -271,7 +275,7 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
         if (!destaddr)
         {
             free(req);
-            tcpdns_log_error(LOG_INFO, "No valid DNS resolver configured");
+            tcpdns_log_error(LOG_WARNING, "No valid DNS resolver configured");
             return;
         }
         /* connect to target directly without going through proxy */
