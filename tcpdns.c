@@ -254,8 +254,8 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
     }
     if (pktlen <= sizeof(dns_header)) 
     {
-        free(req);
         tcpdns_log_error(LOG_INFO, "incomplete DNS request");
+        free(req);
         return;
     }
     req->data_len = pktlen;
@@ -274,8 +274,8 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
         destaddr = choose_tcpdns(self, &req->delay);
         if (!destaddr)
         {
-            free(req);
             tcpdns_log_error(LOG_WARNING, "No valid DNS resolver configured");
+            free(req);
             return;
         }
         /* connect to target directly without going through proxy */
@@ -286,14 +286,14 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
             list_add(&req->list, &self->requests);
         else
         {
-            free(req);
             tcpdns_log_error(LOG_INFO, "Failed to setup connection to DNS resolver");
+            free(req);
         }
     }
     else
     {
-        free(req);
         tcpdns_log_error(LOG_INFO, "malformed DNS request");
+        free(req);
     }
 }
 
