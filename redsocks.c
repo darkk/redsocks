@@ -747,11 +747,11 @@ static void redsocks_debug_dump_instance(redsocks_instance *instance, time_t now
 		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
 		redsocks_log_error(client, LOG_NOTICE, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %li sec, idle: %li sec.",
-			EVENT_FD(&client->client->ev_write),
-				redsocks_event_str(client->client->enabled),
+			client->client ? EVENT_FD(&client->client->ev_write) : -1,
+				client->client ? redsocks_event_str(client->client->enabled) : "NULL",
 				s_client_evshut[0] ? " " : "", s_client_evshut,
-			EVENT_FD(&client->relay->ev_write),
-				redsocks_event_str(client->relay->enabled),
+			client->relay ? EVENT_FD(&client->relay->ev_write) : -1,
+				client->relay ? redsocks_event_str(client->relay->enabled) : "NULL",
 				s_relay_evshut[0] ? " " : "", s_relay_evshut,
 			now - client->first_event,
 			now - client->last_event);
