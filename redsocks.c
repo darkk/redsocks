@@ -741,12 +741,12 @@ static void redsocks_debug_dump_instance(redsocks_instance *instance, time_t now
 {
 	redsocks_client *client = NULL;
 
-	log_error(LOG_DEBUG, "Dumping client list for instance %p:", instance);
+	log_error(LOG_NOTICE, "Dumping client list for instance %p:", instance);
 	list_for_each_entry(client, &instance->clients, list) {
 		const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
 		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
-		redsocks_log_error(client, LOG_DEBUG, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %li sec, idle: %li sec.",
+		redsocks_log_error(client, LOG_NOTICE, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %li sec, idle: %li sec.",
 			EVENT_FD(&client->client->ev_write),
 				redsocks_event_str(client->client->enabled),
 				s_client_evshut[0] ? " " : "", s_client_evshut,
@@ -756,7 +756,7 @@ static void redsocks_debug_dump_instance(redsocks_instance *instance, time_t now
 			now - client->first_event,
 			now - client->last_event);
 	}
-	log_error(LOG_DEBUG, "End of client list.");
+	log_error(LOG_NOTICE, "End of client list.");
 }
 
 static void redsocks_debug_dump(int sig, short what, void *_arg)

@@ -1,6 +1,6 @@
 base {
-	// debug: connection progress & client list on SIGUSR1
-	log_debug = on;
+	// debug: connection progress
+	log_debug = off;
 
 	// info: start and end of client session
 	log_info = on;

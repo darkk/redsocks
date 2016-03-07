@@ -65,12 +65,22 @@ static void syslog_msg(const char *file, int line, const char *func, int priorit
 
 static log_func log_msg = stderr_msg;
 static log_func log_msg_next = NULL;
+static bool should_log_info = true;
+static bool should_log_debug = false;
 
+static bool should_log(int priority)
+{
+	return (priority != LOG_DEBUG && priority != LOG_INFO)
+	    || (priority == LOG_DEBUG && should_log_debug)
+	    || (priority == LOG_INFO && should_log_info);
+}
 
 int log_preopen(const char *dst, bool log_debug, bool log_info)
 {
 	const char *syslog_prefix = "syslog:";
 	const char *file_prefix = "file:";
+	should_log_debug = log_debug;
+	should_log_info = log_info;
 	if (strcmp(dst, "stderr") == 0) {
 		log_msg_next = stderr_msg;
 	}
@@ -137,6 +147,9 @@ void log_open()
 
 void _log_vwrite(const char *file, int line, const char *func, int do_errno, int priority, const char *fmt, va_list ap)
 {
+	if (!should_log(priority))
+		return;
+
 	int saved_errno = errno;
 	struct evbuffer *buff = evbuffer_new();
 	const char *message;
@@ -156,6 +169,9 @@ void _log_vwrite(const char *file, int line, const char *func, int do_errno, int
 
 void _log_write(const char *file, int line, const char *func, int do_errno, int priority, const char *fmt, ...)
 {
+	if (!should_log(priority))
+		return;
+
 	va_list ap;
 
 	va_start(ap, fmt);
