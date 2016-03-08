@@ -642,7 +642,6 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 	struct sockaddr_in myaddr;
 	struct sockaddr_in destaddr;
 	socklen_t          addrlen = sizeof(clientaddr);
-	int on = 1;
 	int client_fd = -1;
 	int error;
 
@@ -682,11 +681,8 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		goto fail;
 	}
 
-	error = setsockopt(client_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
-	if (error) {
-		log_errno(LOG_WARNING, "setsockopt");
+	if (apply_tcp_keepalive(client_fd))
 		goto fail;
-	}
 
 	// everything seems to be ok, let's allocate some memory
 	client = calloc(1, sizeof(redsocks_client) + self->relay_ss->payload_len);

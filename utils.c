@@ -23,6 +23,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "log.h"
+#include "base.h"
 #include "utils.h"
 #include "redsocks.h" // for redsocks_close
 #include "libc-compat.h"
@@ -118,7 +119,6 @@ char *redsocks_evbuffer_readline(struct evbuffer *buf)
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg)
 {
 	struct bufferevent *retval = NULL;
-	int on = 1;
 	int relay_fd = -1;
 	int error;
 
@@ -134,11 +134,8 @@ struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb write
 		goto fail;
 	}
 
-	error = setsockopt(relay_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
-	if (error) {
-		log_errno(LOG_WARNING, "setsockopt");
+	if (apply_tcp_keepalive(relay_fd))
 		goto fail;
-	}
 
 	error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
 	if (error && errno != EINPROGRESS) {

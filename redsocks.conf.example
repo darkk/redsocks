@@ -33,6 +33,13 @@ base {
 	 *   generic    - some generic redirector that MAY work
 	 */
 	redirector = iptables;
+
+	/* Override per-socket values for TCP_KEEPIDLE, TCP_KEEPCNT,
+	 * and TCP_KEEPINTVL. see man 7 tcp for details.
+	 * `redsocks' relies on SO_KEEPALIVE option heavily. */
+	//tcp_keepalive_time = 0;
+	//tcp_keepalive_probes = 0;
+	//tcp_keepalive_intvl = 0;
 }
 
 redsocks {
