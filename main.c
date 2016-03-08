@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	parser_context* parser = parser_start(f, NULL);
+	parser_context* parser = parser_start(f);
 	if (!parser) {
 		perror("Not enough memory for parser");
 		return EXIT_FAILURE;

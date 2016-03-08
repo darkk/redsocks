@@ -23,7 +23,7 @@
 #include "utils.h"
 #include "log.h"
 
-static const char *lowmem = "<Can't print error, not enough memory>";
+const char *error_lowmem = "<Can't print error, not enough memory>";
 
 typedef void (*log_func)(const char *file, int line, const char *func, int priority, const char *message, const char *appendix);
 
@@ -159,7 +159,7 @@ void _log_vwrite(const char *file, int line, const char *func, int do_errno, int
 		message = (const char*)EVBUFFER_DATA(buff);
 	}
 	else
-		message = lowmem;
+		message = error_lowmem;
 
 	log_msg(file, line, func, priority, message, do_errno ? strerror(saved_errno) : NULL);
 

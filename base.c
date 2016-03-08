@@ -301,7 +301,7 @@ static int base_onexit(parser_section *section)
 	}
 
 	if (err)
-		parser_error(section->context, err);
+		parser_error(section->context, "%s", err);
 
 	if (!err)
 		instance.configured = 1;

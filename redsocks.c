@@ -187,7 +187,7 @@ static int redsocks_onexit(parser_section *section)
 	}
 
 	if (err)
-		parser_error(section->context, err);
+		parser_error(section->context, "%s", err);
 
 	return err ? -1 : 0;
 }
