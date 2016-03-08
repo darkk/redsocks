@@ -38,6 +38,10 @@
 
 #define REDSOCKS_RELAY_HALFBUFF  4096
 
+enum pump_state_t {
+	pump_active = -1,
+	pump_MAX = 0,
+};
 
 static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 
@@ -301,6 +305,8 @@ void redsocks_start_relay(redsocks_client *client)
 	if (client->instance->relay_ss->fini)
 		client->instance->relay_ss->fini(client);
 
+	client->state = pump_active;
+
 	client->relay->wm_read.low = 0;
 	client->relay->wm_write.low = 0;
 	client->client->wm_read.low = 0;
@@ -315,9 +321,9 @@ void redsocks_start_relay(redsocks_client *client)
 	client->relay->readcb = redsocks_relay_relayreadcb;
 	client->relay->writecb = redsocks_relay_relaywritecb;
 
-	error = bufferevent_enable(client->client, EV_READ | EV_WRITE);
+	error = bufferevent_enable(client->client, (EV_READ|EV_WRITE) & ~(client->client_evshut));
 	if (!error)
-		error = bufferevent_enable(client->relay, EV_READ | EV_WRITE);
+		error = bufferevent_enable(client->relay, (EV_READ|EV_WRITE) & ~(client->relay_evshut));
 
 	if (!error) {
 		redsocks_log_error(client, LOG_DEBUG, "data relaying started");
@@ -425,7 +431,9 @@ static void redsocks_event_error(struct bufferevent *buffev, short what, void *_
 
 		redsocks_shutdown(client, buffev, SHUT_RD);
 
-		if (antiev != NULL && EVBUFFER_LENGTH(antiev->output) == 0)
+		// If the client has already sent EOF and the pump is not active
+		// (relay is activating), the code should not shutdown write-pipe.
+		if (client->state == pump_active && antiev != NULL && EVBUFFER_LENGTH(antiev->output) == 0)
 			redsocks_shutdown(client, antiev, SHUT_WR);
 	}
 	else {
