@@ -528,7 +528,7 @@ int parser_run(parser_context *context)
 					for (e = section->entries; e->key; e++)
 						if (strcmp(e->key, key_token) == 0)
 							break;
-					if (e) {
+					if (e->key) {
 						if ( (value_parser_by_type[e->type])(context, e->addr, value_token) == -1 )
 							parser_error(context, "value can't be parsed");
 					}
