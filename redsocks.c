@@ -634,7 +634,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		if (errno == ENFILE || errno == EMFILE || errno == ENOBUFS || errno == ENOMEM) {
 			self->accept_backoff_ms = (self->accept_backoff_ms << 1) + 1;
 			clamp_value(self->accept_backoff_ms, self->config.min_backoff_ms, self->config.max_backoff_ms);
-			int delay = (random() % self->accept_backoff_ms) + 1;
+			int delay = (red_randui32() % self->accept_backoff_ms) + 1;
 			log_errno(LOG_WARNING, "accept: out of file descriptors, backing off for %u ms", delay);
 			struct timeval tvdelay = { delay / 1000, (delay % 1000) * 1000 };
 			if (tracked_event_del(&self->listener) != 0)

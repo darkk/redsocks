@@ -48,14 +48,6 @@ static void terminate(int sig, short what, void *_arg)
 		log_error(LOG_WARNING, "event_loopbreak");
 }
 
-static void red_srand()
-{
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	// using tv_usec is a bit less predictable than tv_sec
-	srand(tv.tv_sec*1000000+tv.tv_usec);
-}
-
 int main(int argc, char **argv)
 {
 	int error;
@@ -66,7 +58,7 @@ int main(int argc, char **argv)
 	int opt;
 	int i;
 
-	red_srand();
+	evutil_secure_rng_init();
 	while ((opt = getopt(argc, argv, "h?vtc:p:")) != -1) {
 		switch (opt) {
 		case 't':

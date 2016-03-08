@@ -90,6 +90,13 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
 	return pktlen;
 }
 
+uint32_t red_randui32()
+{
+	uint32_t ret;
+	evutil_secure_rng_get_bytes(&ret, sizeof(ret));
+	return ret;
+}
+
 time_t redsocks_time(time_t *t)
 {
 	time_t retval;

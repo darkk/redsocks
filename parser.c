@@ -319,7 +319,7 @@ static int vp_in_addr(parser_context *context, void *addr, const char *token)
 			struct sockaddr_in *resolved_addr;
 			for (iter = ainfo, count = 0; iter; iter = iter->ai_next, ++count)
 				;
-			taken = rand() % count;
+			taken = red_randui32() % count;
 			for (iter = ainfo; taken > 0; iter = iter->ai_next, --taken)
 				;
 			resolved_addr = (struct sockaddr_in*)iter->ai_addr;
