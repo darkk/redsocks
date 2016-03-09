@@ -9,7 +9,7 @@ VERSION := 0.65
 
 LIBS := -levent
 CFLAGS +=-fPIC -O3
-override CFLAGS += -std=gnu99 -Wall
+override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
 #LDFLAGS += -fwhole-program
 ifdef USE_CRYPTO_POLARSSL
 override LIBS += -lpolarssl

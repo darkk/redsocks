@@ -63,14 +63,6 @@ static void dump_handler(int sig, short what, void *_arg)
     }
 }
 
-static void red_srand()
-{
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	// using tv_usec is a bit less predictable than tv_sec
-	srand(tv.tv_sec*1000000+tv.tv_usec);
-}
-
 /* Setup signals not to be handled with libevent */
 static int setup_signals()
 {
@@ -101,7 +93,7 @@ int main(int argc, char **argv)
 	int opt;
 	int i;
 
-	red_srand();
+	evutil_secure_rng_init();
 	while ((opt = getopt(argc, argv, "h?vtc:p:")) != -1) {
 		switch (opt) {
 		case 't':
@@ -135,7 +127,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	parser_context* parser = parser_start(f, NULL);
+	parser_context* parser = parser_start(f);
 	if (!parser) {
 		perror("Not enough memory for parser");
 		return EXIT_FAILURE;

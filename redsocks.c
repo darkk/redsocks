@@ -38,6 +38,7 @@
 #include "base.h"
 #include "redsocks.h"
 #include "utils.h"
+#include "libevent-compat.h"
 
 
 #define REDSOCKS_RELAY_HALFBUFF 1024*32
@@ -246,6 +247,11 @@ void redsocks_touch_client(redsocks_client *client)
     redsocks_time(&client->last_event);
 }
 
+static inline const char* bufname(redsocks_client *client, struct bufferevent *buf)
+{
+	assert(buf == client->client || buf == client->relay);
+	return buf == client->client ? "client" : "relay";
+}
 
 static void redsocks_relay_readcb(redsocks_client *client, struct bufferevent *from, struct bufferevent *to)
 {

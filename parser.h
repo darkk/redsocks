@@ -38,12 +38,14 @@ struct parser_section_t {
 
 
 
-typedef void (*parser_errhandler)(const char *errmsg, int line);
-
-parser_context* parser_start(FILE *fd, parser_errhandler errhandler);
+parser_context* parser_start(FILE *fd);
 void parser_add_section(parser_context *context, parser_section *section);
 int parser_run(parser_context *context);
-void parser_error(parser_context *context, const char *msg);
+void parser_error(parser_context *context, const char *fmt, ...)
+#if defined(__GNUC__)
+	__attribute__ (( format (printf, 2, 3) ))
+#endif
+;
 void parser_stop(parser_context *context);
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

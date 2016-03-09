@@ -20,7 +20,7 @@ Transocks[3] is alike project but it has noticable performance penality.
 Transsocks_ev[4] is alike project too, but it has no HTTPS-proxy support
 and does not support authentication.
 
-Several Andoird apps also use redsocks under-the-hood: ProxyDroid[5][6] and
+Several Android apps also use redsocks under-the-hood: ProxyDroid[5][6] and
 sshtunnel[7][8]. And that's over 100'000 downloads! Wow!
 
 [1] http://www.torproject.org
@@ -80,6 +80,16 @@ License
 
 All source code is licensed under Apache 2.0 license.
 You can get a copy at http://www.apache.org/licenses/LICENSE-2.0.html
+
+
+Packages
+========
+ * Archlinux: https://aur.archlinux.org/packages.php?ID=41765
+ * Debian: http://packages.debian.org/search?searchon=names&keywords=redsocks
+ * Gentoo (pentoo overlay): https://code.google.com/p/pentoo/source/browse/portage/trunk/net-proxy/redsocks
+ * Gentoo (theebuilds overlay): http://code.google.com/p/theebuilds/source/browse/trunk/net-misc/redsocks
+ * Gentoo (zugaina overlay): http://gpo.zugaina.org/net-proxy/redsocks
+ * Ubuntu: http://packages.ubuntu.com/search?searchon=names&keywords=redsocks
 
 
 Compilation

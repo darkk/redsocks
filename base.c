@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -62,6 +63,11 @@ typedef struct base_instance_t {
 	bool log_debug;
 	bool log_info;
 	bool daemon;
+#if defined(TCP_KEEPIDLE) && defined(TCP_KEEPCNT) && defined(TCP_KEEPINTVL)
+	uint16_t tcp_keepalive_time;
+	uint16_t tcp_keepalive_probes;
+	uint16_t tcp_keepalive_intvl;
+#endif
 } base_instance;
 
 static base_instance instance = {
@@ -241,6 +247,26 @@ int getdestaddr(int fd, const struct sockaddr_in *client, const struct sockaddr_
 	return instance.redirector->getdestaddr(fd, client, bindaddr, destaddr);
 }
 
+int apply_tcp_keepalive(int fd)
+{
+	struct { int level, option, value; } opt[] = {
+		{ SOL_SOCKET, SO_KEEPALIVE, 1 },
+		{ IPPROTO_TCP, TCP_KEEPIDLE, instance.tcp_keepalive_time },
+		{ IPPROTO_TCP, TCP_KEEPCNT, instance.tcp_keepalive_probes },
+		{ IPPROTO_TCP, TCP_KEEPINTVL, instance.tcp_keepalive_intvl },
+	};
+	for (int i = 0; i < SIZEOF_ARRAY(opt); ++i) {
+		if (opt[i].value) {
+			int error = setsockopt(fd, opt[i].level, opt[i].option, &opt[i].value, sizeof(opt[i].value));
+			if (error) {
+				log_errno(LOG_WARNING, "setsockopt(%d, %d, %d, &%d, %zu)", fd, opt[i].level, opt[i].option, opt[i].value, sizeof(opt[i].value));
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
 static redirector_subsys redirector_subsystems[] =
 {
 #ifdef __FreeBSD__
@@ -268,6 +294,11 @@ static parser_entry base_entries[] =
 	{ .key = "log_debug",  .type = pt_bool,    .addr = &instance.log_debug },
 	{ .key = "log_info",   .type = pt_bool,    .addr = &instance.log_info },
 	{ .key = "daemon",     .type = pt_bool,    .addr = &instance.daemon },
+#if defined(TCP_KEEPIDLE) && defined(TCP_KEEPCNT) && defined(TCP_KEEPINTVL)
+	{ .key = "tcp_keepalive_time",   .type = pt_uint16, .addr = &instance.tcp_keepalive_time },
+	{ .key = "tcp_keepalive_probes", .type = pt_uint16, .addr = &instance.tcp_keepalive_probes },
+	{ .key = "tcp_keepalive_intvl",  .type = pt_uint16, .addr = &instance.tcp_keepalive_intvl },
+#endif
 	{ }
 };
 
@@ -302,7 +333,7 @@ static int base_onexit(parser_section *section)
 	}
 
 	if (err)
-		parser_error(section->context, err);
+		parser_error(section->context, "%s", err);
 
 	if (!err)
 		instance.configured = 1;

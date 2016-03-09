@@ -20,6 +20,12 @@ struct sockaddr_in;
 #endif
 
 
+#ifdef __GNUC__
+#define member_type(type, member) __typeof(((type *)0)->member)
+#else
+#define member_type(type, member) const void
+#endif
+
 /**
  * container_of - cast a member of a structure out to the containing structure
  * @ptr:	the pointer to the member.
@@ -27,9 +33,11 @@ struct sockaddr_in;
  * @member:	the name of the member within the struct.
  *
  */
-#define container_of(ptr, type, member) ({			\
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-	(type *)( (char *)__mptr - offsetof(type,member) );})
+#define container_of(ptr, type, member) \
+	((type *)( \
+		(char *)(member_type(type, member) *){ ptr } - offsetof(type, member) \
+	))
+
 
 #define clamp_value(value, min_val, max_val) do { \
        if (value < min_val) \
@@ -39,6 +47,7 @@ struct sockaddr_in;
 } while (0)
 
 
+uint32_t red_randui32();
 time_t redsocks_time(time_t *t);
 char *redsocks_evbuffer_readline(struct evbuffer *buf);
 struct bufferevent* red_connect_relay_if(const char *ifname,

@@ -38,7 +38,6 @@ struct parser_context_t {
 	parser_section *sections;
 	int line;
 	int error;
-	parser_errhandler errhandler;
 	struct {
 		size_t size;
 		size_t filled;
@@ -47,22 +46,33 @@ struct parser_context_t {
 };
 
 
-void parser_error(parser_context *context, const char *msg)
+void parser_error(parser_context *context, const char *fmt, ...)
 {
-	context->error = 1;
-	if (context->errhandler)
-		context->errhandler(msg, context->line);
+	va_list ap;
+	struct evbuffer *buff = evbuffer_new();
+	const char *msg;
+
+	va_start(ap, fmt);
+	if (buff) {
+		evbuffer_add_vprintf(buff, fmt, ap);
+		msg = (const char*)EVBUFFER_DATA(buff);
+	}
 	else
-		fprintf(stderr, "file parsing error at line %u: %s\n", context->line, msg);
+		msg = "<Can't print error, not enough memory>";
+	va_end(ap);
+
+	context->error = 1;
+	fprintf(stderr, "file parsing error at line %u: %s\n", context->line, msg);
+	if (buff)
+		evbuffer_free(buff);
 }
 
-parser_context* parser_start(FILE *fd, parser_errhandler errhandler)
+parser_context* parser_start(FILE *fd)
 {
 	parser_context *ret = calloc(1, sizeof(parser_context));
 	if (!ret)
 		return NULL;
 	ret->fd = fd;
-	ret->errhandler = errhandler;
 	ret->buffer.size = 128; // should be big enough to fetch whole ``line``
 	ret->buffer.data = malloc(ret->buffer.size);
 	if (!ret->buffer.data) {
@@ -309,7 +319,7 @@ static int vp_in_addr(parser_context *context, void *addr, const char *token)
 			struct sockaddr_in *resolved_addr;
 			for (iter = ainfo, count = 0; iter; iter = iter->ai_next, ++count)
 				;
-			taken = rand() % count;
+			taken = red_randui32() % count;
 			for (iter = ainfo; taken > 0; iter = iter->ai_next, --taken)
 				;
 			resolved_addr = (struct sockaddr_in*)iter->ai_addr;
@@ -322,9 +332,9 @@ static int vp_in_addr(parser_context *context, void *addr, const char *token)
 		}
 		else {
 			if (err == EAI_SYSTEM)
-				parser_error(context, strerror(errno));
+				parser_error(context, "unable to resolve %s, error %d (%s)", token, errno, strerror(errno));
 			else
-				parser_error(context, gai_strerror(err));
+				parser_error(context, "unable to resolve %s, getaddrinfo error %d (%s)", token, err, gai_strerror(err));
 			return -1;
 		}
 	}
@@ -528,12 +538,12 @@ int parser_run(parser_context *context)
 					for (e = section->entries; e->key; e++)
 						if (strcmp(e->key, key_token) == 0)
 							break;
-					if (e) {
+					if (e->key) {
 						if ( (value_parser_by_type[e->type])(context, e->addr, value_token) == -1 )
 							parser_error(context, "value can't be parsed");
 					}
 					else {
-						parser_error(context, "assignment with unknown key");
+						parser_error(context, "assignment with unknown key <%s>", key_token);
 					}
 				}
 				else {

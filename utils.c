@@ -24,8 +24,10 @@
 #include <arpa/inet.h>
 #include "main.h"
 #include "log.h"
+#include "base.h"
 #include "utils.h"
 #include "redsocks.h" // for redsocks_close
+#include "libc-compat.h"
 
 #ifndef IP_ORIGDSTADDR
 #define IP_ORIGDSTADDR 20
@@ -92,6 +94,13 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
     }
 
     return pktlen;
+}
+
+uint32_t red_randui32()
+{
+	uint32_t ret;
+	evutil_secure_rng_get_bytes(&ret, sizeof(ret));
+	return ret;
 }
 
 time_t redsocks_time(time_t *t)
@@ -162,6 +171,9 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
         log_errno(LOG_ERR, "bufferevent_enable");
         goto fail;
     }
+
+    if (apply_tcp_keepalive(relay_fd))
+        goto fail;
 
 //  error = bufferevent_socket_connect(retval, (struct sockaddr*)addr, sizeof(*addr));
 //  if (error) {
@@ -236,6 +248,9 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
         goto fail;
     }
     bufferevent_set_timeouts(retval, NULL, timeout_write);
+
+    if (apply_tcp_keepalive(relay_fd))
+        goto fail;
 
 //  error = bufferevent_socket_connect(retval, (struct sockaddr*)addr, sizeof(*addr));
 //  if (error) {

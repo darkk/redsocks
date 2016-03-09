@@ -39,13 +39,7 @@
 #include "main.h"
 #include "redsocks.h"
 #include "redudp.h"
-
-/* Just in case the IP_TRANSPARENT define isn't included somehow */
-#if !defined(IP_TRANSPARENT)
-#define IP_TRANSPARENT 19
-#define IP_ORIGDSTADDR       20
-#define IP_RECVORIGDSTADDR   IP_ORIGDSTADDR
-#endif
+#include "libc-compat.h"
 
 #define DEFAULT_MAX_PKTQUEUE  5
 #define DEFAULT_UDP_TIMEOUT   30
