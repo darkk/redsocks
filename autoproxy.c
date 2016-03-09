@@ -476,6 +476,7 @@ static void auto_drop_relay(redsocks_client *client)
         redsocks_close(fd);
         client->relay = NULL;
     }
+    client->relay_evshut = 0;
     client->relay_connected = 0;
 }
 

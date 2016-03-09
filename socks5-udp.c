@@ -93,7 +93,7 @@ static void socks5_client_fini(redudp_client *client)
 		close(fd);
 	}
     if (socks5client->relay) {
-        fd = EVENT_FD(&socks5client->relay->ev_read);
+        fd = bufferevent_getfd(socks5client->relay);
         bufferevent_free(socks5client->relay);
         shutdown(fd, SHUT_RDWR);
         close(fd);

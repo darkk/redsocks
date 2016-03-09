@@ -63,11 +63,13 @@ typedef enum tcpdns_state_t {
  */
 static void tcpdns_drop_request(dns_request * req)
 {
+    int fd;
     tcpdns_log_error(LOG_DEBUG, "dropping request");
     if (req->resolver)
     {
-        close(bufferevent_getfd(req->resolver)); 
+        fd = bufferevent_getfd(req->resolver);
         bufferevent_free(req->resolver);
+        close(fd);
     }
 
     if (req->delay && req->state != STATE_RESPONSE_SENT)
