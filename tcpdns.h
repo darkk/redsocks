@@ -7,7 +7,7 @@ typedef struct tcpdns_config_t {
 	struct sockaddr_in udpdns2_addr;
 	struct sockaddr_in tcpdns1_addr;
 	struct sockaddr_in tcpdns2_addr;
-	int timeout; /* timeout value for DNS response*/
+	uint16_t timeout; /* timeout value for DNS response*/
 } tcpdns_config;
 
 typedef struct tcpdns_instance_t {

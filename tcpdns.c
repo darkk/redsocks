@@ -130,7 +130,7 @@ static void tcpdns_connected(struct bufferevent *buffev, void *_arg)
 {
     dns_request * req = _arg;
     assert(buffev == req->resolver);
-    struct timeval tv;    
+    struct timeval tv, tv2;
 
     if (!red_is_socket_connected_ok(buffev)) 
     {
@@ -140,6 +140,7 @@ static void tcpdns_connected(struct bufferevent *buffev, void *_arg)
     }
 
     if (req->state != STATE_NEW)
+        // Nothing to write
         return;
 
     // Write dns request to DNS resolver and shutdown connection
@@ -155,9 +156,19 @@ static void tcpdns_connected(struct bufferevent *buffev, void *_arg)
     // Set timeout for read with time left since connection setup.
     gettimeofday(&tv, 0);
     timersub(&tv, &req->req_time, &tv);
-    bufferevent_set_timeouts(buffev, &tv, NULL);
-    bufferevent_enable(buffev, EV_READ);
-    req->state = STATE_REQUEST_SENT;
+    tv2.tv_sec = DEFAULT_TIMEOUT_SECONDS;
+    tv2.tv_usec = 0;
+    if (req->instance->config.timeout > 0)
+        tv2.tv_sec = req->instance->config.timeout;
+    timersub(&tv2, &tv, &tv);
+    if (tv.tv_sec >=0) {
+        bufferevent_set_timeouts(buffev, &tv, NULL);
+        bufferevent_enable(buffev, EV_READ);
+        req->state = STATE_REQUEST_SENT;
+    }
+    else {
+        tcpdns_drop_request(req);
+    }
 }
 
 
