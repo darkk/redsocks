@@ -401,7 +401,7 @@ static int tcpdns_onexit(parser_section *section)
         err = "At least one TCP DNS resolver must be configured.";
 
     if (err)
-        parser_error(section->context, err);
+        parser_error(section->context, "%s", err);
     else
         list_add(&instance->list, &instances);
 

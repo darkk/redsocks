@@ -118,7 +118,7 @@ static int autoproxy_onexit(parser_section *section)
         err = "Timeout value for quick check can not be 0. Default: 3";
 
     if (err)
-        parser_error(section->context, err);
+        parser_error(section->context, "%s", err);
     else
         // Add config to config list
         list_add(&config->list, &configs);

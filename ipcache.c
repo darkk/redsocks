@@ -117,7 +117,7 @@ static int cache_onexit(parser_section *section)
         err = "Time to stale cache item must be equal or greater than 5 seconds.";
 
     if (err)
-        parser_error(section->context, err);
+        parser_error(section->context, "%s", err);
 
     return err ? -1 : 0;
 }
