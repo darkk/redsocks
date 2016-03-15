@@ -6,6 +6,7 @@
 typedef struct app_subsys_t {
 	int (*init)();
 	int (*fini)();
+	void (*dump)();// Allow subsystem to dump information
 	parser_section* conf_section;
 } app_subsys;
 
@@ -13,6 +14,7 @@ typedef struct app_subsys_t {
 #define FOREACH(ptr, array)      for (ptr = array; ptr < array + SIZEOF_ARRAY(array); ptr++)
 #define FOREACH_REV(ptr, array)  for (ptr = array + SIZEOF_ARRAY(array) - 1; ptr >= array; ptr--)
 
+struct event_base * get_event_base();
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */

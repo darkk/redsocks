@@ -14,6 +14,7 @@
  * under the License.
  */
 
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -35,8 +36,8 @@
 # include <net/if.h>
 # include <net/pfvar.h>
 # include <sys/ioctl.h>
-# include <errno.h>
 #endif
+# include <errno.h>
 #include "log.h"
 #include "main.h"
 #include "parser.h"
@@ -440,7 +441,7 @@ static int base_init()
 			exit(EXIT_SUCCESS);
 		}
 	}
-
+    
 	log_open(); // child has nothing to do with TTY
 
 	if (instance.daemon) {

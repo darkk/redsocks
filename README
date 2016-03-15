@@ -1,3 +1,7 @@
+This is a enhanced version of original redsocks.
+
+The content below is from original redsocks project.
+---------------------------------------------------------------------
 This tool allows you to redirect any TCP connection to SOCKS or HTTPS
 proxy using your firewall, so redirection is system-wide.
 

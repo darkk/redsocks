@@ -33,6 +33,7 @@
 #include "utils.h"
 
 #define HTTP_HEAD_WM_HIGH (4096)
+#define MAX_HTTP_REQUEST_LINE_LENGTH 4095
 
 typedef enum httpr_state_t {
 	httpr_new,
@@ -60,7 +61,7 @@ typedef struct httpr_client_t {
 extern const char *auth_request_header;
 extern const char *auth_response_header;
 
-static void httpr_connect_relay(redsocks_client *client);
+static int httpr_connect_relay(redsocks_client *client);
 
 static int httpr_buffer_init(httpr_buffer *buff)
 {
@@ -176,7 +177,6 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 
 						dropped = 1;
 					} else {
-						free(line);
 						char *auth_request = get_auth_request_header(buffev->input);
 
 						if (!auth_request) {
@@ -184,6 +184,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 							redsocks_drop_client(client);
 							dropped = 1;
 						} else {
+							free(line);
 							free(auth->last_auth_query);
 							char *ptr = auth_request;
 
@@ -205,8 +206,9 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 							}
 
 							/* close relay tunnel */
-							redsocks_close(EVENT_FD(&client->relay->ev_write));
+							int fd = bufferevent_getfd(client->relay);
 							bufferevent_free(client->relay);
+							redsocks_close(fd);
 
 							/* set to initial state*/
 							client->state = httpr_recv_request_headers;
@@ -340,6 +342,8 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 			len |= bufferevent_write(client->relay, " ", 1);
 			len |= bufferevent_write(client->relay, auth_string, strlen(auth_string));
 			len |= bufferevent_write(client->relay, "\r\n", 2);
+			free(auth_string);
+			auth_string = NULL;
 			if (len) {
 				redsocks_log_errno(client, LOG_ERR, "bufferevent_write");
 				redsocks_drop_client(client);
@@ -347,7 +351,6 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 			}
 		}
 
-		free(auth_string);
 
 		len = bufferevent_write(client->relay, httpr->client_buffer.buff, httpr->client_buffer.len);
 		if (len < 0) {
@@ -371,7 +374,7 @@ static int httpr_append_header(redsocks_client *client, char *line)
 
 	if (httpr_buffer_append(&httpr->client_buffer, line, strlen(line)) != 0)
 		return -1;
-	if (httpr_buffer_append(&httpr->client_buffer, "\x0d\x0a", 2) != 0)
+	if (httpr_buffer_append(&httpr->client_buffer, "\r\n", 2) != 0)
 		return -1;
 	return 0;
 }
@@ -397,43 +400,44 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 	httpr_client *httpr = (void*)(client + 1);
 	char *uri = NULL;
 	char *host = httpr->has_host ? httpr->host : fmt_http_host(client->destaddr);
+	static char nbuff[MAX_HTTP_REQUEST_LINE_LENGTH + 1];
+	size_t len = 0;
 
 	assert(httpr->firstline);
 
+	if (strlen(httpr->firstline) + strlen(host) + 7 + 2 > MAX_HTTP_REQUEST_LINE_LENGTH) {
+		redsocks_log_error(client, LOG_NOTICE, "HTTP request line too line!");
+		goto fail;
+	}
+
 	uri = strchr(httpr->firstline, ' ');
 	if (uri)
-		uri += 1; // one char further
+		while (*uri == ' ')
+			uri += 1; // one char further
 	else {
 		redsocks_log_error(client, LOG_NOTICE, "malformed request came");
 		goto fail;
 	}
 
-	httpr_buffer nbuff;
-	if (httpr_buffer_init(&nbuff) != 0) {
-		redsocks_log_error(client, LOG_ERR, "httpr_buffer_init");
-		goto fail;
+	memcpy(&nbuff[0], httpr->firstline, uri - httpr->firstline);
+	len = uri - httpr->firstline;
+	if (*uri == '/') {
+		memcpy(&nbuff[len], "http://", 7);
+		len += 7;
+		memcpy(&nbuff[len], host, strlen(host));
+		len += strlen(host);
 	}
-
-	if (httpr_buffer_append(&nbuff, httpr->firstline, uri - httpr->firstline) != 0)
-		goto addition_fail;
-	if (httpr_buffer_append(&nbuff, "http://", 7) != 0)
-		goto addition_fail;
-	if (httpr_buffer_append(&nbuff, host, strlen(host)) != 0)
-		goto addition_fail;
-	if (httpr_buffer_append(&nbuff, uri, strlen(uri)) != 0)
-		goto addition_fail;
-	if (httpr_buffer_append(&nbuff, "\x0d\x0a", 2) != 0)
-		goto addition_fail;
+	memcpy(&nbuff[len], uri, strlen(uri));
+	len += strlen(uri);
+	memcpy(&nbuff[len], "\r\n", 3); // Including NULL terminator
+	len += 3;
 
 	free(httpr->firstline);
 
-	httpr->firstline = calloc(nbuff.len + 1, 1);
-	strcpy(httpr->firstline, nbuff.buff);
-	httpr_buffer_fini(&nbuff);
+	httpr->firstline = calloc(len, 1);
+	strcpy(httpr->firstline, &nbuff[0]);
 	return 0;
 
-addition_fail:
-	httpr_buffer_fini(&nbuff);
 fail:
 	redsocks_log_error(client, LOG_ERR, "httpr_toss_http_firstline");
 	return -1;
@@ -554,7 +558,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 	}
 }
 
-static void httpr_connect_relay(redsocks_client *client)
+static int httpr_connect_relay(redsocks_client *client)
 {
 	int error;
 
@@ -564,6 +568,7 @@ static void httpr_connect_relay(redsocks_client *client)
 		redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
 		redsocks_drop_client(client);
 	}
+    return error;
 }
 
 relay_subsys http_relay_subsys =

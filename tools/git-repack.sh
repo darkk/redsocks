@@ -3,9 +3,9 @@
 set -o errexit
 set -o xtrace
 
-user="darkk"
+user="semigodking"
 proj="redsocks"
-versions="0.1 0.2 0.3 0.4"
+versions="0.1 0.2 0.3 0.4 0.51 0.60 0.65"
 
 for file in `python -c "import urllib2, json; print '\n'.join(d['name'] for d in json.load(urllib2.urlopen('https://api.github.com/repos/${user}/${proj}/downloads')))"`; do
     touch "$file.uploaded"

@@ -50,26 +50,34 @@ struct sockaddr_in;
 uint32_t red_randui32();
 time_t redsocks_time(time_t *t);
 char *redsocks_evbuffer_readline(struct evbuffer *buf);
-struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg);
+struct bufferevent* red_connect_relay_if(const char *ifname,
+                                struct sockaddr_in *addr,
+                                evbuffercb readcb,
+                                evbuffercb writecb,
+                                everrorcb errorcb,
+                                void *cbarg);
+struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb readcb, evbuffercb writecb, everrorcb errorcb, void *cbarg);
+struct bufferevent* red_connect_relay2(struct sockaddr_in *addr, evbuffercb readcb, evbuffercb writecb, everrorcb errorcb, void *cbarg, const struct timeval *timeout_write);
 int red_socket_geterrno(struct bufferevent *buffev);
 int red_is_socket_connected_ok(struct bufferevent *buffev);
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *fromaddr, struct sockaddr_in *toaddr);
 
-int fcntl_nonblock(int fd);
+size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, size_t skip);
 
-#define event_fmt_str "%s|%s|%s|%s|%s|0x%x"
+#define event_fmt_str "%s|%s|%s|%s|%s|%s|0x%x"
 #define event_fmt(what) \
-				(what) & EVBUFFER_READ ? "EVBUFFER_READ" : "0", \
-				(what) & EVBUFFER_WRITE ? "EVBUFFER_WRITE" : "0", \
-				(what) & EVBUFFER_EOF ? "EVBUFFER_EOF" : "0", \
-				(what) & EVBUFFER_ERROR ? "EVBUFFER_ERROR" : "0", \
-				(what) & EVBUFFER_TIMEOUT ? "EVBUFFER_TIMEOUT" : "0", \
-				(what) & ~(EVBUFFER_READ|EVBUFFER_WRITE|EVBUFFER_EOF|EVBUFFER_ERROR|EVBUFFER_TIMEOUT)
+				(what) & BEV_EVENT_READING ? "READING" : "0", \
+				(what) & BEV_EVENT_WRITING ? "WRITING" : "0", \
+				(what) & BEV_EVENT_EOF ? "EOF" : "0", \
+				(what) & BEV_EVENT_ERROR ? "ERROR" : "0", \
+				(what) & BEV_EVENT_TIMEOUT ? "TIMEOUT" : "0", \
+				(what) & BEV_EVENT_CONNECTED ? "CONNECTED" : "0", \
+				(what) & ~(BEV_EVENT_READING|BEV_EVENT_WRITING|BEV_EVENT_EOF|BEV_EVENT_ERROR|BEV_EVENT_TIMEOUT|BEV_EVENT_CONNECTED)
 
 #if INET6_ADDRSTRLEN < INET_ADDRSTRLEN
 #	error Impossible happens: INET6_ADDRSTRLEN < INET_ADDRSTRLEN
 #else
-#	define RED_INET_ADDRSTRLEN (INET6_ADDRSTRLEN + 1 + 5 + 1) // addr + : + port + \0
+#	define RED_INET_ADDRSTRLEN (1 + INET6_ADDRSTRLEN + 1 + 1 + 5 + 1) // [ + addr + ] + : + port + \0
 #endif
 char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_size);
 

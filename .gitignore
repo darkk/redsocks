@@ -1,5 +1,6 @@
 *.o
 config.h
 tags
-redsocks
+redsocks2
+gen/
 .depend

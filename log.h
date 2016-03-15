@@ -5,13 +5,14 @@
 #include <stdbool.h>
 #include <syslog.h>
 
+#define MAX_LOG_LENGTH 512
+
 #define log_errno(prio, msg...) _log_write(__FILE__, __LINE__, __func__, 1, prio, ## msg)
 #define log_error(prio, msg...) _log_write(__FILE__, __LINE__, __func__, 0, prio, ## msg)
 
-extern const char *error_lowmem;
-
 int log_preopen(const char *dst, bool log_debug, bool log_info);
 void log_open();
+int log_level_enabled(int priority);
 
 void _log_vwrite(const char *file, int line, const char *func, int do_errno, int priority, const char *fmt, va_list ap);
 

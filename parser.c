@@ -58,7 +58,7 @@ void parser_error(parser_context *context, const char *fmt, ...)
 		msg = (const char*)EVBUFFER_DATA(buff);
 	}
 	else
-		msg = error_lowmem;
+		msg = "<Can't print error, not enough memory>";
 	va_end(ap);
 
 	context->error = 1;

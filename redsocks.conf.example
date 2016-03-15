@@ -1,5 +1,5 @@
 base {
-	// debug: connection progress
+	// debug: connection progress & client list on SIGUSR1
 	log_debug = off;
 
 	// info: start and end of client session
@@ -65,14 +65,33 @@ redsocks {
 	// `ip' and `port' are IP and tcp-port of proxy-server
 	// You can also use hostname instead of IP, only one (random)
 	// address of multihomed host will be used.
+	// The two fields are meaningless when proxy type is 'direct'.
 	ip = example.org;
 	port = 1080;
 
-
 	// known types: socks4, socks5, http-connect, http-relay
+	// New types: direct, shadowsocks
 	type = socks5;
 
-	// login = "foobar";
+    // Specify interface for outgoing connections when 'direct' type
+    // is used. This is useful when you have multiple connections to
+    // internet or you have VPN connections.
+    // interface = tun0;
+
+	// Change this parameter to 1 if you want auto proxy feature. 
+	// When autoproxy is set to non-zero, the connection to target
+	// will be made directly first. If direct connection to target
+	// fails for timeout/connection refuse, redsocks will try to
+	// connect to target via the proxy.
+	autoproxy = 0;
+	// timeout is meaningful when 'autoproxy' is non-zero.
+	// It specified timeout value when trying to connect to destination
+	// directly. Default is 10 seconds. When it is set to 0, default
+	// timeout value will be used.
+	timeout = 10;
+
+	// login = "foobar";// field 'login' is reused as encryption
+					   // method of shadowsocks
 	// password = "baz";
 }
 
@@ -86,8 +105,12 @@ redudp {
 	// `ip' and `port' of socks5 proxy server.
 	ip = 10.0.0.1;
 	port = 1080;
-	login = username;
+	login = username;// field 'login' is reused as encryption
+					   // method of shadowsocks
 	password = pazzw0rd;
+
+	// know types: socks5, shadowsocks
+	type = socks5;
 
 	// redsocks knows about two options while redirecting UDP packets at
 	// linux: TPROXY and REDIRECT.  TPROXY requires more complex routing
@@ -100,16 +123,52 @@ redudp {
 	dest_ip = 8.8.8.8;
 	dest_port = 53;
 
+	// Do not set it large if this section is for DNS requests. Otherwise,
+	// you may encounter out of file descriptor problem. For DNS requests,
+	// 10s is adequate.
 	udp_timeout = 30;
-	udp_timeout_stream = 180;
+	// udp_timeout_stream = 180;
 }
 
-dnstc {
-	// fake and really dumb DNS server that returns "truncated answer" to
-	// every query via UDP, RFC-compliant resolver should repeat same query
-	// via TCP in this case.
-	local_ip = 127.0.0.1;
-	local_port = 5300;
+tcpdns {
+	// Transform UDP DNS requests into TCP DNS requests.
+	// You can also redirect connections to external TCP DNS server to
+	// REDSOCKS transparent proxy via iptables.
+	local_ip = 192.168.1.1; // Local server to act as DNS server
+	local_port = 1053;      // UDP port to receive UDP DNS requests
+	tcpdns1 = 8.8.4.4;      // DNS server that supports TCP DNS requests
+	tcpdns2 = 8.8.8.8;      // DNS server that supports TCP DNS requests
+	timeout = 4;            // Timeout value for TCP DNS requests
+}
+
+autoproxy {
+    no_quick_check_seconds = 60; // Directly relay traffic to proxy if an IP
+                                 // is found blocked in cache and it has been
+                                 // added into cache no earlier than this
+                                 // specified number of seconds.
+                                 // Set it to 0 if you do not want to perform
+                                 // quick check when an IP is found in blocked
+                                 // IP cache, thus the connection will be
+                                 // redirected to proxy immediately.
+    quick_connect_timeout = 3;   // Timeout value when performing quick
+                                 // connection check if an IP is found blocked
+                                 // in cache.
+}
+
+ipcache {
+    // Configure IP cache
+    cache_size = 4;   // Maximum number of IP's in 1K. 
+    stale_time = 900; // Seconds to stale an IP in cache since it is added
+                      // into cahce.
+                      // Set it to 0 to disable cache stale.
+    port_check = 1;   // Whether to distinguish port number in address
+    cache_file = "/tmp/ipcache.txt"; // File used to store blocked IP's in cache.
+    autosave_interval = 3600; // Interval for saving ip cache into file.
+                              // Set it to 0 to disable autosave.
+    // When autosave_interval and stale_time are both 0, IP cache behaves like
+    // a static blacklist. 
 }
 
 // you can add more `redsocks' and `redudp' sections if you need.
+
+

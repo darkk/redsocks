@@ -23,8 +23,6 @@
 #include "utils.h"
 #include "log.h"
 
-const char *error_lowmem = "<Can't print error, not enough memory>";
-
 typedef void (*log_func)(const char *file, int line, const char *func, int priority, const char *message, const char *appendix);
 
 static void fprint_timestamp(
@@ -65,29 +63,22 @@ static void syslog_msg(const char *file, int line, const char *func, int priorit
 
 static log_func log_msg = stderr_msg;
 static log_func log_msg_next = NULL;
-static bool should_log_info = true;
-static bool should_log_debug = false;
-
-static bool should_log(int priority)
-{
-	return (priority != LOG_DEBUG && priority != LOG_INFO)
-	    || (priority == LOG_DEBUG && should_log_debug)
-	    || (priority == LOG_INFO && should_log_info);
-}
+static int log_mask = LOG_MASK(LOG_NOTICE)|LOG_MASK(LOG_WARNING)|LOG_MASK(LOG_ERR);
 
 int log_preopen(const char *dst, bool log_debug, bool log_info)
 {
 	const char *syslog_prefix = "syslog:";
 	const char *file_prefix = "file:";
-	should_log_debug = log_debug;
-	should_log_info = log_info;
+	if (log_debug)
+		log_mask |= LOG_MASK(LOG_DEBUG);
+	if (log_info)
+		log_mask |= LOG_MASK(LOG_INFO);
 	if (strcmp(dst, "stderr") == 0) {
 		log_msg_next = stderr_msg;
 	}
 	else if (strncmp(dst, syslog_prefix, strlen(syslog_prefix)) == 0) {
 		const char *facility_name = dst + strlen(syslog_prefix);
 		int facility = -1;
-		int logmask;
 		struct {
 			char *name; int value;
 		} *ptpl, tpl[] = {
@@ -114,12 +105,12 @@ int log_preopen(const char *dst, bool log_debug, bool log_info)
 
 		openlog("redsocks", LOG_NDELAY | LOG_PID, facility);
 
-		logmask = setlogmask(0);
+		log_mask = setlogmask(0);
 		if (!log_debug)
-			logmask &= ~(LOG_MASK(LOG_DEBUG));
+			log_mask &= ~(LOG_MASK(LOG_DEBUG));
 		if (!log_info)
-			logmask &= ~(LOG_MASK(LOG_INFO));
-		setlogmask(logmask);
+			log_mask &= ~(LOG_MASK(LOG_INFO));
+		setlogmask(log_mask);
 
 		log_msg_next = syslog_msg;
 	}
@@ -145,33 +136,24 @@ void log_open()
 	log_msg_next = NULL;
 }
 
+int log_level_enabled(int priority)
+{
+    return (log_mask & LOG_MASK(priority));
+}
+
 void _log_vwrite(const char *file, int line, const char *func, int do_errno, int priority, const char *fmt, va_list ap)
 {
-	if (!should_log(priority))
-		return;
-
 	int saved_errno = errno;
-	struct evbuffer *buff = evbuffer_new();
-	const char *message;
+	char message[MAX_LOG_LENGTH+1];
 
-	if (buff) {
-		evbuffer_add_vprintf(buff, fmt, ap);
-		message = (const char*)EVBUFFER_DATA(buff);
-	}
-	else
-		message = error_lowmem;
-
-	log_msg(file, line, func, priority, message, do_errno ? strerror(saved_errno) : NULL);
-
-	if (buff)
-		evbuffer_free(buff);
+	if (!log_level_enabled(priority))
+		return;
+	vsnprintf(&message[0], sizeof(message), fmt, ap);
+	log_msg(file, line, func, priority, &message[0], do_errno ? strerror(saved_errno) : NULL);
 }
 
 void _log_write(const char *file, int line, const char *func, int do_errno, int priority, const char *fmt, ...)
 {
-	if (!should_log(priority))
-		return;
-
 	va_list ap;
 
 	va_start(ap, fmt);
