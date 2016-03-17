@@ -427,6 +427,7 @@ static void redsocks_event_error(struct bufferevent *buffev, short what, void *_
 {
 	redsocks_client *client = _arg;
 	assert(buffev == client->relay || buffev == client->client);
+	const int bakerrno = errno;
 
 	redsocks_touch_client(client);
 
@@ -445,9 +446,18 @@ static void redsocks_event_error(struct bufferevent *buffev, short what, void *_
 			redsocks_shutdown(client, antiev, SHUT_WR);
 	}
 	else {
-		errno = redsocks_socket_geterrno(client, buffev);
-		redsocks_log_errno(client, LOG_NOTICE, "%s error, code " event_fmt_str,
+		const int sockrrno = redsocks_socket_geterrno(client, buffev);
+		const char *errsrc = "";
+		if (sockrrno != -1 && sockrrno != 0) {
+			errno = sockrrno;
+			errsrc = "socket ";
+		} else {
+			errno = bakerrno;
+		}
+		// client errors are logged with LOG_INFO, server errors with LOG_NOTICE
+		redsocks_log_errno(client, (buffev == client->client) ? LOG_INFO : LOG_NOTICE, "%s %serror, code " event_fmt_str,
 				bufname(client, buffev),
+				errsrc,
 				event_fmt(what));
 		redsocks_drop_client(client);
 	}
