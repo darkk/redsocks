@@ -499,7 +499,7 @@ int parser_run(parser_context *context)
 								parser_error(context, "section->onenter failed");
 					}
 					else {
-						parser_error(context, "unknown section");
+						parser_error(context, "unknown section <%s>", section_token);
 					}
 					FREE(section_token);
 				}
