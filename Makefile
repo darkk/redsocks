@@ -39,7 +39,7 @@ gen/version.c: *.c *.h gen/.build
 	if [ -d .git ]; then \
 		echo '"redsocks.git/'`git describe --tags`'"'; \
 		if [ `git status --porcelain | grep -v -c '^??'` != 0 ]; then \
-			echo '"-unclean"'; \
+			echo '"'"-unclean-$$(date --rfc-3339=seconds | tr ' ' 'T')-$${USER}@$$(uname -n)"'"'; \
 		fi \
 	else \
 		echo '"redsocks/$(VERSION)"'; \
