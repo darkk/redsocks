@@ -27,6 +27,21 @@ const char *error_lowmem = "<Can't print error, not enough memory>";
 
 typedef void (*log_func)(const char *file, int line, const char *func, int priority, const char *message, const char *appendix);
 
+static const char* getprioname(int priority)
+{
+	switch (priority) {
+		case LOG_EMERG:   return "emerg";
+		case LOG_ALERT:   return "alert";
+		case LOG_CRIT:    return "crit";
+		case LOG_ERR:     return "err";
+		case LOG_WARNING: return "warning";
+		case LOG_NOTICE:  return "notice";
+		case LOG_INFO:    return "info";
+		case LOG_DEBUG:   return "debug";
+		default:          return "?";
+	}
+}
+
 static void fprint_timestamp(
 		FILE* fd,
 		const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
@@ -36,10 +51,11 @@ static void fprint_timestamp(
 
 	/* XXX: there is no error-checking, IMHO it's better to lose messages
 	 *      then to die and stop service */
+	const char* sprio = getprioname(priority);
 	if (appendix)
-		fprintf(fd, "%lu.%6.6lu %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message, appendix);
+		fprintf(fd, "%lu.%6.6lu %s %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, sprio, file, line, func, message, appendix);
 	else
-		fprintf(fd, "%lu.%6.6lu %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message);
+		fprintf(fd, "%lu.%6.6lu %s %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, sprio, file, line, func, message);
 }
 
 static void stderr_msg(const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
