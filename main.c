@@ -26,14 +26,19 @@
 #include "main.h"
 #include "utils.h"
 #include "version.h"
+#include "config.h"
 
 extern app_subsys redsocks_subsys;
+extern app_subsys debug_subsys;
 extern app_subsys base_subsys;
 extern app_subsys redudp_subsys;
 extern app_subsys dnstc_subsys;
 
 app_subsys *subsystems[] = {
 	&redsocks_subsys,
+#ifdef DBG_BUILD
+	&debug_subsys,
+#endif
 	&base_subsys,
 	&redudp_subsys,
 	&dnstc_subsys,
@@ -118,12 +123,12 @@ int main(int argc, char **argv)
 	if (conftest)
 		return EXIT_SUCCESS;
 
-	event_init();
+	struct event_base* evbase = event_init();
 	memset(terminators, 0, sizeof(terminators));
 
 	FOREACH(ss, subsystems) {
 		if ((*ss)->init) {
-			error = (*ss)->init();
+			error = (*ss)->init(evbase);
 			if (error)
 				goto shutdown;
 		}
@@ -167,7 +172,7 @@ shutdown:
 		if ((*ss)->fini)
 			(*ss)->fini();
 
-	event_base_free(NULL);
+	event_base_free(evbase);
 
 	return !error ? EXIT_SUCCESS : EXIT_FAILURE;
 }

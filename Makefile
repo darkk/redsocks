@@ -1,10 +1,16 @@
+-include make.conf
 OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
+ifeq ($(DBG_BUILD),1)
+OBJS += debug.o
+endif
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks
 VERSION := 0.4
 
+# -levent_extra is required only for `http` and `debug`
+# -levent_core may be used for space reduction
 LIBS := -levent
 CFLAGS += -g -O2
 override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
@@ -29,6 +35,9 @@ $(CONF):
 		echo "/* Unknown system, only generic firewall code is compiled */" >$(CONF) \
 		;; \
 	esac
+ifeq ($(DBG_BUILD),1)
+	echo "#define DBG_BUILD 1" >>$(CONF)
+endif
 
 # Dependency on .git is useful to rebuild `version.c' after commit, but it breaks non-git builds.
 gen/version.c: *.c *.h gen/.build
