@@ -227,7 +227,7 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
 	uint16_t port;
 	const char placeholder[] = "???:???";
 
-	assert(buffer_size >= sizeof(placeholder));
+	assert(buffer_size >= RED_INET_ADDRSTRLEN);
 
 	memset(buffer, 0, buffer_size);
 	if (sa->sin_family == AF_INET) {
