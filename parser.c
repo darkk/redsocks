@@ -55,7 +55,7 @@ void parser_error(parser_context *context, const char *fmt, ...)
 	va_start(ap, fmt);
 	if (buff) {
 		evbuffer_add_vprintf(buff, fmt, ap);
-		msg = (const char*)EVBUFFER_DATA(buff);
+		msg = (const char*)evbuffer_pullup(buff, -1);
 	}
 	else
 		msg = error_lowmem;

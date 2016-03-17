@@ -172,7 +172,7 @@ void _log_vwrite(const char *file, int line, const char *func, int do_errno, int
 
 	if (buff) {
 		evbuffer_add_vprintf(buff, fmt, ap);
-		message = (const char*)EVBUFFER_DATA(buff);
+		message = (const char*)evbuffer_pullup(buff, -1);
 	}
 	else
 		message = error_lowmem;

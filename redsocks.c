@@ -229,7 +229,7 @@ void redsocks_log_write_plain(
 	va_start(ap, orig_fmt);
 	if (fmt) {
 		errno = saved_errno;
-		_log_vwrite(file, line, func, do_errno, priority, (const char*)EVBUFFER_DATA(fmt), ap);
+		_log_vwrite(file, line, func, do_errno, priority, (const char*)evbuffer_pullup(fmt, -1), ap);
 		evbuffer_free(fmt);
 	}
 	va_end(ap);
@@ -248,7 +248,7 @@ static inline const char* bufname(redsocks_client *client, struct bufferevent *b
 
 static void redsocks_relay_readcb(redsocks_client *client, struct bufferevent *from, struct bufferevent *to)
 {
-	if (EVBUFFER_LENGTH(to->output) < to->wm_write.high) {
+	if (evbuffer_get_length(to->output) < to->wm_write.high) {
 		if (bufferevent_write_buffer(to, from->input) == -1)
 			redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
 	}
@@ -266,10 +266,10 @@ static void redsocks_relay_writecb(redsocks_client *client, struct bufferevent *
 	assert(from == client->client || from == client->relay);
 	char from_eof = (from == client->client ? client->client_evshut : client->relay_evshut) & EV_READ;
 
-	if (EVBUFFER_LENGTH(from->input) == 0 && from_eof) {
+	if (evbuffer_get_length(from->input) == 0 && from_eof) {
 		redsocks_shutdown(client, to, SHUT_WR);
 	}
-	else if (EVBUFFER_LENGTH(to->output) < to->wm_write.high) {
+	else if (evbuffer_get_length(to->output) < to->wm_write.high) {
 		if (bufferevent_write_buffer(to, from->input) == -1)
 			redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
 		if (!from_eof && !(bufferevent_get_enabled(from) & EV_READ)) {
@@ -370,7 +370,7 @@ static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffe
 
 	assert(how == SHUT_RD || how == SHUT_WR || how == SHUT_RDWR);
 	assert(buffev == client->client || buffev == client->relay);
-	assert(EVENT_FD(&buffev->ev_read) == EVENT_FD(&buffev->ev_write));
+	assert(event_get_fd(&buffev->ev_read) == event_get_fd(&buffev->ev_write));
 
 	if (how == SHUT_RD) {
 		strhow = "SHUT_RD";
@@ -397,7 +397,7 @@ static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffe
 	// we're either going to abort data flow (bad behaviour) or confirm EOF
 	// and in this case socket is already SHUT_RD'ed
 	if ( !(how == SHUT_RD && (*pevshut & EV_WRITE)) )
-		if (shutdown(EVENT_FD(&buffev->ev_read), how) != 0)
+		if (shutdown(event_get_fd(&buffev->ev_read), how) != 0)
 			redsocks_log_errno(client, LOG_ERR, "shutdown(%s, %s)", strev, strhow);
 
 	redsocks_log_error(client, LOG_DEBUG, "shutdown: bufferevent_disable(%s, %s)", strev, strevhow);
@@ -442,7 +442,7 @@ static void redsocks_event_error(struct bufferevent *buffev, short what, void *_
 
 		// If the client has already sent EOF and the pump is not active
 		// (relay is activating), the code should not shutdown write-pipe.
-		if (client->state == pump_active && antiev != NULL && EVBUFFER_LENGTH(antiev->output) == 0)
+		if (client->state == pump_active && antiev != NULL && evbuffer_get_length(antiev->output) == 0)
 			redsocks_shutdown(client, antiev, SHUT_WR);
 	}
 	else {
@@ -475,7 +475,7 @@ int sizes_greater_equal(size_t a, size_t b)
 
 int redsocks_read_expected(redsocks_client *client, struct evbuffer *input, void *data, size_comparator comparator, size_t expected)
 {
-	size_t len = EVBUFFER_LENGTH(input);
+	size_t len = evbuffer_get_length(input);
 	if (comparator(len, expected)) {
 		int read = evbuffer_remove(input, data, expected);
 		UNUSED(read);
@@ -778,10 +778,10 @@ static void redsocks_debug_dump_instance(redsocks_instance *instance, time_t now
 		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
 		redsocks_log_error(client, LOG_NOTICE, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %li sec, idle: %li sec.",
-			client->client ? EVENT_FD(&client->client->ev_write) : -1,
+			client->client ? event_get_fd(&client->client->ev_write) : -1,
 				client->client ? redsocks_event_str(client->client->enabled) : "NULL",
 				s_client_evshut[0] ? " " : "", s_client_evshut,
-			client->relay ? EVENT_FD(&client->relay->ev_write) : -1,
+			client->relay ? event_get_fd(&client->relay->ev_write) : -1,
 				client->relay ? redsocks_event_str(client->relay->enabled) : "NULL",
 				s_relay_evshut[0] ? " " : "", s_relay_evshut,
 			now - client->first_event,
@@ -884,7 +884,7 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 		if (timerisset(&instance->listener.inserted))
 			if (tracked_event_del(&instance->listener) != 0)
 				log_errno(LOG_WARNING, "event_del");
-		redsocks_close(EVENT_FD(&instance->listener.ev));
+		redsocks_close(event_get_fd(&instance->listener.ev));
 		memset(&instance->listener, 0, sizeof(instance->listener));
 	}
 

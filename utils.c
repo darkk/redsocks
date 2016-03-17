@@ -173,9 +173,9 @@ int red_socket_geterrno(struct bufferevent *buffev)
 	int pseudo_errno;
 	socklen_t optlen = sizeof(pseudo_errno);
 
-	assert(EVENT_FD(&buffev->ev_read) == EVENT_FD(&buffev->ev_write));
+	assert(event_get_fd(&buffev->ev_read) == event_get_fd(&buffev->ev_write));
 
-	error = getsockopt(EVENT_FD(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
+	error = getsockopt(event_get_fd(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
 	if (error) {
 		log_errno(LOG_ERR, "getsockopt");
 		return -1;
