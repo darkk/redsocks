@@ -94,6 +94,9 @@ int redsocks_write_helper(
 #define redsocks_close(fd) redsocks_close_internal((fd), __FILE__, __LINE__, __func__)
 void redsocks_close_internal(int fd, const char* file, int line, const char *func);
 
+// I have to account descriptiors for accept-backoff, that's why BEV_OPT_CLOSE_ON_FREE is not used.
+void redsocks_bufferevent_free(struct bufferevent *buffev);
+
 #define redsocks_log_error(client, prio, msg...) \
 	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 0, &(client)->clientaddr, &(client)->destaddr, prio, ## msg)
 #define redsocks_log_errno(client, prio, msg...) \

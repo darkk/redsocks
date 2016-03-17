@@ -352,15 +352,11 @@ void redsocks_drop_client(redsocks_client *client)
 	if (client->instance->relay_ss->fini)
 		client->instance->relay_ss->fini(client);
 
-	if (client->client) {
-		redsocks_close(EVENT_FD(&client->client->ev_write));
-		bufferevent_free(client->client);
-	}
+	if (client->client)
+		redsocks_bufferevent_free(client->client);
 
-	if (client->relay) {
-		redsocks_close(EVENT_FD(&client->relay->ev_write));
-		bufferevent_free(client->relay);
-	}
+	if (client->relay)
+		redsocks_bufferevent_free(client->relay);
 
 	list_del(&client->list);
 	free(client);
@@ -632,6 +628,14 @@ void redsocks_close_internal(int fd, const char* file, int line, const char *fun
 		const int do_errno = 1;
 		_log_write(file, line, func, do_errno, LOG_WARNING, "close");
 	}
+}
+
+void redsocks_bufferevent_free(struct bufferevent *buffev)
+{
+	int fd = bufferevent_getfd(buffev);
+	bufferevent_setfd(buffev, -1); // to avoid EBADFD warnings from epoll
+	bufferevent_free(buffev);
+	redsocks_close(fd);
 }
 
 static void redsocks_accept_client(int fd, short what, void *_arg)

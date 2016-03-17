@@ -149,6 +149,8 @@ struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb write
 		goto fail;
 	}
 
+	relay_fd = -1;
+
 	error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
 	if (error) {
 		log_errno(LOG_ERR, "bufferevent_enable");
@@ -161,7 +163,7 @@ fail:
 	if (relay_fd != -1)
 		redsocks_close(relay_fd);
 	if (retval)
-		bufferevent_free(retval);
+		redsocks_bufferevent_free(retval);
 	return NULL;
 }
 

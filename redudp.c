@@ -214,21 +214,16 @@ static struct evbuffer* socks5_mkassociate(void *p)
  */
 static void redudp_drop_client(redudp_client *client)
 {
-	int fd;
 	redudp_log_error(client, LOG_INFO, "Dropping...");
 	enqueued_packet *q, *tmp;
 	if (event_initialized(&client->timeout)) {
 		if (event_del(&client->timeout) == -1)
 			redudp_log_errno(client, LOG_ERR, "event_del");
 	}
-	if (client->relay) {
-		fd = EVENT_FD(&client->relay->ev_read);
-		bufferevent_free(client->relay);
-		shutdown(fd, SHUT_RDWR);
-		redsocks_close(fd);
-	}
+	if (client->relay)
+		redsocks_bufferevent_free(client->relay);
 	if (event_initialized(&client->udprelay)) {
-		fd = EVENT_FD(&client->udprelay);
+		int fd = EVENT_FD(&client->udprelay);
 		if (event_del(&client->udprelay) == -1)
 			redudp_log_errno(client, LOG_ERR, "event_del");
 		redsocks_close(fd);
