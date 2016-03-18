@@ -357,8 +357,7 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 
 		client->state = httpr_request_sent;
 
-		buffev->wm_read.low = 1;
-		buffev->wm_read.high = HTTP_HEAD_WM_HIGH;
+		bufferevent_setwatermark(buffev, EV_READ, 1, HTTP_HEAD_WM_HIGH);
 		bufferevent_enable(buffev, EV_READ);
 	}
 }

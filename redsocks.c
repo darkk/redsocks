@@ -318,14 +318,10 @@ void redsocks_start_relay(redsocks_client *client)
 
 	client->state = pump_active;
 
-	client->relay->wm_read.low = 0;
-	client->relay->wm_write.low = 0;
-	client->client->wm_read.low = 0;
-	client->client->wm_write.low = 0;
-	client->relay->wm_read.high = REDSOCKS_RELAY_HALFBUFF;
-	client->relay->wm_write.high = REDSOCKS_RELAY_HALFBUFF;
-	client->client->wm_read.high = REDSOCKS_RELAY_HALFBUFF;
-	client->client->wm_write.high = REDSOCKS_RELAY_HALFBUFF;
+	// wm_write.high is respected by libevent-2.0.22 only for ssl and filters,
+	// so it's implemented in redsocks callbacks.  wm_read.high works as expected.
+	bufferevent_setwatermark(client->client, EV_READ|EV_WRITE, 0, REDSOCKS_RELAY_HALFBUFF);
+	bufferevent_setwatermark(client->relay, EV_READ|EV_WRITE, 0, REDSOCKS_RELAY_HALFBUFF);
 
 	client->client->readcb = redsocks_relay_clientreadcb;
 	client->client->writecb = redsocks_relay_clientwritecb;
@@ -548,8 +544,7 @@ int redsocks_write_helper_ex_plain(
 
 	if (client)
 		client->state = state;
-	buffev->wm_read.low = wm_low;
-	buffev->wm_read.high = wm_high;
+	bufferevent_setwatermark(buffev, EV_READ, wm_low, wm_high);
 	bufferevent_enable(buffev, EV_READ);
 	drop = 0;
 
