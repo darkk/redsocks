@@ -836,16 +836,16 @@ void redsocks_dump_client(redsocks_client * client, int loglevel)
     const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
     redsocks_log_error(client, loglevel, "client(%i): (%s)%s%s input %u output %u, relay(%i): (%s)%s%s input %u output %u, age: %li sec, idle: %li sec.",
-        bufferevent_getfd(client->client),
-            redsocks_event_str(bufferevent_get_enabled(client->client)),
+        client->client ? bufferevent_getfd(client->client) : -1,
+            redsocks_event_str(client->client ?  bufferevent_get_enabled(client->client) : 0),
             s_client_evshut[0] ? " " : "", s_client_evshut,
-            evbuffer_get_length(bufferevent_get_input(client->client)),
-            evbuffer_get_length(bufferevent_get_output(client->client)),
-        bufferevent_getfd(client->relay),
-            redsocks_event_str(bufferevent_get_enabled(client->relay)),
+            client->client ? evbuffer_get_length(bufferevent_get_input(client->client)) : 0,
+            client->client ? evbuffer_get_length(bufferevent_get_output(client->client)) : 0,
+        client->relay ? bufferevent_getfd(client->relay) : -1,
+            redsocks_event_str(client->relay ? bufferevent_get_enabled(client->relay) : 0),
             s_relay_evshut[0] ? " " : "", s_relay_evshut,
-            evbuffer_get_length(bufferevent_get_input(client->relay)),
-            evbuffer_get_length(bufferevent_get_output(client->relay)),
+            client->relay ? evbuffer_get_length(bufferevent_get_input(client->relay)) : 0,
+            client->relay ? evbuffer_get_length(bufferevent_get_output(client->relay)) : 0,
             now - client->first_event,
             now - client->last_event);
 }
