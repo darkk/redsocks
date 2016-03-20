@@ -891,7 +891,8 @@ static void redsocks_audit_instance(redsocks_instance *instance)
             /* drop this client if either end disconnected */   
             if ((client->client_evshut == EV_WRITE && client->relay_evshut == EV_READ)
                 || (client->client_evshut == EV_READ && client->relay_evshut == EV_WRITE)
-                || (client->client_evshut == (EV_READ|EV_WRITE) && client->relay_evshut == EV_WRITE))
+                || (client->client_evshut == (EV_READ|EV_WRITE) && client->relay_evshut == EV_WRITE)
+                || (client->client_evshut == EV_READ && client->relay == NULL))
                 drop_it = 1;
         }
         /* close long connections without activities */
