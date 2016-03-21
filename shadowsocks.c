@@ -39,7 +39,6 @@ typedef struct ss_client_t {
 } ss_client;
 
 typedef struct ss_instance_t {
-    int init;
     int method; 
     enc_info info;
 } ss_instance;

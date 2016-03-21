@@ -223,7 +223,7 @@ static void socks5_read_assoc_reply(struct bufferevent *buffev, void *_arg)
 	socks5client->udprelayaddr.sin_port = reply.ip.port;
 	socks5client->udprelayaddr.sin_addr.s_addr = reply.ip.addr;
 
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (fd == -1) {
 		redudp_log_errno(client, LOG_ERR, "socket");
 		goto fail;

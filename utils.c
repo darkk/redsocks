@@ -29,10 +29,6 @@
 #include "redsocks.h" // for redsocks_close
 #include "libc-compat.h"
 
-#ifndef IP_ORIGDSTADDR
-#define IP_ORIGDSTADDR 20
-#endif
-
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr, struct sockaddr_in *toaddr)
 {
     socklen_t addrlen = sizeof(*inaddr);
@@ -66,8 +62,6 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
                 cmsg->cmsg_len >= CMSG_LEN(sizeof(*toaddr))
             ) {
                 struct sockaddr_in* cmsgaddr = (struct sockaddr_in*)CMSG_DATA(cmsg);
-                //char buf[RED_INET_ADDRSTRLEN];
-                //log_error(LOG_DEBUG, "IP_ORIGDSTADDR: %s", red_inet_ntop(cmsgaddr, buf, sizeof(buf)));
                 memcpy(toaddr, cmsgaddr, sizeof(*toaddr));
             }
             else {
@@ -133,7 +127,7 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
     int relay_fd = -1;
     int error;
 
-    relay_fd = socket(AF_INET, SOCK_STREAM, 0);
+    relay_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (relay_fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;
@@ -216,7 +210,7 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
     int relay_fd = -1;
     int error;
 
-    relay_fd = socket(AF_INET, SOCK_STREAM, 0);
+    relay_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (relay_fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;

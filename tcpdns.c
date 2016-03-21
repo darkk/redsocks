@@ -417,7 +417,7 @@ static int tcpdns_init_instance(tcpdns_instance *instance)
     int error;
     int fd = -1;
 
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;
@@ -479,8 +479,6 @@ static int tcpdns_init()
 {
     tcpdns_instance *tmp, *instance = NULL;
 
-    // TODO: init debug_dumper
-
     list_for_each_entry_safe(instance, tmp, &instances, list) {
         if (tcpdns_init_instance(instance) != 0)
             goto fail;
@@ -503,6 +501,30 @@ static int tcpdns_fini()
     return 0;
 }
 
+static void tcpdns_dump_instance(tcpdns_instance *instance)
+{
+    char buf1[RED_INET_ADDRSTRLEN];
+
+    log_error(LOG_INFO, "Dumping data for instance (tcpdns @ %s):",
+                        red_inet_ntop(&instance->config.bindaddr, buf1, sizeof(buf1)));
+    log_error(LOG_INFO, "Delay of TCP DNS [%s]: %dms",
+                        red_inet_ntop(&instance->config.tcpdns1_addr, buf1, sizeof(buf1)),
+                        instance->tcp1_delay_ms);
+    log_error(LOG_INFO, "Delay of TCP DNS [%s]: %dms",
+                        red_inet_ntop(&instance->config.tcpdns2_addr, buf1, sizeof(buf1)),
+                        instance->tcp2_delay_ms);
+    log_error(LOG_INFO, "End of data dumping.");
+}
+
+
+static void tcpdns_debug_dump()
+{
+    tcpdns_instance *instance = NULL;
+
+    list_for_each_entry(instance, &instances, list)
+        tcpdns_dump_instance(instance);
+}
+
 static parser_section tcpdns_conf_section =
 {
     .name    = "tcpdns",
@@ -515,6 +537,7 @@ app_subsys tcpdns_subsys =
 {
     .init = tcpdns_init,
     .fini = tcpdns_fini,
+    .dump = tcpdns_debug_dump,
     .conf_section = &tcpdns_conf_section,
 };
 

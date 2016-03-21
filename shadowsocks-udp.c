@@ -35,7 +35,6 @@ typedef struct ss_client_t {
 } ss_client;
 
 typedef struct ss_instance_t {
-    int init;
     int method; 
     enc_info info;
     struct enc_ctx e_ctx;
@@ -194,7 +193,7 @@ static void ss_connect_relay(redudp_client *client)
     int fd = -1;
     int error;
 
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
         redudp_log_errno(client, LOG_ERR, "socket");
         goto fail;

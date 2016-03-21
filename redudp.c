@@ -113,7 +113,7 @@ static int bound_udp4_get(const struct sockaddr_in *addr)
 
     node->key = key;
     node->ref = 1;
-    node->fd = socket(AF_INET, SOCK_DGRAM, 0);
+    node->fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     node->t_last_rx = redsocks_time(NULL);
     if (node->fd == -1) {
         log_errno(LOG_ERR, "socket");
@@ -554,7 +554,7 @@ static int redudp_init_instance(redudp_instance *instance)
         goto fail;
     } 
 
-    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;

@@ -41,7 +41,7 @@
 #include "libevent-compat.h"
 
 
-#define REDSOCKS_RELAY_HALFBUFF 1024*32
+#define REDSOCKS_RELAY_HALFBUFF 1024*16
 #define REDSOCKS_AUDIT_INTERVAL 60*2
 static void redsocks_relay_relayreadcb(struct bufferevent *from, void *_client);
 static void redsocks_relay_relaywritecb(struct bufferevent *from, void *_client);
@@ -932,7 +932,7 @@ static int redsocks_init_instance(redsocks_instance *instance)
         goto fail;
     } 
 
-    fd = socket(AF_INET, SOCK_STREAM, 0);
+    fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;

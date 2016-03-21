@@ -54,7 +54,7 @@ typedef struct redudp_client_t {
 	time_t              first_event;
 	time_t              last_client_event;
 	time_t              last_relay_event;
-	unsigned int        queue_len;
+	uint16_t            queue_len;
 	list_head           queue;
 } redudp_client;
 
