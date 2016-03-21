@@ -29,6 +29,7 @@ typedef struct redsocks_config_t {
 	char *type;
 	char *login;
 	char *password;
+	int login_send_origin;
 	uint16_t min_backoff_ms;
 	uint16_t max_backoff_ms; // backoff capped by 65 seconds is enough :)
 	uint16_t listenq;

@@ -77,6 +77,11 @@ redsocks {
 
 	// login = "foobar";
 	// password = "baz";
+
+	// prepend the originating host to login name (only with SOCKS4):
+	// 1: prepend address;
+	// 2: prepend address:port;
+	login_send_origin = 0;
 }
 
 redudp {

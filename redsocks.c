@@ -69,6 +69,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "type",       .type = pt_pchar },
 	{ .key = "login",      .type = pt_pchar },
 	{ .key = "password",   .type = pt_pchar },
+	{ .key = "login_send_origin", .type = pt_uint16 },
 	{ .key = "listenq",    .type = pt_uint16 },
 	{ .key = "min_accept_backoff", .type = pt_uint16 },
 	{ .key = "max_accept_backoff", .type = pt_uint16 },
@@ -138,6 +139,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "type") == 0)       ? (void*)&instance->config.type :
 			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
+			(strcmp(entry->key, "login_send_origin") == 0)  ? (void*)&instance->config.login_send_origin :
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
 			(strcmp(entry->key, "min_accept_backoff") == 0) ? (void*)&instance->config.min_backoff_ms :
 			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
