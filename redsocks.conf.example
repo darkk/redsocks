@@ -21,6 +21,9 @@ base {
 	 * privilegies on startup.
 	 * Note, your chroot may requre /etc/localtime if you write log to syslog.
 	 * Log is opened before chroot & uid changing.
+	 * Debian, Ubuntu and some other distributions use `nogroup` instead of
+	 * `nobody`, so change it according to your system if you want redsocks
+	 * to drop root privileges.
 	 */
 	// user = nobody;
 	// group = nobody;
