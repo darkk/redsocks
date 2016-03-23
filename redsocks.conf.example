@@ -78,9 +78,15 @@ redsocks {
 	// login = "foobar";
 	// password = "baz";
 
-	// prepend the originating host to login name (only with SOCKS4):
-	// 1: prepend address;
-	// 2: prepend address:port;
+	// transmit the originating host to the upstream proxy
+	// 1: transmit address;
+	// 2: transmit address:port;
+	//
+	// This is only supported for socks4 and http-connect connections:
+	// * for socks4 servers, the origin will be _pre_pended to the
+	//   configured login name, separated by ;
+	// * for http-connect servers, a X-Forwarded-For HTTP header is
+	//   added to the connection
 	login_send_origin = 0;
 }
 
