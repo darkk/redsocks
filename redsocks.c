@@ -44,6 +44,7 @@ enum pump_state_t {
 };
 
 static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
+static const char *redsocks_event_str(unsigned short what);
 
 
 extern relay_subsys http_connect_subsys;
@@ -341,9 +342,32 @@ void redsocks_start_relay(redsocks_client *client)
 	}
 }
 
+static bool has_loopback_destination(redsocks_client *client)
+{
+	const uint32_t net = ntohl(client->destaddr.sin_addr.s_addr) >> 24;
+	return 0 == memcmp(&client->destaddr.sin_addr, &client->instance->config.relayaddr.sin_addr, sizeof(client->destaddr.sin_addr))
+	    || net == 127 || net == 0;
+}
+
 void redsocks_drop_client(redsocks_client *client)
 {
-	redsocks_log_error(client, LOG_INFO, "dropping client");
+	if (client->relay_evshut == (EV_READ|EV_WRITE) && client->client_evshut == (EV_READ|EV_WRITE)) {
+		redsocks_log_error(client, LOG_INFO, "connection closed");
+	} else {
+		if (has_loopback_destination(client)) {
+			static time_t last = 0;
+			const time_t now = redsocks_time(NULL);
+			if (now - last >= 3600) {
+				// log this warning once an hour to save some debugging time, OTOH it may be valid traffic in some cases
+				redsocks_log_error(client, LOG_NOTICE, "client tries to connect to the proxy using proxy! Usual proxy security policy is to drop alike connection");
+				last = now;
+			}
+		}
+
+		redsocks_log_error(client, LOG_INFO, "dropping client (%s), relay (%s)",
+			redsocks_event_str( (~client->client_evshut) & (EV_READ|EV_WRITE) ),
+			redsocks_event_str( (~client->relay_evshut) & (EV_READ|EV_WRITE) ));
+	}
 
 	if (client->instance->relay_ss->fini)
 		client->instance->relay_ss->fini(client);
