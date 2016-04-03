@@ -1308,6 +1308,9 @@ static int redsocks_init_instance(redsocks_instance *instance)
 		goto fail;
 	}
 
+	if (instance->relay_ss->instance_init)
+		instance->relay_ss->instance_init(instance);
+
 	return 0;
 
 fail:

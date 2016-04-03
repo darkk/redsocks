@@ -119,6 +119,11 @@ static void httpr_client_fini(redsocks_client *client)
 	httpr_buffer_fini(&httpr->relay_buffer);
 }
 
+static void httpr_instance_init(redsocks_instance *instance)
+{
+	log_error(LOG_WARNING, "You should avoid `http-relay`, e.g. due to CVE-2009-0801");
+}
+
 static void httpr_instance_fini(redsocks_instance *instance)
 {
 	http_auth *auth = (void*)(instance + 1);
@@ -574,6 +579,7 @@ relay_subsys http_relay_subsys =
 	.connect_relay        = httpr_connect_relay,
 	.readcb               = httpr_relay_read_cb,
 	.writecb              = httpr_relay_write_cb,
+	.instance_init        = httpr_instance_init,
 	.instance_fini        = httpr_instance_fini,
 };
 
