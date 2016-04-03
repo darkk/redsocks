@@ -78,7 +78,7 @@ int socks5_is_valid_cred(const char *login, const char *password)
 
 void socks5_client_init(redsocks_client *client)
 {
-	socks5_client *socks5 = (void*)(client + 1);
+	socks5_client *socks5 = red_payload(client);
 	const redsocks_config *config = &client->instance->config;
 
 	client->state = socks5_new;
@@ -87,7 +87,7 @@ void socks5_client_init(redsocks_client *client)
 
 static struct evbuffer *socks5_mkmethods(redsocks_client *client)
 {
-	socks5_client *socks5 = (void*)(client + 1);
+	socks5_client *socks5 = red_payload(client);
 	return socks5_mkmethods_plain(socks5->do_password);
 }
 
@@ -274,7 +274,7 @@ static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *clien
 static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
-	socks5_client *socks5 = (void*)(client + 1);
+	socks5_client *socks5 = red_payload(client);
 
 	redsocks_touch_client(client);
 

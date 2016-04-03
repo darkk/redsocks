@@ -73,6 +73,13 @@ static parser_section debug_conf_section =
 	.onexit  = debug_onexit,
 };
 
+static void debug_pipe(struct evhttp_request *req, void *arg)
+{
+	UNUSED(arg);
+	int fds[2];
+	int code = (pipe(fds) == 0) ? HTTP_OK : HTTP_SERVUNAVAIL;
+	evhttp_send_reply(req, code, NULL, NULL);
+}
 static void debug_meminfo_json(struct evhttp_request *req, void *arg)
 {
 	UNUSED(arg);
@@ -122,6 +129,11 @@ static int debug_init(struct event_base* evbase)
 
 	if (evhttp_bind_socket(instance.http_server, instance.http_ip, instance.http_port) != 0) {
 		log_errno(LOG_ERR, "evhttp_bind_socket()");
+		goto fail;
+	}
+
+	if (evhttp_set_cb(instance.http_server, "/debug/pipe", debug_pipe, NULL) != 0) {
+		log_errno(LOG_ERR, "evhttp_set_cb()");
 		goto fail;
 	}
 

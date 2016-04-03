@@ -84,7 +84,7 @@ static log_func log_msg_next = NULL;
 static bool should_log_info = true;
 static bool should_log_debug = false;
 
-static bool should_log(int priority)
+bool should_log(int priority)
 {
 	return (priority != LOG_DEBUG && priority != LOG_INFO)
 	    || (priority == LOG_DEBUG && should_log_debug)

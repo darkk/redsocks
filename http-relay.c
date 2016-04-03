@@ -99,7 +99,7 @@ static int httpr_buffer_append(httpr_buffer *buff, const char *data, int len)
 
 static void httpr_client_init(redsocks_client *client)
 {
-	httpr_client *httpr = (void*)(client + 1);
+	httpr_client *httpr = red_payload(client);
 
 	client->state = httpr_new;
 	memset(httpr, 0, sizeof(*httpr));
@@ -109,7 +109,7 @@ static void httpr_client_init(redsocks_client *client)
 
 static void httpr_client_fini(redsocks_client *client)
 {
-	httpr_client *httpr = (void*)(client + 1);
+	httpr_client *httpr = red_payload(client);
 
 	free(httpr->firstline);
 	httpr->firstline = NULL;
@@ -144,7 +144,7 @@ static char *get_auth_request_header(struct evbuffer *buf)
 static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
-	httpr_client *httpr = (void*)(client + 1);
+	httpr_client *httpr = red_payload(client);
 	int dropped = 0;
 
 	assert(client->state >= httpr_request_sent);
@@ -263,7 +263,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
-	httpr_client *httpr = (void*)(client + 1);
+	httpr_client *httpr = red_payload(client);
 	int len = 0;
 
 	assert(client->state >= httpr_recv_request_headers);
@@ -365,7 +365,7 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 // drops client on failure
 static int httpr_append_header(redsocks_client *client, char *line)
 {
-	httpr_client *httpr = (void*)(client + 1);
+	httpr_client *httpr = red_payload(client);
 
 	if (httpr_buffer_append(&httpr->client_buffer, line, strlen(line)) != 0)
 		return -1;
@@ -392,7 +392,7 @@ static char *fmt_http_host(struct sockaddr_in addr)
 
 static int httpr_toss_http_firstline(redsocks_client *client)
 {
-	httpr_client *httpr = (void*)(client + 1);
+	httpr_client *httpr = red_payload(client);
 	char *uri = NULL;
 	char *host = httpr->has_host ? httpr->host : fmt_http_host(client->destaddr);
 
@@ -439,7 +439,7 @@ fail:
 
 static void httpr_client_read_content(struct bufferevent *buffev, redsocks_client *client)
 {
-	httpr_client *httpr = (void*)(client + 1);
+	httpr_client *httpr = red_payload(client);
 
 	static int post_buffer_len = 64 * 1024;
 	char *post_buffer = calloc(post_buffer_len, 1);
@@ -476,7 +476,7 @@ static void httpr_client_read_content(struct bufferevent *buffev, redsocks_clien
 static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
-	httpr_client *httpr = (void*)(client + 1);
+	httpr_client *httpr = red_payload(client);
 
 	redsocks_touch_client(client);
 

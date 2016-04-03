@@ -13,7 +13,8 @@ VERSION := 0.4
 # -levent_core may be used for space reduction
 LIBS := -levent
 CFLAGS += -g -O2
-override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
+# _GNU_SOURCE is used to get splice(2), it also implies _BSD_SOURCE
+override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_DEFAULT_SOURCE -D_GNU_SOURCE -Wall
 
 all: $(OUT)
 

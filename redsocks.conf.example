@@ -57,6 +57,10 @@ redsocks {
 	// good enough for most of us.
 	// listenq = 128; // SOMAXCONN equals 128 on my Linux box.
 
+	// Enable or disable faster data pump based on splice(2) syscall.
+	// Default value depends on your kernel version, true for 2.6.27.13+
+	// splice = false;
+
 	// `max_accept_backoff` is a delay to retry `accept()` after accept
 	// failure (e.g. due to lack of file descriptors). It's measured in
 	// milliseconds and maximal value is 65535. `min_accept_backoff` is
