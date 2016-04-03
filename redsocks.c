@@ -1106,6 +1106,12 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		goto fail;
 	}
 
+	error = fcntl_nonblock(client_fd);
+	if (error) {
+		log_errno(LOG_ERR, "fcntl");
+		goto fail;
+	}
+
 	if (apply_tcp_keepalive(client_fd))
 		goto fail;
 
