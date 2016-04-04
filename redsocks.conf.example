@@ -81,6 +81,14 @@ redsocks {
 
 	// login = "foobar";
 	// password = "baz";
+
+	// known ways to disclose client IP to the proxy:
+	//  false -- disclose nothing
+	// http-connect supports:
+	//  X-Forwarded-For  -- X-Forwarded-For: IP
+	//  Forwarded_ip     -- Forwarded: for=IP # see RFC7239
+	//  Forwarded_ipport -- Forwarded: for="IP:port" # see RFC7239
+	// disclose_src = false;
 }
 
 redudp {

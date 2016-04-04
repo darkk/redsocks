@@ -270,6 +270,27 @@ static int vp_pbool(parser_context *context, void *addr, const char *token)
 	return -1;
 }
 
+static int vp_disclose_src(parser_context *context, void *addr, const char *token)
+{
+	enum disclose_src_e *dst = addr;
+	struct { char *name; enum disclose_src_e value; } opt[] = {
+		{ "off", DISCLOSE_NONE },
+		{ "no", DISCLOSE_NONE },
+		{ "false", DISCLOSE_NONE },
+		{ "X-Forwarded-For", DISCLOSE_X_FORWARDED_FOR },
+		{ "Forwarded_ip", DISCLOSE_FORWARDED_IP },
+		{ "Forwarded_ipport", DISCLOSE_FORWARDED_IPPORT },
+	};
+	for (int i = 0; i < SIZEOF_ARRAY(opt); ++i) {
+		if (strcmp(token, opt[i].name) == 0) {
+			*dst = opt[i].value;
+			return 0;
+		}
+	}
+	parser_error(context, "disclose_src <%s> is not parsed", token);
+	return -1;
+}
+
 static int vp_pchar(parser_context *context, void *addr, const char *token)
 {
 	char *p = strdup(token);
@@ -399,6 +420,7 @@ static value_parser value_parser_by_type[] =
 	[pt_uint16] = vp_uint16,
 	[pt_in_addr] = vp_in_addr,
 	[pt_in_addr2] = vp_in_addr2,
+	[pt_disclose_src] = vp_disclose_src,
 };
 
 int parser_run(parser_context *context)

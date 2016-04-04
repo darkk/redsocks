@@ -182,6 +182,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 {
 	struct evbuffer *buff = NULL, *retval = NULL;
+	char *auth_string = NULL;
 	int len;
 
 	buff = evbuffer_new();
@@ -194,7 +195,6 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 	++auth->last_auth_count;
 
 	const char *auth_scheme = NULL;
-	char *auth_string = NULL;
 
 	if (auth->last_auth_query != NULL) {
 		/* find previous auth challange */
@@ -218,27 +218,51 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 		}
 	}
 
-	if (auth_string == NULL) {
-		len = evbuffer_add_printf(buff,
-			"CONNECT %s:%u HTTP/1.0\r\n\r\n",
-			inet_ntoa(client->destaddr.sin_addr),
-			ntohs(client->destaddr.sin_port)
-		);
-	} else {
-		len = evbuffer_add_printf(buff,
-			"CONNECT %s:%u HTTP/1.0\r\n%s %s %s\r\n\r\n",
-			inet_ntoa(client->destaddr.sin_addr),
-			ntohs(client->destaddr.sin_port),
-			auth_response_header,
-			auth_scheme,
-			auth_string
-		);
-	}
-
-	free(auth_string);
-
+	// TODO: do accurate evbuffer_expand() while cleaning up http-auth
+	len = evbuffer_add_printf(buff, "CONNECT %s:%u HTTP/1.0\r\n",
+		inet_ntoa(client->destaddr.sin_addr),
+		ntohs(client->destaddr.sin_port));
 	if (len < 0) {
 		redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
+		goto fail;
+	}
+
+	if (auth_string) {
+		len = evbuffer_add_printf(buff, "%s %s %s\r\n",
+			auth_response_header, auth_scheme, auth_string);
+		if (len < 0) {
+			redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
+			goto fail;
+		}
+		free(auth_string);
+		auth_string = NULL;
+	}
+
+	const enum disclose_src_e disclose_src = client->instance->config.disclose_src;
+	if (disclose_src != DISCLOSE_NONE) {
+		char clientip[INET_ADDRSTRLEN];
+		const char *ip = inet_ntop(client->clientaddr.sin_family, &client->clientaddr.sin_addr, clientip, sizeof(clientip));
+		if (!ip) {
+			redsocks_log_errno(client, LOG_ERR, "inet_ntop");
+			goto fail;
+		}
+		if (disclose_src == DISCLOSE_X_FORWARDED_FOR) {
+			len = evbuffer_add_printf(buff, "X-Forwarded-For: %s\r\n", ip);
+		} else if (disclose_src == DISCLOSE_FORWARDED_IP) {
+			len = evbuffer_add_printf(buff, "Forwarded: for=%s\r\n", ip);
+		} else if (disclose_src == DISCLOSE_FORWARDED_IPPORT) {
+			len = evbuffer_add_printf(buff, "Forwarded: for=\"%s:%d\"\r\n", ip,
+				ntohs(client->clientaddr.sin_port));
+		}
+		if (len < 0) {
+			redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
+			goto fail;
+		}
+	}
+
+	len = evbuffer_add(buff, "\r\n", 2);
+	if (len < 0) {
+		redsocks_log_errno(client, LOG_ERR, "evbufer_add");
 		goto fail;
 	}
 
@@ -246,6 +270,8 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 	buff = NULL;
 
 fail:
+	if (auth_string)
+		free(auth_string);
 	if (buff)
 		evbuffer_free(buff);
 	return retval;

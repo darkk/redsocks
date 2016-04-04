@@ -77,6 +77,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "password",   .type = pt_pchar },
 	{ .key = "listenq",    .type = pt_uint16 },
 	{ .key = "splice",     .type = pt_bool },
+	{ .key = "disclose_src", .type = pt_disclose_src },
 	{ .key = "min_accept_backoff", .type = pt_uint16 },
 	{ .key = "max_accept_backoff", .type = pt_uint16 },
 	{ }
@@ -158,6 +159,7 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.min_backoff_ms = 100;
 	instance->config.max_backoff_ms = 60000;
 	instance->config.use_splice = is_splice_good();
+	instance->config.disclose_src = DISCLOSE_NONE;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
@@ -170,6 +172,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
 			(strcmp(entry->key, "splice") == 0)     ? (void*)&instance->config.use_splice :
+			(strcmp(entry->key, "disclose_src") == 0) ? (void*)&instance->config.disclose_src :
 			(strcmp(entry->key, "min_accept_backoff") == 0) ? (void*)&instance->config.min_backoff_ms :
 			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
 			NULL;
@@ -183,7 +186,6 @@ static int redsocks_onexit(parser_section *section)
 	 *        file is not correct, so correct on-the-fly config reloading is
 	 *        currently impossible.
 	 */
-	const char *err = NULL;
 	redsocks_instance *instance = section->data;
 
 	section->data = NULL;
@@ -202,29 +204,38 @@ static int redsocks_onexit(parser_section *section)
 				break;
 			}
 		}
-		if (!instance->relay_ss)
-			err = "invalid `type` for redsocks";
+		if (!instance->relay_ss) {
+			parser_error(section->context, "invalid `type` <%s> for redsocks", instance->config.type);
+			return -1;
+		}
 	}
 	else {
-		err = "no `type` for redsocks";
+		parser_error(section->context, "no `type` for redsocks");
+		return -1;
 	}
 
-	if (!err && !instance->config.min_backoff_ms) {
-		err = "`min_accept_backoff` must be positive, 0 ms is too low";
+	if (instance->config.disclose_src != DISCLOSE_NONE && instance->relay_ss != &http_connect_subsys) {
+		parser_error(section->context, "only `http-connect` supports `disclose_src` at the moment");
+		return -1;
 	}
 
-	if (!err && !instance->config.max_backoff_ms) {
-		err = "`max_accept_backoff` must be positive, 0 ms is too low";
+	if (!instance->config.min_backoff_ms) {
+		parser_error(section->context, "`min_accept_backoff` must be positive, 0 ms is too low");
+		return -1;
 	}
 
-	if (!err && !(instance->config.min_backoff_ms < instance->config.max_backoff_ms)) {
-		err = "`min_accept_backoff` must be less than `max_accept_backoff`";
+	if (!instance->config.max_backoff_ms) {
+		parser_error(section->context, "`max_accept_backoff` must be positive, 0 ms is too low");
+		return -1;
 	}
 
-	if (err)
-		parser_error(section->context, "%s", err);
+	if (instance->config.min_backoff_ms >= instance->config.max_backoff_ms) {
+		parser_error(section->context, "`min_accept_backoff` (%d) must be less than `max_accept_backoff` (%d)",
+			instance->config.min_backoff_ms, instance->config.max_backoff_ms);
+		return -1;
+	}
 
-	return err ? -1 : 0;
+	return 0;
 }
 
 static parser_section redsocks_conf_section =

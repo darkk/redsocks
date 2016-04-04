@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <event.h>
 #include "list.h"
+#include "parser.h"
 
 
 struct redsocks_client_t;
@@ -35,6 +36,7 @@ typedef struct redsocks_config_t {
 	uint16_t max_backoff_ms; // backoff capped by 65 seconds is enough :)
 	uint16_t listenq;
 	bool use_splice;
+	enum disclose_src_e disclose_src;
 } redsocks_config;
 
 struct tracked_event {
