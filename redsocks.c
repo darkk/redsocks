@@ -382,7 +382,7 @@ int redsocks_start_relay(redsocks_client *client)
 void redsocks_drop_client(redsocks_client *client)
 {
     int fd;
-    redsocks_log_error(client, LOG_DEBUG, "dropping client");
+    redsocks_log_error(client, LOG_DEBUG, "dropping client @ state: %d", client->state);
 
     if (client->instance->config.autoproxy && autoproxy_subsys.fini)
         autoproxy_subsys.fini(client);
@@ -859,9 +859,11 @@ void redsocks_dump_client(redsocks_client * client, int loglevel)
 static void redsocks_dump_instance(redsocks_instance *instance)
 {
     redsocks_client *client = NULL;
+    char addr_str[RED_INET_ADDRSTRLEN];
 
-    log_error(LOG_INFO, "Dumping client list for instance %p(%s):", instance,
-                        instance->relay_ss->name);
+    log_error(LOG_INFO, "Dumping client list for instance (%s @ %s):",
+              instance->relay_ss->name,
+              red_inet_ntop(&instance->config.bindaddr, addr_str, sizeof(addr_str)));
     list_for_each_entry(client, &instance->clients, list)
         redsocks_dump_client(client, LOG_INFO);
     
@@ -886,9 +888,11 @@ static void redsocks_audit_instance(redsocks_instance *instance)
     redsocks_client *tmp, *client = NULL;
     time_t now = redsocks_time(NULL);
     int drop_it = 0;
+    char addr_str[RED_INET_ADDRSTRLEN];
 
-    log_error(LOG_DEBUG, "Audit client list for instance %p(%s):", instance,
-                        instance->relay_ss->name);
+    log_error(LOG_DEBUG, "Audit client list for instance (%s @ %s):",
+              instance->relay_ss->name,
+              red_inet_ntop(&instance->config.bindaddr, addr_str, sizeof(addr_str)));
     list_for_each_entry_safe(client, tmp, &instance->clients, list) {
         drop_it = 0;
 

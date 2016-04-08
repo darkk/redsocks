@@ -355,6 +355,7 @@ static int ss_instance_init(struct redsocks_instance_t *instance)
 {
     ss_instance * ss = (ss_instance *)(instance+1);
     const redsocks_config *config = &instance->config;
+    char buf1[RED_INET_ADDRSTRLEN];
 
     int valid_cred =  ss_is_valid_cred(config->login, config->password);
     if (!valid_cred 
@@ -365,7 +366,10 @@ static int ss_instance_init(struct redsocks_instance_t *instance)
     }
     else
     {
-        log_error(LOG_INFO, "using encryption method: %s", config->login);
+        log_error(LOG_INFO, "%s @ %s: encryption method: %s",
+            instance->relay_ss->name,
+            red_inet_ntop(&instance->config.bindaddr, buf1, sizeof(buf1)),
+            config->login);
     }
     return 0;
 }

@@ -241,7 +241,7 @@ struct sockaddr_in* get_destaddr(redudp_client *client)
  */
 void redudp_drop_client(redudp_client *client)
 {
-    redudp_log_error(client, LOG_DEBUG, "Dropping UDP client");
+    redudp_log_error(client, LOG_DEBUG, "Dropping client @ state: %d", client->state);
     enqueued_packet *q, *tmp;
 
     if (client->instance->relay_ss->fini)

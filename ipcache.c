@@ -406,7 +406,7 @@ static void cache_dumper()
     cache_data * item;
     cache_config * config = get_config();
 
-    log_error(LOG_INFO, "Start dumping IP cache:");
+    log_error(LOG_INFO, "Dumping IP cache:");
     for (; blk < config->block_count; blk++)
     {
         for (idx=0; idx < config->block_size; idx++)

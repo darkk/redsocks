@@ -190,7 +190,7 @@ int main(int argc, char **argv)
         goto shutdown;
     }
 
-	log_error(LOG_NOTICE, "redsocks started");
+	log_error(LOG_NOTICE, "redsocks started with: %s", event_base_get_method(g_event_base));
 
 	event_base_dispatch(g_event_base);
 

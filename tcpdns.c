@@ -75,7 +75,7 @@ typedef enum tcpdns_state_t {
 static void tcpdns_drop_request(dns_request * req)
 {
     int fd;
-    tcpdns_log_error(LOG_DEBUG, "dropping request");
+    tcpdns_log_error(LOG_DEBUG, "dropping request @ state: %d", req->state);
     if (req->resolver)
     {
         fd = bufferevent_getfd(req->resolver);
@@ -444,6 +444,7 @@ static int tcpdns_init_instance(tcpdns_instance *instance)
      */
     int error;
     int fd = -1;
+    char buf1[RED_INET_ADDRSTRLEN];
 
     fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
@@ -471,6 +472,8 @@ static int tcpdns_init_instance(tcpdns_instance *instance)
         goto fail;
     }
 
+    log_error(LOG_INFO, "tcpdns @ %s",
+        red_inet_ntop(&instance->config.bindaddr, buf1, sizeof(buf1)));
     return 0;
 
 fail:
