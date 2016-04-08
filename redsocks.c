@@ -741,6 +741,12 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
         goto fail;
     }
 
+    error = evutil_make_socket_nonblocking(client_fd);
+    if (error) {
+        log_errno(LOG_ERR, "evutil_make_socket_nonblocking");
+        goto fail;
+    }
+
     error = setsockopt(client_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
     if (error) {
         log_errno(LOG_WARNING, "setsockopt");
