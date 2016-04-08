@@ -82,7 +82,7 @@ static void socks5_instance_init(redsocks_instance *instance)
 	if (config->login || config->password) {
 		bool deauth = false;
 		if (config->login && config->password) {
-			deauth = socks5_is_valid_cred(config->login, config->password);
+			deauth = ! socks5_is_valid_cred(config->login, config->password);
 		} else  {
 			log_error(LOG_WARNING, "Socks5 needs either both login and password or none of them");
 			deauth = true;
