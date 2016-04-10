@@ -52,11 +52,14 @@ const int socks4_status_no_ident = 92;
 const int socks4_status_fake_ident = 93;
 
 
-void socks4_client_init(redsocks_client *client)
+static void socks4_instance_init(redsocks_instance *instance)
 {
-	if (client->instance->config.password)
-		redsocks_log_error(client, LOG_WARNING, "password is ignored for socks4 connections");
+	if (instance->config.password)
+		log_error(LOG_WARNING, "password <%s> is ignored for socks4 connections", instance->config.password);
+}
 
+static void socks4_client_init(redsocks_client *client)
+{
 	client->state = socks4_new;
 }
 
@@ -161,6 +164,7 @@ relay_subsys socks4_subsys =
 	.readcb               = socks4_read_cb,
 	.writecb              = socks4_write_cb,
 	.init                 = socks4_client_init,
+	.instance_init        = socks4_instance_init,
 };
 
 

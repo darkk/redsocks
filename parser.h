@@ -4,12 +4,20 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+enum disclose_src_e {
+	DISCLOSE_NONE,
+	DISCLOSE_X_FORWARDED_FOR,
+	DISCLOSE_FORWARDED_IP,
+	DISCLOSE_FORWARDED_IPPORT,
+};
+
 typedef enum {
 	pt_bool,      // "bool" from stdbool.h, not "_Bool" or anything else
 	pt_pchar,
 	pt_uint16,
 	pt_in_addr,
 	pt_in_addr2,  // inaddr[0] = net, inaddr[1] = netmask
+	pt_disclose_src,
 } parser_type;
 
 typedef struct parser_entry_t {

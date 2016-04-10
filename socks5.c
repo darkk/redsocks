@@ -61,33 +61,52 @@ const char* socks5_status_to_str(int socks5_status)
 	}
 }
 
-int socks5_is_valid_cred(const char *login, const char *password)
+bool socks5_is_valid_cred(const char *login, const char *password)
 {
 	if (!login || !password)
-		return 0;
+		return false;
 	if (strlen(login) > 255) {
 		log_error(LOG_WARNING, "Socks5 login can't be more than 255 chars, <%s> is too long", login);
-		return 0;
+		return false;
 	}
 	if (strlen(password) > 255) {
 		log_error(LOG_WARNING, "Socks5 password can't be more than 255 chars, <%s> is too long", password);
-		return 0;
+		return false;
 	}
-	return 1;
+	return true;
 }
 
-void socks5_client_init(redsocks_client *client)
+static void socks5_instance_init(redsocks_instance *instance)
 {
-	socks5_client *socks5 = (void*)(client + 1);
+	redsocks_config *config = &instance->config;
+	if (config->login || config->password) {
+		bool deauth = false;
+		if (config->login && config->password) {
+			deauth = ! socks5_is_valid_cred(config->login, config->password);
+		} else  {
+			log_error(LOG_WARNING, "Socks5 needs either both login and password or none of them");
+			deauth = true;
+		}
+		if (deauth) {
+			free(config->login);
+			free(config->password);
+			config->login = config->password = NULL;
+		}
+	}
+}
+
+static void socks5_client_init(redsocks_client *client)
+{
+	socks5_client *socks5 = red_payload(client);
 	const redsocks_config *config = &client->instance->config;
 
 	client->state = socks5_new;
-	socks5->do_password = socks5_is_valid_cred(config->login, config->password);
+	socks5->do_password = (config->login && config->password) ? 1 : 0;
 }
 
 static struct evbuffer *socks5_mkmethods(redsocks_client *client)
 {
-	socks5_client *socks5 = (void*)(client + 1);
+	socks5_client *socks5 = red_payload(client);
 	return socks5_mkmethods_plain(socks5->do_password);
 }
 
@@ -274,7 +293,7 @@ static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *clien
 static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
-	socks5_client *socks5 = (void*)(client + 1);
+	socks5_client *socks5 = red_payload(client);
 
 	redsocks_touch_client(client);
 
@@ -317,6 +336,7 @@ relay_subsys socks5_subsys =
 	.readcb               = socks5_read_cb,
 	.writecb              = socks5_write_cb,
 	.init                 = socks5_client_init,
+	.instance_init        = socks5_instance_init,
 };
 
 

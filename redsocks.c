@@ -15,16 +15,19 @@
  */
 
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <event.h>
 #include "list.h"
 #include "parser.h"
@@ -44,6 +47,9 @@ enum pump_state_t {
 };
 
 static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
+static const char *redsocks_event_str(unsigned short what);
+static int redsocks_start_bufferpump(redsocks_client *client);
+static int redsocks_start_splicepump(redsocks_client *client);
 
 
 extern relay_subsys http_connect_subsys;
@@ -71,6 +77,8 @@ static parser_entry redsocks_entries[] =
 	{ .key = "password",   .type = pt_pchar },
 	{ .key = "login_send_origin", .type = pt_uint16 },
 	{ .key = "listenq",    .type = pt_uint16 },
+	{ .key = "splice",     .type = pt_bool },
+	{ .key = "disclose_src", .type = pt_disclose_src },
 	{ .key = "min_accept_backoff", .type = pt_uint16 },
 	{ .key = "max_accept_backoff", .type = pt_uint16 },
 	{ }
@@ -102,6 +110,28 @@ static int tracked_event_del(struct tracked_event *tev)
 	return ret;
 }
 
+static bool is_splice_good()
+{
+	struct utsname u;
+	if (uname(&u) != 0) {
+		return false;
+	}
+
+	unsigned long int v[4] = { 0, 0, 0, 0 };
+	char *rel = u.release;
+	for (int i = 0; i < SIZEOF_ARRAY(v); ++i) {
+		v[i] = strtoul(rel, &rel, 0);
+		while (*rel && !isdigit(*rel))
+			++rel;
+	}
+
+	// haproxy assumes that splice "works" for 2.6.27.13+
+	return (v[0] > 2) ||
+	       (v[0] == 2 && v[1] > 6) ||
+	       (v[0] == 2 && v[1] == 6 && v[2] > 27) ||
+	       (v[0] == 2 && v[1] == 6 && v[2] == 27 && v[3] >= 13);
+}
+
 static int redsocks_onenter(parser_section *section)
 {
 	// FIXME: find proper way to calulate instance_payload_len
@@ -129,6 +159,8 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.listenq = SOMAXCONN;
 	instance->config.min_backoff_ms = 100;
 	instance->config.max_backoff_ms = 60000;
+	instance->config.use_splice = is_splice_good();
+	instance->config.disclose_src = DISCLOSE_NONE;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
@@ -141,6 +173,8 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
 			(strcmp(entry->key, "login_send_origin") == 0)  ? (void*)&instance->config.login_send_origin :
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
+			(strcmp(entry->key, "splice") == 0)     ? (void*)&instance->config.use_splice :
+			(strcmp(entry->key, "disclose_src") == 0) ? (void*)&instance->config.disclose_src :
 			(strcmp(entry->key, "min_accept_backoff") == 0) ? (void*)&instance->config.min_backoff_ms :
 			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
 			NULL;
@@ -154,7 +188,6 @@ static int redsocks_onexit(parser_section *section)
 	 *        file is not correct, so correct on-the-fly config reloading is
 	 *        currently impossible.
 	 */
-	const char *err = NULL;
 	redsocks_instance *instance = section->data;
 
 	section->data = NULL;
@@ -173,29 +206,38 @@ static int redsocks_onexit(parser_section *section)
 				break;
 			}
 		}
-		if (!instance->relay_ss)
-			err = "invalid `type` for redsocks";
+		if (!instance->relay_ss) {
+			parser_error(section->context, "invalid `type` <%s> for redsocks", instance->config.type);
+			return -1;
+		}
 	}
 	else {
-		err = "no `type` for redsocks";
+		parser_error(section->context, "no `type` for redsocks");
+		return -1;
 	}
 
-	if (!err && !instance->config.min_backoff_ms) {
-		err = "`min_accept_backoff` must be positive, 0 ms is too low";
+	if (instance->config.disclose_src != DISCLOSE_NONE && instance->relay_ss != &http_connect_subsys) {
+		parser_error(section->context, "only `http-connect` supports `disclose_src` at the moment");
+		return -1;
 	}
 
-	if (!err && !instance->config.max_backoff_ms) {
-		err = "`max_accept_backoff` must be positive, 0 ms is too low";
+	if (!instance->config.min_backoff_ms) {
+		parser_error(section->context, "`min_accept_backoff` must be positive, 0 ms is too low");
+		return -1;
 	}
 
-	if (!err && !(instance->config.min_backoff_ms < instance->config.max_backoff_ms)) {
-		err = "`min_accept_backoff` must be less than `max_accept_backoff`";
+	if (!instance->config.max_backoff_ms) {
+		parser_error(section->context, "`max_accept_backoff` must be positive, 0 ms is too low");
+		return -1;
 	}
 
-	if (err)
-		parser_error(section->context, "%s", err);
+	if (instance->config.min_backoff_ms >= instance->config.max_backoff_ms) {
+		parser_error(section->context, "`min_accept_backoff` (%d) must be less than `max_accept_backoff` (%d)",
+			instance->config.min_backoff_ms, instance->config.max_backoff_ms);
+		return -1;
+	}
 
-	return err ? -1 : 0;
+	return 0;
 }
 
 static parser_section redsocks_conf_section =
@@ -211,6 +253,9 @@ void redsocks_log_write_plain(
 		const struct sockaddr_in *clientaddr, const struct sockaddr_in *destaddr,
 		int priority, const char *orig_fmt, ...
 ) {
+	if (!should_log(priority))
+		return;
+
 	int saved_errno = errno;
 	struct evbuffer *fmt = evbuffer_new();
 	va_list ap;
@@ -242,7 +287,18 @@ void redsocks_touch_client(redsocks_client *client)
 	redsocks_time(&client->last_event);
 }
 
-static inline const char* bufname(redsocks_client *client, struct bufferevent *buf)
+static bool shut_both(redsocks_client *client)
+{
+	return client->relay_evshut == (EV_READ|EV_WRITE) && client->client_evshut == (EV_READ|EV_WRITE);
+}
+
+static int bufprio(redsocks_client *client, struct bufferevent *buffev)
+{
+	// client errors are logged with LOG_INFO, server errors with LOG_NOTICE
+	return (buffev == client->client) ? LOG_INFO : LOG_NOTICE;
+}
+
+static const char* bufname(redsocks_client *client, struct bufferevent *buf)
 {
 	assert(buf == client->client || buf == client->relay);
 	return buf == client->client ? "client" : "relay";
@@ -282,7 +338,6 @@ static void redsocks_relay_writecb(redsocks_client *client, struct bufferevent *
 	}
 }
 
-
 static void redsocks_relay_relayreadcb(struct bufferevent *from, void *_client)
 {
 	redsocks_client *client = _client;
@@ -313,13 +368,20 @@ static void redsocks_relay_clientwritecb(struct bufferevent *to, void *_client)
 
 void redsocks_start_relay(redsocks_client *client)
 {
-	int error;
-
 	if (client->instance->relay_ss->fini)
 		client->instance->relay_ss->fini(client);
 
 	client->state = pump_active;
 
+	int error = ((client->instance->config.use_splice) ? redsocks_start_splicepump : redsocks_start_bufferpump)(client);
+	if (!error)
+		redsocks_log_error(client, LOG_DEBUG, "data relaying started");
+	else
+		redsocks_drop_client(client);
+}
+
+static int redsocks_start_bufferpump(redsocks_client *client)
+{
 	// wm_write.high is respected by libevent-2.0.22 only for ssl and filters,
 	// so it's implemented in redsocks callbacks.  wm_read.high works as expected.
 	bufferevent_setwatermark(client->client, EV_READ|EV_WRITE, 0, REDSOCKS_RELAY_HALFBUFF);
@@ -330,22 +392,329 @@ void redsocks_start_relay(redsocks_client *client)
 	client->relay->readcb = redsocks_relay_relayreadcb;
 	client->relay->writecb = redsocks_relay_relaywritecb;
 
-	error = bufferevent_enable(client->client, (EV_READ|EV_WRITE) & ~(client->client_evshut));
+	int error = bufferevent_enable(client->client, (EV_READ|EV_WRITE) & ~(client->client_evshut));
 	if (!error)
 		error = bufferevent_enable(client->relay, (EV_READ|EV_WRITE) & ~(client->relay_evshut));
-
-	if (!error) {
-		redsocks_log_error(client, LOG_DEBUG, "data relaying started");
-	}
-	else {
+	if (error)
 		redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");
-		redsocks_drop_client(client);
+	return error;
+}
+
+static int pipeprio(redsocks_pump *pump, int fd)
+{
+	// client errors are logged with LOG_INFO, server errors with LOG_NOTICE
+	return (fd == event_get_fd(&pump->client_read)) ? LOG_INFO : LOG_NOTICE;
+}
+
+static const char* pipename(redsocks_pump *pump, int fd)
+{
+	return (fd == event_get_fd(&pump->client_read)) ? "client" : "relay";
+}
+
+static void bufferevent_free_unused(struct bufferevent **p) {
+	if (*p && !evbuffer_get_length((*p)->input) && !evbuffer_get_length((*p)->output)) {
+		bufferevent_free(*p);
+		*p = NULL;
 	}
+}
+
+static bool would_block(int e) {
+	return e == EAGAIN || e == EWOULDBLOCK;
+}
+
+typedef struct redsplice_write_ctx_t {
+	// drain ebsrc[0], ebsrc[1], pisrc in that order
+	struct evbuffer *ebsrc[2];
+	splice_pipe *pisrc;
+	struct event *evsrc;
+	struct event *evdst;
+	const evshut_t *shut_src;
+	evshut_t *shut_dst;
+} redsplice_write_ctx;
+
+static void redsplice_write_cb(redsocks_pump *pump, redsplice_write_ctx *c, int out)
+{
+	bool has_data = false; // there is some pending data to be written
+	bool can_write = true; // socket SEEMS TO BE writable
+
+	// short write -- goto read/write management
+	// write error -- drop client alltogether
+	// full write  -- take next buffer
+	// got EOF & no data -- relay EOF
+
+	for (int i = 0; i < SIZEOF_ARRAY(c->ebsrc); ++i) {
+		struct evbuffer *ebsrc = c->ebsrc[i];
+		if (ebsrc) {
+			const size_t avail = evbuffer_get_length(ebsrc);
+			has_data = !!avail;
+			if (avail) {
+				const ssize_t sent = evbuffer_write(ebsrc, out);
+				if (sent == -1) {
+					if (would_block(errno)) { // short (zero) write
+						can_write = false;
+						goto decide;
+					} else {
+						redsocks_log_errno(&pump->c, pipeprio(pump, out), "evbuffer_write(to %s)", pipename(pump, out));
+						redsocks_drop_client(&pump->c);
+						return;
+					}
+				} else if (avail == sent) {
+					has_data = false; // unless stated otherwise
+				} else { // short write
+					can_write = false;
+					goto decide;
+				}
+			}
+		}
+	}
+
+	do {
+		has_data = !!c->pisrc->size;
+		const size_t avail = c->pisrc->size;
+		if (avail) {
+			const ssize_t sent = splice(c->pisrc->read, NULL, out, NULL, avail, SPLICE_F_MOVE|SPLICE_F_NONBLOCK);
+			if (sent == -1) {
+				if (would_block(errno)) { // short (zero) write
+					can_write = false;
+					goto decide;
+				} else {
+					redsocks_log_errno(&pump->c, pipeprio(pump, out), "splice(to %s)", pipename(pump, out));
+					redsocks_drop_client(&pump->c);
+					return;
+				}
+			} else {
+				c->pisrc->size -= sent;
+				if (avail == sent) {
+					has_data = false;
+				} else { // short write
+					can_write = false;
+					goto decide;
+				}
+			}
+		}
+	} while (0);
+
+decide:
+	if (!has_data && (*c->shut_src & EV_READ) && !(*c->shut_dst & EV_WRITE)) {
+		if (shutdown(out, SHUT_WR) != 0) {
+			redsocks_log_errno(&pump->c, LOG_ERR, "shutdown(%s, SHUT_WR)", pipename(pump, out));
+		}
+		*c->shut_dst |= EV_WRITE;
+		can_write = false;
+		assert(!c->pisrc->size);
+		redsocks_close(c->pisrc->read);
+		c->pisrc->read = -1;
+		redsocks_close(c->pisrc->write);
+		c->pisrc->write = -1;
+		if (shut_both(&pump->c)) {
+			redsocks_drop_client(&pump->c);
+			return;
+		}
+	}
+
+	assert(!(can_write && has_data)); // incomplete write to writable socket
+
+	if (!can_write && has_data) {
+		if (event_pending(c->evsrc, EV_READ, NULL))
+			redsocks_log_error(&pump->c, LOG_DEBUG, "backpressure: event_del(%s_read)", pipename(pump, event_get_fd(c->evsrc)));
+		redsocks_event_del(&pump->c, c->evsrc);
+		redsocks_event_add(&pump->c, c->evdst);
+	} else if (can_write && !has_data) {
+		if (!event_pending(c->evsrc, EV_READ, NULL))
+			redsocks_log_error(&pump->c, LOG_DEBUG, "backpressure: event_add(%s_read)", pipename(pump, event_get_fd(c->evsrc)));
+		redsocks_event_add(&pump->c, c->evsrc);
+		redsocks_event_del(&pump->c, c->evdst);
+	} else if (!can_write && !has_data) { // something like EOF
+		redsocks_event_del(&pump->c, c->evsrc);
+		redsocks_event_del(&pump->c, c->evdst);
+	}
+}
+
+typedef struct redsplice_read_ctx_t {
+	splice_pipe *dst;
+	struct event *evsrc;
+	struct event *evdst;
+	evshut_t *shut_src;
+} redsplice_read_ctx;
+
+static void redsplice_read_cb(redsocks_pump *pump, redsplice_read_ctx *c, int in)
+{
+	const size_t pipesize = 1048576; // some default value from fs.pipe-max-size
+	const ssize_t got = splice(in, NULL, c->dst->write, NULL, pipesize, SPLICE_F_MOVE|SPLICE_F_NONBLOCK);
+	if (got == -1) {
+		if (would_block(errno)) {
+			// there is data at `in', but pipe is full
+			if (!event_pending(c->evsrc, EV_READ, NULL))
+				redsocks_log_error(&pump->c, LOG_DEBUG, "backpressure: event_del(%s_read)", pipename(pump, event_get_fd(c->evsrc)));
+			redsocks_event_del(&pump->c, c->evsrc);
+		} else {
+			redsocks_log_errno(&pump->c, pipeprio(pump, in), "splice(from %s)", pipename(pump, in));
+			redsocks_drop_client(&pump->c);
+		}
+		return;
+	}
+
+	if (got == 0) { // got EOF
+		if (shutdown(in, SHUT_RD) != 0) {
+			if (errno != ENOTCONN) { // do not log common case for splice()
+				redsocks_log_errno(&pump->c, LOG_DEBUG, "shutdown(%s, SHUT_RD) after EOF", pipename(pump, in));
+			}
+		}
+		*c->shut_src |= EV_READ;
+		redsocks_event_del(&pump->c, c->evsrc);
+	} else {
+		c->dst->size += got;
+	}
+	event_active(c->evdst, EV_WRITE, 0);
+}
+
+static void redsocks_touch_pump(redsocks_pump *pump)
+{
+	redsocks_touch_client(&pump->c);
+	bufferevent_free_unused(&pump->c.client);
+	bufferevent_free_unused(&pump->c.relay);
+}
+
+static void redsplice_relay_read(int fd, short what, void *_pump)
+{
+	redsocks_pump *pump = _pump;
+	assert(fd == event_get_fd(&pump->relay_read) && (what & EV_READ));
+	redsocks_touch_pump(pump);
+	redsplice_read_ctx c = {
+		.dst = &pump->reply,
+		.evsrc = &pump->relay_read,
+		.evdst = &pump->client_write,
+		.shut_src = &pump->c.relay_evshut,
+	};
+	redsplice_read_cb(pump, &c, fd);
+}
+
+static void redsplice_client_read(int fd, short what, void *_pump)
+{
+	redsocks_pump *pump = _pump;
+	assert(fd == event_get_fd(&pump->client_read) && (what & EV_READ));
+	redsocks_touch_pump(pump);
+	redsplice_read_ctx c = {
+		.dst = &pump->request,
+		.evsrc = &pump->client_read,
+		.evdst = &pump->relay_write,
+		.shut_src = &pump->c.client_evshut,
+	};
+	redsplice_read_cb(pump, &c, fd);
+}
+
+static void redsplice_relay_write(int fd, short what, void *_pump)
+{
+	redsocks_pump *pump = _pump;
+	assert(fd == event_get_fd(&pump->relay_write) && (what & EV_WRITE));
+	redsocks_touch_pump(pump);
+	redsplice_write_ctx c = {
+		.ebsrc = {
+			pump->c.relay ? pump->c.relay->output : NULL,
+			pump->c.client ? pump->c.client->input : NULL,
+		},
+		.pisrc = &pump->request,
+		.evsrc = &pump->client_read,
+		.evdst = &pump->relay_write,
+		.shut_src = &pump->c.client_evshut,
+		.shut_dst = &pump->c.relay_evshut,
+	};
+	redsplice_write_cb(pump, &c, fd);
+}
+
+static void redsplice_client_write(int fd, short what, void *_pump)
+{
+	redsocks_pump *pump = _pump;
+	assert(fd == event_get_fd(&pump->client_write) && (what & EV_WRITE));
+	redsocks_touch_pump(pump);
+	redsplice_write_ctx c = {
+		.ebsrc = {
+			pump->c.client ? pump->c.client->output : NULL,
+			pump->c.relay ? pump->c.relay->input : NULL,
+		},
+		.pisrc = &pump->reply,
+		.evsrc = &pump->relay_read,
+		.evdst = &pump->client_write,
+		.shut_src = &pump->c.relay_evshut,
+		.shut_dst = &pump->c.client_evshut,
+	};
+	redsplice_write_cb(pump, &c, fd);
+}
+
+static int redsocks_start_splicepump(redsocks_client *client)
+{
+	int error = bufferevent_disable(client->client, EV_READ|EV_WRITE);
+	if (!error)
+		error = bufferevent_disable(client->relay, EV_READ|EV_WRITE);
+	if (error) {
+		redsocks_log_errno(client, LOG_ERR, "bufferevent_disable");
+		return error;
+	}
+
+	redsocks_pump *pump = red_pump(client);
+	if (!error)
+		error = pipe2(&pump->request.read, O_NONBLOCK);
+	if (!error)
+		error = pipe2(&pump->reply.read, O_NONBLOCK);
+	if (error) {
+		redsocks_log_errno(client, LOG_ERR, "pipe2");
+		return error;
+	}
+
+	struct event_base *base = NULL;
+	const int relay_fd = bufferevent_getfd(client->relay);
+	const int client_fd = bufferevent_getfd(client->client);
+	if (!error)
+		error = event_assign(&pump->client_read, base, client_fd, EV_READ|EV_PERSIST, redsplice_client_read, pump);
+	if (!error)
+		error = event_assign(&pump->client_write, base, client_fd, EV_WRITE|EV_PERSIST, redsplice_client_write, pump);
+	if (!error)
+		error = event_assign(&pump->relay_read, base, relay_fd, EV_READ|EV_PERSIST, redsplice_relay_read, pump);
+	if (!error)
+		error = event_assign(&pump->relay_write, base, relay_fd, EV_WRITE|EV_PERSIST, redsplice_relay_write, pump);
+	if (error) {
+		redsocks_log_errno(client, LOG_ERR, "event_assign");
+		return error;
+	}
+
+	redsocks_bufferevent_dropfd(client, client->relay);
+	redsocks_bufferevent_dropfd(client, client->client);
+
+	// flush buffers (if any) and enable EV_READ callbacks
+	event_active(&pump->client_write, EV_WRITE, 0);
+	event_active(&pump->relay_write, EV_WRITE, 0);
+	redsocks_event_add(&pump->c, &pump->client_read);
+	redsocks_event_add(&pump->c, &pump->relay_read);
+
+	return 0;
+}
+
+static bool has_loopback_destination(redsocks_client *client)
+{
+	const uint32_t net = ntohl(client->destaddr.sin_addr.s_addr) >> 24;
+	return 0 == memcmp(&client->destaddr.sin_addr, &client->instance->config.relayaddr.sin_addr, sizeof(client->destaddr.sin_addr))
+	    || net == 127 || net == 0;
 }
 
 void redsocks_drop_client(redsocks_client *client)
 {
-	redsocks_log_error(client, LOG_INFO, "dropping client");
+	if (shut_both(client)) {
+		redsocks_log_error(client, LOG_INFO, "connection closed");
+	} else {
+		if (has_loopback_destination(client)) {
+			static time_t last = 0;
+			const time_t now = redsocks_time(NULL);
+			if (now - last >= 3600) {
+				// log this warning once an hour to save some debugging time, OTOH it may be valid traffic in some cases
+				redsocks_log_error(client, LOG_NOTICE, "client tries to connect to the proxy using proxy! Usual proxy security policy is to drop alike connection");
+				last = now;
+			}
+		}
+
+		redsocks_log_error(client, LOG_INFO, "dropping client (%s), relay (%s)",
+			redsocks_event_str( (~client->client_evshut) & (EV_READ|EV_WRITE) ),
+			redsocks_event_str( (~client->relay_evshut) & (EV_READ|EV_WRITE) ));
+	}
 
 	if (client->instance->relay_ss->fini)
 		client->instance->relay_ss->fini(client);
@@ -355,6 +724,38 @@ void redsocks_drop_client(redsocks_client *client)
 
 	if (client->relay)
 		redsocks_bufferevent_free(client->relay);
+
+	if (client->instance->config.use_splice) {
+		redsocks_pump *pump = red_pump(client);
+
+		if (pump->request.read != -1)
+			redsocks_close(pump->request.read);
+		if (pump->request.write != -1)
+			redsocks_close(pump->request.write);
+		if (pump->reply.read != -1)
+			redsocks_close(pump->reply.read);
+		if (pump->reply.write != -1)
+			redsocks_close(pump->reply.write);
+
+		// redsocks_close MAY log error if some of events was not properly initialized
+		if (event_initialized(&pump->client_read)) {
+			int fd = event_get_fd(&pump->client_read);
+			redsocks_event_del(&pump->c, &pump->client_read);
+			redsocks_close(fd);
+		}
+		if (event_initialized(&pump->client_write)) {
+			redsocks_event_del(&pump->c, &pump->client_write);
+		}
+
+		if (event_initialized(&pump->relay_read)) {
+			int fd = event_get_fd(&pump->relay_read);
+			redsocks_event_del(&pump->c, &pump->relay_read);
+			redsocks_close(fd);
+		}
+		if (event_initialized(&pump->relay_write)) {
+			redsocks_event_del(&pump->c, &pump->relay_write);
+		}
+	}
 
 	list_del(&client->list);
 	free(client);
@@ -404,7 +805,7 @@ static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffe
 
 	*pevshut |= evhow;
 
-	if (client->relay_evshut == (EV_READ|EV_WRITE) && client->client_evshut == (EV_READ|EV_WRITE)) {
+	if (shut_both(client)) {
 		redsocks_log_error(client, LOG_DEBUG, "both client and server disconnected");
 		redsocks_drop_client(client);
 	}
@@ -452,8 +853,7 @@ static void redsocks_event_error(struct bufferevent *buffev, short what, void *_
 		} else {
 			errno = bakerrno;
 		}
-		// client errors are logged with LOG_INFO, server errors with LOG_NOTICE
-		redsocks_log_errno(client, (buffev == client->client) ? LOG_INFO : LOG_NOTICE, "%s %serror, code " event_fmt_str,
+		redsocks_log_errno(client, bufprio(client, buffev), "%s %serror, code " event_fmt_str,
 				bufname(client, buffev),
 				errsrc,
 				event_fmt(what));
@@ -637,12 +1037,39 @@ void redsocks_close_internal(int fd, const char* file, int line, const char *fun
 	}
 }
 
+void redsocks_event_add_internal(redsocks_client *client, struct event *ev, const char *file, int line, const char *func)
+{
+	if (event_add(ev, NULL) != 0) {
+		const int do_errno = 1;
+		redsocks_log_write_plain(file, line, func, do_errno, &(client)->clientaddr, &(client)->destaddr, LOG_WARNING, "event_add");
+	}
+}
+
+void redsocks_event_del_internal(redsocks_client *client, struct event *ev, const char *file, int line, const char *func)
+{
+	if (event_del(ev) != 0) {
+		const int do_errno = 1;
+		redsocks_log_write_plain(file, line, func, do_errno, &(client)->clientaddr, &(client)->destaddr, LOG_WARNING, "event_del");
+	}
+}
+
+void redsocks_bufferevent_dropfd_internal(redsocks_client *client, struct bufferevent *ev, const char *file, int line, const char *func)
+{
+	if (bufferevent_setfd(ev, -1) != 0) {
+		const int do_errno = 1;
+		redsocks_log_write_plain(file, line, func, do_errno, &(client)->clientaddr, &(client)->destaddr, LOG_WARNING, "bufferevent_setfd");
+	}
+}
+
 void redsocks_bufferevent_free(struct bufferevent *buffev)
 {
 	int fd = bufferevent_getfd(buffev);
-	bufferevent_setfd(buffev, -1); // to avoid EBADFD warnings from epoll
+	if (bufferevent_setfd(buffev, -1)) { // to avoid EBADFD warnings from epoll
+		log_errno(LOG_WARNING, "bufferevent_setfd");
+	}
 	bufferevent_free(buffev);
-	redsocks_close(fd);
+	if (fd != -1)
+		redsocks_close(fd);
 }
 
 static void redsocks_accept_client(int fd, short what, void *_arg)
@@ -692,16 +1119,29 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 		goto fail;
 	}
 
+	error = fcntl_nonblock(client_fd);
+	if (error) {
+		log_errno(LOG_ERR, "fcntl");
+		goto fail;
+	}
+
 	if (apply_tcp_keepalive(client_fd))
 		goto fail;
 
 	// everything seems to be ok, let's allocate some memory
-	client = calloc(1, sizeof(redsocks_client) + self->relay_ss->payload_len);
+	client = calloc(1, sizeof_client(self));
 	if (!client) {
 		log_errno(LOG_ERR, "calloc");
 		goto fail;
 	}
 	client->instance = self;
+	if (client->instance->config.use_splice) {
+		redsocks_pump *pump = red_pump(client);
+		pump->request.read = -1;
+		pump->request.write = -1;
+		pump->reply.read = -1;
+		pump->reply.write = -1;
+	}
 	memcpy(&client->clientaddr, &clientaddr, sizeof(clientaddr));
 	memcpy(&client->destaddr, &destaddr, sizeof(destaddr));
 	INIT_LIST_HEAD(&client->list);
@@ -774,15 +1214,47 @@ static void redsocks_debug_dump_instance(redsocks_instance *instance, time_t now
 		const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
 		const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
-		redsocks_log_error(client, LOG_NOTICE, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %li sec, idle: %li sec.",
-			client->client ? event_get_fd(&client->client->ev_write) : -1,
+		if (!instance->config.use_splice) {
+			redsocks_log_error(client, LOG_NOTICE, "client: %i (%s)%s%s, relay: %i (%s)%s%s, age: %li sec, idle: %li sec.",
+				client->client ? bufferevent_getfd(client->client) : -1,
 				client->client ? redsocks_event_str(client->client->enabled) : "NULL",
-				s_client_evshut[0] ? " " : "", s_client_evshut,
-			client->relay ? event_get_fd(&client->relay->ev_write) : -1,
+				s_client_evshut[0] ? " " : "",
+				s_client_evshut,
+				client->relay ? bufferevent_getfd(client->relay) : -1,
 				client->relay ? redsocks_event_str(client->relay->enabled) : "NULL",
-				s_relay_evshut[0] ? " " : "", s_relay_evshut,
-			now - client->first_event,
-			now - client->last_event);
+				s_relay_evshut[0] ? " " : "",
+				s_relay_evshut,
+				now - client->first_event,
+				now - client->last_event);
+		} else {
+			redsocks_pump *pump = red_pump(client);
+
+			redsocks_log_error(client, LOG_NOTICE, "client: buf %i (%s) splice %i (%s/%s) pipe[%d, %d]=%zu%s%s, relay: buf %i (%s) splice %i (%s/%s) pipe[%d, %d]=%zu%s%s, age: %li sec, idle: %li sec.",
+				client->client ? bufferevent_getfd(client->client) : -1,
+				client->client ? redsocks_event_str(client->client->enabled) : "NULL",
+				event_get_fd(&pump->client_read),
+				event_pending(&pump->client_read, EV_READ, NULL) ? "R" : "-",
+				event_pending(&pump->client_write, EV_WRITE, NULL) ? "W" : "-",
+				pump->request.read,
+				pump->request.write,
+				pump->request.size,
+				s_client_evshut[0] ? " " : "",
+				s_client_evshut,
+
+				client->relay ? bufferevent_getfd(client->relay) : -1,
+				client->relay ? redsocks_event_str(client->relay->enabled) : "NULL",
+				event_get_fd(&pump->relay_read),
+				event_pending(&pump->relay_read, EV_READ, NULL) ? "R" : "-",
+				event_pending(&pump->relay_write, EV_WRITE, NULL) ? "W" : "-",
+				pump->reply.read,
+				pump->reply.write,
+				pump->reply.size,
+				s_relay_evshut[0] ? " " : "",
+				s_relay_evshut,
+
+				now - client->first_event,
+				now - client->last_event);
+		}
 	}
 	log_error(LOG_NOTICE, "End of client list.");
 }
@@ -848,6 +1320,9 @@ static int redsocks_init_instance(redsocks_instance *instance)
 		log_errno(LOG_ERR, "event_add");
 		goto fail;
 	}
+
+	if (instance->relay_ss->instance_init)
+		instance->relay_ss->instance_init(instance);
 
 	return 0;
 

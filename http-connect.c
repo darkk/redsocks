@@ -182,10 +182,8 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 {
 	struct evbuffer *buff = NULL, *retval = NULL;
-	int len = 0;
-
-	const char *auth_scheme = NULL;
 	char *auth_string = NULL;
+	int len;
 
 	buff = evbuffer_new();
 	if (!buff) {
@@ -195,6 +193,8 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 
 	http_auth *auth = (void*)(client->instance + 1);
 	++auth->last_auth_count;
+
+	const char *auth_scheme = NULL;
 
 	if (auth->last_auth_query != NULL) {
 		/* find previous auth challange */
@@ -218,46 +218,60 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 		}
 	}
 
+	// TODO: do accurate evbuffer_expand() while cleaning up http-auth
 	len = evbuffer_add_printf(buff, "CONNECT %s:%u HTTP/1.0\r\n",
-	                           inet_ntoa(client->destaddr.sin_addr),
-	                           ntohs(client->destaddr.sin_port));
-	if (len < 0) goto fail;
-
-	if (auth_string != NULL) {
-		len = evbuffer_add_printf(buff, "%s %s %s\r\n",
-		                           auth_response_header,
-		                           auth_scheme,
-		                           auth_string);
-		if (len < 0) goto fail;
+		inet_ntoa(client->destaddr.sin_addr),
+		ntohs(client->destaddr.sin_port));
+	if (len < 0) {
+		redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
+		goto fail;
 	}
 
-	int send_origin = client->instance->config.login_send_origin;
-	if (send_origin > 0) {
-		char host[NI_MAXHOST];
-		char port[NI_MAXSERV];
-		if (!getnameinfo((struct sockaddr*) &client->clientaddr, sizeof(client->clientaddr),
-		                 host, sizeof(host),
-		                 port, sizeof(port),
-		                 NI_NUMERICHOST)) {
-			len = evbuffer_add_printf(buff, "X-Forwarded-For: %s%s%s\r\n",
-			                          host,
-			                          (send_origin > 1 ? ":" : ""),
-			                          (send_origin > 1 ? port : ""));
-			if (len < 0) goto fail;
+	if (auth_string) {
+		len = evbuffer_add_printf(buff, "%s %s %s\r\n",
+			auth_response_header, auth_scheme, auth_string);
+		if (len < 0) {
+			redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
+			goto fail;
+		}
+		free(auth_string);
+		auth_string = NULL;
+	}
+
+	const enum disclose_src_e disclose_src = client->instance->config.disclose_src;
+	if (disclose_src != DISCLOSE_NONE) {
+		char clientip[INET_ADDRSTRLEN];
+		const char *ip = inet_ntop(client->clientaddr.sin_family, &client->clientaddr.sin_addr, clientip, sizeof(clientip));
+		if (!ip) {
+			redsocks_log_errno(client, LOG_ERR, "inet_ntop");
+			goto fail;
+		}
+		if (disclose_src == DISCLOSE_X_FORWARDED_FOR) {
+			len = evbuffer_add_printf(buff, "X-Forwarded-For: %s\r\n", ip);
+		} else if (disclose_src == DISCLOSE_FORWARDED_IP) {
+			len = evbuffer_add_printf(buff, "Forwarded: for=%s\r\n", ip);
+		} else if (disclose_src == DISCLOSE_FORWARDED_IPPORT) {
+			len = evbuffer_add_printf(buff, "Forwarded: for=\"%s:%d\"\r\n", ip,
+				ntohs(client->clientaddr.sin_port));
+		}
+		if (len < 0) {
+			redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
+			goto fail;
 		}
 	}
 
-	len = evbuffer_add_printf(buff, "\r\n");
-	if (len < 0) goto fail;
+	len = evbuffer_add(buff, "\r\n", 2);
+	if (len < 0) {
+		redsocks_log_errno(client, LOG_ERR, "evbufer_add");
+		goto fail;
+	}
 
 	retval = buff;
 	buff = NULL;
 
 fail:
-	if (len < 0)
-		redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
-
-	free(auth_string);
+	if (auth_string)
+		free(auth_string);
 	if (buff)
 		evbuffer_free(buff);
 	return retval;

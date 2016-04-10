@@ -97,6 +97,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (event_get_struct_event_size() != sizeof(struct event)) {
+		puts("libevent event_get_struct_event_size() != sizeof(struct event)! Check `redsocks -v` and recompile redsocks");
+		return EXIT_FAILURE;
+	}
 
 	FILE *f = fopen(confname, "r");
 	if (!f) {
@@ -151,6 +155,10 @@ int main(int argc, char **argv)
 			log_errno(LOG_ERR, "signal_add");
 			goto shutdown;
 		}
+	}
+
+	if (LIBEVENT_VERSION_NUMBER != event_get_version_number()) {
+		log_error(LOG_WARNING, "libevent version mismatch! headers %8x, runtime %8x\n", LIBEVENT_VERSION_NUMBER, event_get_version_number());
 	}
 
 	log_error(LOG_NOTICE, "redsocks started");
