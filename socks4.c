@@ -103,7 +103,8 @@ static struct evbuffer *socks4_mkconnect(redsocks_client *client)
 
 	// space for \0 comes from socks4_req->login
 	size_t username_len = strlen(login);
-	if (config->login_send_origin > 0) {
+	if (config->disclose_src == DISCLOSE_USERNAME_APPEND_IP ||
+	    config->disclose_src == DISCLOSE_USERNAME_APPEND_IPPORT) {
 		username_len += NI_MAXHOST + 1 + NI_MAXSERV + 1;
 	}
 
@@ -114,8 +115,11 @@ static struct evbuffer *socks4_mkconnect(redsocks_client *client)
 	req->cmd = socks4_cmd_connect;
 	req->port = client->destaddr.sin_port;
 	req->addr = client->destaddr.sin_addr.s_addr;
-	if (config->login_send_origin > 0) {
-		// prepend origin addresss (and maybe port) to login (separated by ;)
+	strcat(req->login, login);
+	if (config->disclose_src == DISCLOSE_USERNAME_APPEND_IP ||
+	    config->disclose_src == DISCLOSE_USERNAME_APPEND_IPPORT) {
+		strcat(req->login, "@");
+		// append origin addresss (and maybe port) to login (separated by @)
 		char host[NI_MAXHOST];
 		char port[NI_MAXSERV];
 		if (!getnameinfo((struct sockaddr*) &client->clientaddr, sizeof(client->clientaddr),
@@ -123,15 +127,13 @@ static struct evbuffer *socks4_mkconnect(redsocks_client *client)
 		                 port, sizeof(port),
 		                 NI_NUMERICHOST)) {
 			strcat(req->login, host);
-			// also prepend the port
-			if (config->login_send_origin > 1) {
+			// also append the port
+			if (config->disclose_src == DISCLOSE_USERNAME_APPEND_IPPORT) {
 				strcat(req->login, ":");
 				strcat(req->login, port);
 			}
 		}
-		strcat(req->login, ";");
 	}
-	strcat(req->login, login);
 
 	struct evbuffer *ret = mkevbuffer(req, len);
 	free(req);

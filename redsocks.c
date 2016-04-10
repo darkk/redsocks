@@ -75,7 +75,6 @@ static parser_entry redsocks_entries[] =
 	{ .key = "type",       .type = pt_pchar },
 	{ .key = "login",      .type = pt_pchar },
 	{ .key = "password",   .type = pt_pchar },
-	{ .key = "login_send_origin", .type = pt_uint16 },
 	{ .key = "listenq",    .type = pt_uint16 },
 	{ .key = "splice",     .type = pt_bool },
 	{ .key = "disclose_src", .type = pt_disclose_src },
@@ -171,7 +170,6 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "type") == 0)       ? (void*)&instance->config.type :
 			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
-			(strcmp(entry->key, "login_send_origin") == 0)  ? (void*)&instance->config.login_send_origin :
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
 			(strcmp(entry->key, "splice") == 0)     ? (void*)&instance->config.use_splice :
 			(strcmp(entry->key, "disclose_src") == 0) ? (void*)&instance->config.disclose_src :
@@ -216,9 +214,23 @@ static int redsocks_onexit(parser_section *section)
 		return -1;
 	}
 
-	if (instance->config.disclose_src != DISCLOSE_NONE && instance->relay_ss != &http_connect_subsys) {
-		parser_error(section->context, "only `http-connect` supports `disclose_src` at the moment");
-		return -1;
+	switch(instance->config.disclose_src) {
+		case DISCLOSE_X_FORWARDED_FOR:
+		case DISCLOSE_FORWARDED_IP:
+		case DISCLOSE_FORWARDED_IPPORT:
+			if (instance->relay_ss != &http_connect_subsys) {
+				parser_error(section->context, "only `http-connect` supports the configured `disclose_src` option at the moment");
+				return -1;
+			}
+		case DISCLOSE_USERNAME_APPEND_IP:
+		case DISCLOSE_USERNAME_APPEND_IPPORT:
+			if (instance->relay_ss != &socks4_subsys) {
+				parser_error(section->context, "only `socks4` supports the configured `disclose_src` option at the moment");
+				return -1;
+			}
+		case DISCLOSE_NONE:
+		default:
+			break;
 	}
 
 	if (!instance->config.min_backoff_ms) {
