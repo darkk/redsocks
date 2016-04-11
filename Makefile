@@ -18,7 +18,7 @@ override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_DEFAULT_SOURCE -D_GNU_SOURCE 
 
 all: $(OUT)
 
-.PHONY: all clean distclean
+.PHONY: all clean distclean test
 
 tags: *.c *.h
 	ctags -R
@@ -97,3 +97,10 @@ clean:
 distclean: clean
 	$(RM) tags $(DEPS)
 	$(RM) -r gen
+
+tests/__build-tstamp__: $(OUT) tests/[a-z]* tests/[a-z]*/*
+	cd tests && ./build
+	touch $@
+
+test: tests/__build-tstamp__
+	cd tests && env $(TEST_ENV) ./run
