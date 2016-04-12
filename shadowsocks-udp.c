@@ -28,8 +28,6 @@
 #include "encrypt.h"
 #include "shadowsocks.h"
 
-#define SHARED_BUFF_SIZE 0x10000 //64K
-
 typedef struct ss_client_t {
     struct event   udprelay;
 } ss_client;
@@ -40,7 +38,6 @@ typedef struct ss_instance_t {
     struct enc_ctx e_ctx;
     struct enc_ctx d_ctx;
     void * buff;
-    void * buff2;
 } ss_instance;
 
 
@@ -85,6 +82,7 @@ static void ss_forward_pkt(redudp_client *client, struct sockaddr * destaddr, vo
     ss_header_ipv4 header;
     size_t len = 0;
     size_t fwdlen = 0;
+    void * buff = client->instance->shared_buff;
 
     /* build and send header */
     // TODO: Better implementation and IPv6 Support
@@ -96,11 +94,11 @@ static void ss_forward_pkt(redudp_client *client, struct sockaddr * destaddr, vo
         redudp_log_error(client, LOG_ERR, "Shadowsocks UDP failed to initialize encryption context.");
         return;
     }
-    rc = ss_encrypt(&ss->e_ctx, (char *)&header, sizeof(header), ss->buff, &len);
+    rc = ss_encrypt(&ss->e_ctx, (char *)&header, sizeof(header), buff, &len);
     if (rc)
     {
-        if (len + pktlen < SHARED_BUFF_SIZE)
-            rc = ss_encrypt(&ss->e_ctx, (char *)data, pktlen, ss->buff+len, &fwdlen);
+        if (len + pktlen < MAX_UDP_PACKET_SIZE)
+            rc = ss_encrypt(&ss->e_ctx, (char *)data, pktlen, buff+len, &fwdlen);
         else
             rc = 0;
     }
@@ -118,7 +116,7 @@ static void ss_forward_pkt(redudp_client *client, struct sockaddr * destaddr, vo
     msg.msg_iov = io;
     msg.msg_iovlen = SIZEOF_ARRAY(io);
 
-    io[0].iov_base = ss->buff;
+    io[0].iov_base = buff;
     io[0].iov_len = fwdlen;
 
     outgoing = sendmsg(event_get_fd(&ssclient->udprelay), &msg, 0);
@@ -142,10 +140,12 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
     size_t  fwdlen;
     struct sockaddr_in udprelayaddr;
     int rc;
+    void * buff = client->instance->shared_buff;
+    void * buff2 = ss->buff;
 
     assert(fd == event_get_fd(&ssclient->udprelay));
 
-    pktlen = red_recv_udp_pkt(fd, ss->buff, SHARED_BUFF_SIZE, &udprelayaddr, NULL);
+    pktlen = red_recv_udp_pkt(fd, buff, MAX_UDP_PACKET_SIZE, &udprelayaddr, NULL);
     if (pktlen == -1)
         return;
 
@@ -153,13 +153,13 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
         redudp_log_error(client, LOG_ERR, "Shadowsocks UDP failed to initialize decryption context.");
         return;
     }
-    rc = ss_decrypt(&ss->d_ctx, ss->buff, pktlen, ss->buff2, &fwdlen);
+    rc = ss_decrypt(&ss->d_ctx, buff, pktlen, buff2, &fwdlen);
     enc_ctx_free(&ss->d_ctx);
     if (!rc) {
         redudp_log_error(client, LOG_DEBUG, "Can't decrypt packet, dropping it");
         return;
     }
-    header = (ss_header_ipv4 *)ss->buff2;
+    header = (ss_header_ipv4 *)buff2;
     // We do not verify src address, but at least, we need to ensure address type is correct.
     if (header->addr_type != ss_addrtype_ipv4) {
         redudp_log_error(client, LOG_DEBUG, "Got address type #%u instead of expected #%u (IPv4).",
@@ -178,7 +178,7 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
         return;
     }
     fwdlen -= sizeof(*header);
-    redudp_fwd_pkt_to_sender(client, ss->buff2 + sizeof(*header), fwdlen, &pktaddr);
+    redudp_fwd_pkt_to_sender(client, buff2 + sizeof(*header), fwdlen, &pktaddr);
 }
 
 static int ss_ready_to_fwd(struct redudp_client_t *client)
@@ -247,15 +247,12 @@ static int ss_instance_init(struct redudp_instance_t *instance)
             red_inet_ntop(&instance->config.bindaddr, buf1, sizeof(buf1)),
             config->login);
     }
-    // Two buffers are allocated for each instance. One is for receiving plain
-    // data, one is for encryption/decrption.
-    ss->buff = malloc(SHARED_BUFF_SIZE);
-    ss->buff2 = malloc(SHARED_BUFF_SIZE);
-    if (!ss->buff || !ss->buff2) {
+    // An additional buffer is allocated for each instance for encryption/decrption.
+    ss->buff = malloc(MAX_UDP_PACKET_SIZE);
+    if (!ss->buff) {
         log_error(LOG_ERR, "Out of memory.");
         return -1;
     }
-
     return 0;
 }
 
@@ -265,10 +262,6 @@ static void ss_instance_fini(struct redudp_instance_t *instance)
     if (ss->buff) {
         free(ss->buff);
         ss->buff = NULL;
-    }
-    if (ss->buff2) {
-        free(ss->buff2);
-        ss->buff2 = NULL;
     }
 }
 

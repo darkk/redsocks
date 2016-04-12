@@ -46,7 +46,7 @@
 #define REDUDP_AUDIT_INTERVAL 10
 
 // Multiple instances share the same buffer for message receiving
-static char recv_buff[64*1024];// max size of UDP packet is less than 64K
+static char shared_buff[MAX_UDP_PACKET_SIZE];// max size of UDP packet is less than 64K
 
 static void redudp_fini_instance(redudp_instance *instance);
 static int redudp_fini();
@@ -394,7 +394,7 @@ static void redudp_pkt_from_client(int fd, short what, void *_arg)
 
     assert(fd == event_get_fd(&self->listener));
     // destaddr will be filled with true destination if it is available
-    pktlen = red_recv_udp_pkt(fd, recv_buff, sizeof(recv_buff), &clientaddr, pdestaddr);
+    pktlen = red_recv_udp_pkt(fd, self->shared_buff, MAX_UDP_PACKET_SIZE, &clientaddr, pdestaddr);
     if (pktlen == -1)
         return;
     if (!pdestaddr)
@@ -414,14 +414,14 @@ static void redudp_pkt_from_client(int fd, short what, void *_arg)
         redudp_bump_timeout(client);
 
         if (self->relay_ss->ready_to_fwd(client)) {
-            self->relay_ss->forward_pkt(client, (struct sockaddr *)pdestaddr, recv_buff, pktlen);
+            self->relay_ss->forward_pkt(client, (struct sockaddr *)pdestaddr, self->shared_buff, pktlen);
         }
         else {
-            redudp_enqeue_pkt(client, pdestaddr, recv_buff, pktlen);
+            redudp_enqeue_pkt(client, pdestaddr, self->shared_buff, pktlen);
         }
     }
     else {
-        redudp_first_pkt_from_client(self, &clientaddr, pdestaddr, recv_buff, pktlen);
+        redudp_first_pkt_from_client(self, &clientaddr, pdestaddr, self->shared_buff, pktlen);
     }
 }
 
@@ -548,6 +548,7 @@ static int redudp_init_instance(redudp_instance *instance)
     int fd = -1;
     char buf1[RED_INET_ADDRSTRLEN], buf2[RED_INET_ADDRSTRLEN];
 
+    instance->shared_buff = &shared_buff[0];
     if (instance->relay_ss->instance_init 
         && instance->relay_ss->instance_init(instance)) {
         log_errno(LOG_ERR, "Failed to init UDP relay subsystem.");

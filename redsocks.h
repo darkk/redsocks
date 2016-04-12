@@ -65,7 +65,7 @@ typedef struct redsocks_client_t {
 	struct sockaddr_in  clientaddr;
 	struct sockaddr_in  destaddr;
 	int                 state;         // it's used by bottom layer
-	int                 relay_connected;
+	short               relay_connected;
 	unsigned short      client_evshut;
 	unsigned short      relay_evshut;
 	time_t              first_event;

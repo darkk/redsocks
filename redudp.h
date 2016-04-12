@@ -4,6 +4,8 @@
 #include <event.h>
 #include "list.h"
 
+#define MAX_UDP_PACKET_SIZE 0xFFFF
+
 struct redudp_client_t;
 struct redudp_instance_t;
 
@@ -42,6 +44,7 @@ typedef struct redudp_instance_t {
 	struct event    listener;
 	list_head       clients;
 	udprelay_subsys   *relay_ss;
+	void *          shared_buff; // pointer to 64K buffer shared by clients for receiving/processing udp packets
 } redudp_instance;
 
 typedef struct redudp_client_t {
