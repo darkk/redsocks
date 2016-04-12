@@ -37,6 +37,7 @@ typedef struct redsocks_config_t {
 	uint16_t listenq;
 	bool use_splice;
 	enum disclose_src_e disclose_src;
+	enum on_proxy_fail_e on_proxy_fail;
 } redsocks_config;
 
 struct tracked_event {
@@ -106,6 +107,7 @@ static inline redsocks_pump* red_pump(redsocks_client *c)
 	return (redsocks_pump*)c;
 }
 
+void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 void redsocks_drop_client(redsocks_client *client);
 void redsocks_touch_client(redsocks_client *client);
 void redsocks_connect_relay(redsocks_client *client);

@@ -1,6 +1,7 @@
 from functools import partial
 from multiprocessing.dummy import Pool as ThrPool
 from subprocess import check_call, check_output
+import multiprocessing
 import os
 import time
 
@@ -143,9 +144,13 @@ class TankVM(VM):
 
 class RegwVM(VM):
     def __init__(self):
-        if int(os.environ.get('VALGRIND_TEST', '0')):
+        debug = os.environ.get('DEBUG_TEST', '')
+        if debug:
             self.preserve_root = True
-            kw = {'cmd': 'valgrind --leak-check=full --show-leak-kinds=all /usr/local/sbin/redsocks -c /usr/local/etc/redsocks.conf'}
+            kw = {'cmd': {
+                'valgrind': 'valgrind --leak-check=full --show-leak-kinds=all /usr/local/sbin/redsocks -c /usr/local/etc/redsocks.conf',
+                'strace': 'strace -ttt /usr/local/sbin/redsocks -c /usr/local/etc/redsocks.conf',
+            }[debug]}
         else:
             kw = {}
         VM.__init__(self, 'regw', 'redsocks/regw', **kw)
@@ -158,9 +163,15 @@ class RegwVM(VM):
         for t in TANKS.values():
             self.netcall('iptables -t nat -A PREROUTING --source 10.0.2.%d/32 --dest 10.0.1.0/24 -p tcp -j REDIRECT --to-port %d' % (t, 12340 + t - TANKS_BASE))
 
-def pmap(l):
+CPU = object()
+MAX = object()
+def pmap(l, j=MAX):
     #return map(lambda x: x(), l)
-    p = ThrPool(len(l))
+    if j is MAX:
+        j = len(l)
+    elif j is CPU:
+        j = multiprocessing.cpu_count()
+    p = ThrPool(j)
     try:
         return p.map(lambda x: x(), l, chunksize=1)
     finally:
@@ -180,6 +191,10 @@ TANKS = {
     'socks5_nopass': TANKS_BASE + 8,
     'socks5_baduser': TANKS_BASE + 9,
     'socks5_badpass': TANKS_BASE + 10,
+    'httperr_connect_nopass': TANKS_BASE + 11,
+    'httperr_connect_baduser': TANKS_BASE + 12,
+    'httperr_connect_badpass': TANKS_BASE + 13,
+    'httperr_connect_digest': TANKS_BASE + 14,
 }
 
 class _Network(object):
@@ -199,6 +214,7 @@ class _Network(object):
             vm.append(partial(TankVM, t))
         self.vm = {_.name: _ for _ in pmap(vm)} # pmap saves ~5 seconds
     def close(self):
+        check_output('sudo docker ps'.split())
         pmap([_.close for _ in self.vm.values()]) # pmap saves ~7 seconds
 
 @pytest.fixture(scope="session")

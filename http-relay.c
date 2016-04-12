@@ -126,24 +126,9 @@ static void httpr_instance_init(redsocks_instance *instance)
 
 static void httpr_instance_fini(redsocks_instance *instance)
 {
-	http_auth *auth = (void*)(instance + 1);
+	http_auth *auth = red_http_auth(instance);
 	free(auth->last_auth_query);
 	auth->last_auth_query = NULL;
-}
-
-static char *get_auth_request_header(struct evbuffer *buf)
-{
-	char *line;
-	for (;;) {
-		line = redsocks_evbuffer_readline(buf);
-		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
-			free(line);
-			return NULL;
-		}
-		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
-			return line;
-		free(line);
-	}
 }
 
 static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
@@ -168,7 +153,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 			unsigned int code;
 			if (sscanf(line, "HTTP/%*u.%*u %u", &code) == 1) { // 1 == one _assigned_ match
 				if (code == 407) { // auth failed
-					http_auth *auth = (void*)(client->instance + 1);
+					http_auth *auth = red_http_auth(client->instance);
 
 					if (auth->last_auth_query != NULL && auth->last_auth_count == 1) {
 						redsocks_log_error(client, LOG_NOTICE, "HTTP Proxy auth failed: %s", line);
@@ -180,7 +165,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 						dropped = 1;
 					} else {
 						free(line);
-						char *auth_request = get_auth_request_header(buffev->input);
+						char *auth_request = http_auth_request_header(buffev->input, NULL);
 
 						if (!auth_request) {
 							redsocks_log_error(client, LOG_NOTICE, "HTTP Proxy auth required, but no <%s> header found: %s", auth_request_header, line);
@@ -225,6 +210,10 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 					redsocks_drop_client(client);
 					dropped = 1;
 				}
+			} else {
+				redsocks_log_error(client, LOG_NOTICE, "HTTP Proxy bad firstline: %s", line);
+				redsocks_drop_client(client);
+				dropped = 1;
 			}
 			free(line);
 		}
@@ -285,7 +274,7 @@ static void httpr_relay_write_cb(struct bufferevent *buffev, void *_arg)
 		}
 
 
-		http_auth *auth = (void*)(client->instance + 1);
+		http_auth *auth = red_http_auth(client->instance);
 		++auth->last_auth_count;
 
 		const char *auth_scheme = NULL;

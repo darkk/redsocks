@@ -25,7 +25,7 @@
 
 #include "md5.h"
 #include "base64.h"
-
+#include "log.h"
 #include "http-auth.h"
 
 char* basic_authentication_encode(const char *user, const char *passwd)
@@ -270,3 +270,28 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 
 const char *auth_request_header = "Proxy-Authenticate:";
 const char *auth_response_header = "Proxy-Authorization:";
+
+char *http_auth_request_header(struct evbuffer *src, struct evbuffer *tee)
+{
+	char *line;
+	for (;;) {
+		line = redsocks_evbuffer_readline(src);
+		if (tee && line) {
+			if (evbuffer_add(tee, line, strlen(line)) != 0 ||
+			    evbuffer_add(tee, "\r\n", 2) != 0)
+			{
+				log_error(LOG_NOTICE, "evbuffer_add");
+				free(line);
+				return NULL; // I'm going up straight to the 403...
+			}
+		}
+		// FIXME: multi-line headers are not supported
+		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
+			free(line);
+			return NULL;
+		}
+		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
+			return line;
+		free(line);
+	}
+}

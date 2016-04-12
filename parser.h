@@ -11,6 +11,11 @@ enum disclose_src_e {
 	DISCLOSE_FORWARDED_IPPORT,
 };
 
+enum on_proxy_fail_e {
+	ONFAIL_CLOSE,
+	ONFAIL_FORWARD_HTTP_ERR,
+};
+
 typedef enum {
 	pt_bool,      // "bool" from stdbool.h, not "_Bool" or anything else
 	pt_pchar,
@@ -18,6 +23,7 @@ typedef enum {
 	pt_in_addr,
 	pt_in_addr2,  // inaddr[0] = net, inaddr[1] = netmask
 	pt_disclose_src,
+	pt_on_proxy_fail,
 } parser_type;
 
 typedef struct parser_entry_t {

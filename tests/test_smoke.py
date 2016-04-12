@@ -9,9 +9,10 @@ import pytest
 def test_vmdebug(net):
     check_call('sleep 365d'.split())
 
-GOOD_AUTH = 'connect_none connect_basic connect_digest socks5_none socks5_auth'.split()
+GOOD_AUTH = 'connect_none connect_basic connect_digest socks5_none socks5_auth httperr_connect_digest'.split()
 BAD_AUTH = 'connect_nopass connect_baduser connect_badpass socks5_nopass socks5_baduser socks5_badpass'.split()
-assert set(conftest.TANKS) == set(GOOD_AUTH + BAD_AUTH)
+UGLY_AUTH = 'httperr_connect_nopass httperr_connect_baduser httperr_connect_badpass'.split()
+assert set(conftest.TANKS) == set(GOOD_AUTH + BAD_AUTH + UGLY_AUTH)
 
 @pytest.mark.parametrize('tank', GOOD_AUTH)
 def test_smoke(net, tank):
@@ -26,12 +27,24 @@ def test_badauth(net, tank):
         vm.do('curl --max-time 0.5 http://10.0.1.80/')
     assert excinfo.value.returncode == 52 # Empty reply from server
 
-@pytest.mark.parametrize('tank', conftest.TANKS)
+@pytest.mark.parametrize('tank', UGLY_AUTH)
+def test_uglyauth(net, tank):
+    vm = net.vm['tank%d' % conftest.TANKS[tank]]
+    page = vm.do('curl -sSv --max-time 0.5 http://10.0.1.80/')
+    assert '<!-- ERR_CACHE_ACCESS_DENIED -->' in page
+
+@pytest.mark.parametrize('tank', set(conftest.TANKS) - set(UGLY_AUTH + ['httperr_connect_digest']))
 def test_econnrefused(net, tank):
     vm = net.vm['tank%d' % conftest.TANKS[tank]]
     with pytest.raises(CalledProcessError) as excinfo:
         vm.do('curl --max-time 0.5 http://10.0.1.80:81/')
     assert excinfo.value.returncode == 52 # Empty reply from server
+
+def test_econnrefused_httperr(net):
+    tank = 'httperr_connect_digest'
+    vm = net.vm['tank%d' % conftest.TANKS[tank]]
+    page = vm.do('curl --max-time 0.5 http://10.0.1.80:81/')
+    assert '<!-- ERR_CONNECT_FAIL -->' in page
 
 RTT = 200 # ms
 

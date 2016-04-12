@@ -46,7 +46,6 @@ enum pump_state_t {
 	pump_MAX = 0,
 };
 
-static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 static const char *redsocks_event_str(unsigned short what);
 static int redsocks_start_bufferpump(redsocks_client *client);
 static int redsocks_start_splicepump(redsocks_client *client);
@@ -78,6 +77,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "listenq",    .type = pt_uint16 },
 	{ .key = "splice",     .type = pt_bool },
 	{ .key = "disclose_src", .type = pt_disclose_src },
+	{ .key = "on_proxy_fail", .type = pt_on_proxy_fail },
 	{ .key = "min_accept_backoff", .type = pt_uint16 },
 	{ .key = "max_accept_backoff", .type = pt_uint16 },
 	{ }
@@ -160,6 +160,7 @@ static int redsocks_onenter(parser_section *section)
 	instance->config.max_backoff_ms = 60000;
 	instance->config.use_splice = is_splice_good();
 	instance->config.disclose_src = DISCLOSE_NONE;
+	instance->config.on_proxy_fail = ONFAIL_CLOSE;
 
 	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
 		entry->addr =
@@ -173,6 +174,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
 			(strcmp(entry->key, "splice") == 0)     ? (void*)&instance->config.use_splice :
 			(strcmp(entry->key, "disclose_src") == 0) ? (void*)&instance->config.disclose_src :
+			(strcmp(entry->key, "on_proxy_fail") == 0) ? (void*)&instance->config.on_proxy_fail :
 			(strcmp(entry->key, "min_accept_backoff") == 0) ? (void*)&instance->config.min_backoff_ms :
 			(strcmp(entry->key, "max_accept_backoff") == 0) ? (void*)&instance->config.max_backoff_ms :
 			NULL;
@@ -216,6 +218,11 @@ static int redsocks_onexit(parser_section *section)
 
 	if (instance->config.disclose_src != DISCLOSE_NONE && instance->relay_ss != &http_connect_subsys) {
 		parser_error(section->context, "only `http-connect` supports `disclose_src` at the moment");
+		return -1;
+	}
+
+	if (instance->config.on_proxy_fail != ONFAIL_CLOSE && instance->relay_ss != &http_connect_subsys) {
+		parser_error(section->context, "only `http-connect` supports `on_proxy_fail` at the moment");
 		return -1;
 	}
 
@@ -452,7 +459,7 @@ static void redsplice_write_cb(redsocks_pump *pump, redsplice_write_ctx *c, int 
 						can_write = false;
 						goto decide;
 					} else {
-						redsocks_log_errno(&pump->c, pipeprio(pump, out), "evbuffer_write(to %s)", pipename(pump, out));
+						redsocks_log_errno(&pump->c, pipeprio(pump, out), "evbuffer_write(to %s, %zu)", pipename(pump, out), avail);
 						redsocks_drop_client(&pump->c);
 						return;
 					}
@@ -649,6 +656,12 @@ static int redsocks_start_splicepump(redsocks_client *client)
 		return error;
 	}
 
+	// going to steal this buffers to the socket
+	evbuffer_unfreeze(client->client->input, 0);
+	evbuffer_unfreeze(client->client->output, 1);
+	evbuffer_unfreeze(client->relay->input, 0);
+	evbuffer_unfreeze(client->relay->output, 1);
+
 	redsocks_pump *pump = red_pump(client);
 	if (!error)
 		error = pipe2(&pump->request.read, O_NONBLOCK);
@@ -759,7 +772,7 @@ void redsocks_drop_client(redsocks_client *client)
 	free(client);
 }
 
-static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how)
+void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how)
 {
 	short evhow = 0;
 	const char *strev, *strhow = NULL, *strevhow = NULL;
@@ -793,9 +806,12 @@ static void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffe
 	// if EV_WRITE is already shut and we're going to shutdown read then
 	// we're either going to abort data flow (bad behaviour) or confirm EOF
 	// and in this case socket is already SHUT_RD'ed
-	if ( !(how == SHUT_RD && (*pevshut & EV_WRITE)) )
+	if ( !(how == SHUT_RD && (*pevshut & EV_WRITE)) ) {
 		if (shutdown(event_get_fd(&buffev->ev_read), how) != 0)
 			redsocks_log_errno(client, LOG_ERR, "shutdown(%s, %s)", strev, strhow);
+	} else {
+		redsocks_log_error(client, LOG_DEBUG, "ignored shutdown(%s, %s)", strev, strhow);
+	}
 
 	redsocks_log_error(client, LOG_DEBUG, "shutdown: bufferevent_disable(%s, %s)", strev, strevhow);
 	if (bufferevent_disable(buffev, evhow) != 0)

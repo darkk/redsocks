@@ -89,6 +89,11 @@ redsocks {
 	//  Forwarded_ip     -- Forwarded: for=IP # see RFC7239
 	//  Forwarded_ipport -- Forwarded: for="IP:port" # see RFC7239
 	// disclose_src = false;
+
+	// various ways to handle proxy failure
+	//  close -- just close connection (default)
+	//  forward_http_err -- forward HTTP error page from proxy as-is
+	// on_proxy_fail = close;
 }
 
 redudp {

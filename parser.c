@@ -291,6 +291,23 @@ static int vp_disclose_src(parser_context *context, void *addr, const char *toke
 	return -1;
 }
 
+static int vp_on_proxy_fail(parser_context *context, void *addr, const char *token)
+{
+	enum on_proxy_fail_e *dst = addr;
+	struct { char *name; enum on_proxy_fail_e value; } opt[] = {
+		{ "close", ONFAIL_CLOSE },
+		{ "forward_http_err", ONFAIL_FORWARD_HTTP_ERR },
+	};
+	for (int i = 0; i < SIZEOF_ARRAY(opt); ++i) {
+		if (strcmp(token, opt[i].name) == 0) {
+			*dst = opt[i].value;
+			return 0;
+		}
+	}
+	parser_error(context, "on_proxy_fail <%s> is not parsed", token);
+	return -1;
+}
+
 static int vp_pchar(parser_context *context, void *addr, const char *token)
 {
 	char *p = strdup(token);
@@ -421,6 +438,7 @@ static value_parser value_parser_by_type[] =
 	[pt_in_addr] = vp_in_addr,
 	[pt_in_addr2] = vp_in_addr2,
 	[pt_disclose_src] = vp_disclose_src,
+	[pt_on_proxy_fail] = vp_on_proxy_fail,
 };
 
 int parser_run(parser_context *context)
