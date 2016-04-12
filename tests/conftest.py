@@ -52,8 +52,8 @@ class VM(object):
         self.net_br_gw()
 
     def net_noext(self):
-        self.call('sudo ip netns exec {name} ip link set dev eth0 down')
-        self.call('sudo ip netns exec {name} ip route replace unreachable {dns}/32')
+        self.netcall('ip link set dev eth0 down')
+        self.netcall('ip route replace unreachable {dns}/32')
 
     def net_br_gw(self):
         self.call('sudo {pipework} br-{br} -i {intif} -l {vethif} {name} {ip4}/24@{gw4}')
@@ -96,6 +96,8 @@ class VM(object):
         check_call(self.fmt(cmd))
     def do(self, cmd):
         return self.output('sudo docker exec {sha} ' + cmd)
+    def netcall(self, cmd):
+        return self.output('sudo ip netns exec {name} ' + cmd)
 
 class WebVM(VM):
     def __init__(self):
@@ -112,7 +114,7 @@ class SquidVM(VM):
                     cmd='/etc/squid3/squid-%d.conf' % no)
     def net(self):
         self.net_br_nogw()
-        self.call('sudo ip netns exec {name} ip route replace 10.0.0.0/16 via 10.0.1.1')
+        self.netcall('ip route replace 10.0.0.0/16 via 10.0.1.1')
 
 class DanteVM(VM):
     def __init__(self, no):
@@ -120,7 +122,7 @@ class DanteVM(VM):
                     cmd='/etc/danted-%d.conf' % (1080 + no))
     def net(self):
         self.net_br_nogw()
-        self.call('sudo ip netns exec {name} ip route replace 10.0.0.0/16 via 10.0.1.1')
+        self.netcall('ip route replace 10.0.0.0/16 via 10.0.1.1')
 
 
 class GwVM(VM):
@@ -132,7 +134,7 @@ class GwVM(VM):
         self.ip4 = '10.0.8.1'
         self.net_br_nogw()
         del self.ip4
-        self.call('sudo ip netns exec {name} ip route replace unreachable 10.0.2.0/24')
+        self.netcall('ip route replace unreachable 10.0.2.0/24')
 
 class TankVM(VM):
     def __init__(self, no):
@@ -154,7 +156,7 @@ class RegwVM(VM):
         self.net_br_gw()
         del self.ip4
         for t in TANKS.values():
-            self.call('sudo ip netns exec {name} iptables -t nat -A PREROUTING --source 10.0.2.%d/32 --dest 10.0.1.0/24 -p tcp -j REDIRECT --to-port %d' % (t, 12340 + t - TANKS_BASE))
+            self.netcall('iptables -t nat -A PREROUTING --source 10.0.2.%d/32 --dest 10.0.1.0/24 -p tcp -j REDIRECT --to-port %d' % (t, 12340 + t - TANKS_BASE))
 
 def pmap(l):
     #return map(lambda x: x(), l)
