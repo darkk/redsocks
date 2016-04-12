@@ -150,6 +150,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 			free(line);
 		}
 		else if (len >= HTTP_HEAD_WM_HIGH) {
+			redsocks_log_error(client, LOG_NOTICE, "HTTP Proxy reply is too long, %zu bytes", len);
 			redsocks_drop_client(client);
 			dropped = 1;
 		}
