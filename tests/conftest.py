@@ -200,3 +200,10 @@ def net(request):
     n = _Network()
     request.addfinalizer(n.close)
     return n
+
+def pytest_addoption(parser):
+    parser.addoption('--vmdebug', action='store_true', help='run `test_debug` test')
+
+def pytest_cmdline_preparse(args):
+    if '--vmdebug' in args:
+        args[:] = ['-k', 'test_vmdebug'] + args
