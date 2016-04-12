@@ -80,7 +80,7 @@ You can get a copy at http://www.apache.org/licenses/LICENSE-2.0.html
 
 Packages
 ========
- * Archlinux: https://aur.archlinux.org/packages.php?ID=41765
+ * Archlinux: https://aur.archlinux.org/packages/redsocks-git
  * Debian: http://packages.debian.org/search?searchon=names&keywords=redsocks
  * Gentoo (pentoo overlay): https://code.google.com/p/pentoo/source/browse/portage/trunk/net-proxy/redsocks
  * Gentoo (theebuilds overlay): http://code.google.com/p/theebuilds/source/browse/trunk/net-misc/redsocks
