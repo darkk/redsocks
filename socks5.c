@@ -231,7 +231,7 @@ static void socks5_read_auth_reply(struct bufferevent *buffev, redsocks_client *
 		return;
 
 	if (reply.ver != socks5_password_ver) {
-		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected auth reply version...");
+		redsocks_log_error(client, LOG_NOTICE, "Socks5 server reported unexpected auth reply version %d", reply.ver);
 		redsocks_drop_client(client);
 	}
 	else if (reply.status == socks5_password_passed)
@@ -239,8 +239,10 @@ static void socks5_read_auth_reply(struct bufferevent *buffev, redsocks_client *
 			buffev, client,
 			socks5_mkconnect, socks5_request_sent, sizeof(socks5_reply)
 			);
-	else
+	else {
+		redsocks_log_error(client, LOG_NOTICE, "Socks5 auth failure, status %i", reply.status);
 		redsocks_drop_client(client);
+    }
 }
 
 static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *client, socks5_client *socks5)

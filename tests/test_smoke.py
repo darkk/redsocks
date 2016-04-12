@@ -1,5 +1,5 @@
 from functools import partial
-from subprocess import check_call
+from subprocess import check_call, CalledProcessError
 import time
 
 import conftest
@@ -9,11 +9,29 @@ import pytest
 def test_vmdebug(net):
     check_call('sleep 365d'.split())
 
-@pytest.mark.parametrize('tank', conftest.TANKS.keys())
+GOOD_AUTH = 'connect_none connect_basic connect_digest socks5_none socks5_auth'.split()
+BAD_AUTH = 'connect_nopass connect_baduser connect_badpass socks5_nopass socks5_baduser socks5_badpass'.split()
+assert set(conftest.TANKS) == set(GOOD_AUTH + BAD_AUTH)
+
+@pytest.mark.parametrize('tank', GOOD_AUTH)
 def test_smoke(net, tank):
     vm = net.vm['tank%d' % conftest.TANKS[tank]]
     page = vm.do('curl --max-time 0.5 http://10.0.1.80/')
     assert 'Welcome to nginx!' in page
+
+@pytest.mark.parametrize('tank', BAD_AUTH)
+def test_badauth(net, tank):
+    vm = net.vm['tank%d' % conftest.TANKS[tank]]
+    with pytest.raises(CalledProcessError) as excinfo:
+        vm.do('curl --max-time 0.5 http://10.0.1.80/')
+    assert excinfo.value.returncode == 52 # Empty reply from server
+
+@pytest.mark.parametrize('tank', conftest.TANKS)
+def test_econnrefused(net, tank):
+    vm = net.vm['tank%d' % conftest.TANKS[tank]]
+    with pytest.raises(CalledProcessError) as excinfo:
+        vm.do('curl --max-time 0.5 http://10.0.1.80:81/')
+    assert excinfo.value.returncode == 52 # Empty reply from server
 
 RTT = 200 # ms
 
@@ -45,7 +63,7 @@ def http_ping(vm):
     connect, total, code, size = float(connect) * 1000, float(total) * 1000, int(code), int(size)
     return connect, total, code, size
 
-@pytest.mark.parametrize('tank', conftest.TANKS.keys())
+@pytest.mark.parametrize('tank', set(conftest.TANKS) & set(LATENCY))
 def test_latency_tank(slow_net, tank):
     vm = slow_net.vm['tank%d' % conftest.TANKS[tank]]
     heatup(vm)

@@ -174,6 +174,12 @@ TANKS = {
     'connect_digest': TANKS_BASE + 2,
     'socks5_none': TANKS_BASE + 3,
     'socks5_auth': TANKS_BASE + 4,
+    'connect_nopass': TANKS_BASE + 5,
+    'connect_baduser': TANKS_BASE + 6,
+    'connect_badpass': TANKS_BASE + 7,
+    'socks5_nopass': TANKS_BASE + 8,
+    'socks5_baduser': TANKS_BASE + 9,
+    'socks5_badpass': TANKS_BASE + 10,
 }
 
 class _Network(object):

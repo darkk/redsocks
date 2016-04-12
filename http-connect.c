@@ -94,20 +94,17 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 					http_auth *auth = (void*)(client->instance + 1);
 
 					if (auth->last_auth_query != NULL && auth->last_auth_count == 1) {
-						redsocks_log_error(client, LOG_NOTICE, "proxy auth failed");
+						redsocks_log_error(client, LOG_NOTICE, "HTTP Proxy auth failed: %s", line);
 						redsocks_drop_client(client);
-
 						dropped = 1;
 					} else if (client->instance->config.login == NULL || client->instance->config.password == NULL) {
-						redsocks_log_error(client, LOG_NOTICE, "proxy auth required, but no login information provided");
+						redsocks_log_error(client, LOG_NOTICE, "HTTP Proxy auth required, but no login/password configured: %s", line);
 						redsocks_drop_client(client);
-
 						dropped = 1;
 					} else {
 						char *auth_request = get_auth_request_header(buffev->input);
-
 						if (!auth_request) {
-							redsocks_log_error(client, LOG_NOTICE, "403 found, but no proxy auth challenge");
+							redsocks_log_error(client, LOG_NOTICE, "HTTP Proxy auth required, but no <%s> header found: %s", auth_request_header, line);
 							redsocks_drop_client(client);
 							dropped = 1;
 						} else {
@@ -145,7 +142,7 @@ static void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 				} else if (200 <= code && code <= 299) {
 					client->state = httpc_reply_came;
 				} else {
-					redsocks_log_error(client, LOG_NOTICE, "%s", line);
+					redsocks_log_error(client, LOG_NOTICE, "HTTP Proxy error: %s", line);
 					redsocks_drop_client(client);
 					dropped = 1;
 				}
