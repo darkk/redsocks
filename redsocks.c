@@ -749,22 +749,27 @@ void redsocks_drop_client(redsocks_client *client)
 			redsocks_close(pump->reply.write);
 
 		// redsocks_close MAY log error if some of events was not properly initialized
+		int fd = -1;
 		if (event_initialized(&pump->client_read)) {
-			int fd = event_get_fd(&pump->client_read);
+			fd = event_get_fd(&pump->client_read);
 			redsocks_event_del(&pump->c, &pump->client_read);
-			redsocks_close(fd);
 		}
 		if (event_initialized(&pump->client_write)) {
 			redsocks_event_del(&pump->c, &pump->client_write);
 		}
-
-		if (event_initialized(&pump->relay_read)) {
-			int fd = event_get_fd(&pump->relay_read);
-			redsocks_event_del(&pump->c, &pump->relay_read);
+		if (fd != -1)
 			redsocks_close(fd);
+
+		fd = -1;
+		if (event_initialized(&pump->relay_read)) {
+			fd = event_get_fd(&pump->relay_read);
+			redsocks_event_del(&pump->c, &pump->relay_read);
 		}
 		if (event_initialized(&pump->relay_write)) {
 			redsocks_event_del(&pump->c, &pump->relay_write);
+		}
+		if (fd != -1) {
+			redsocks_close(fd);
 		}
 	}
 
