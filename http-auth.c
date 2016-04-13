@@ -32,15 +32,15 @@ char* basic_authentication_encode(const char *user, const char *passwd)
 {
 	/* prepare the user:pass key pair */
 	int pair_len = strlen(user) + 1 + strlen(passwd);
-	char *pair_ptr = calloc(pair_len + 1, 1);
+	char pair[pair_len + 1];
 
-	sprintf(pair_ptr, "%s:%s", user, passwd);
+	sprintf(pair, "%s:%s", user, passwd);
 
 	/* calculate the final string length */
 	int basic_len = BASE64_SIZE(pair_len);
 	char *basic_ptr = calloc(basic_len + 1, 1);
 
-	if (!base64_encode(basic_ptr, basic_len, (const uint8_t*)pair_ptr, pair_len))
+	if (!base64_encode(basic_ptr, basic_len, (const uint8_t*)pair, pair_len))
 		return NULL;
 
 	return basic_ptr;
