@@ -102,5 +102,8 @@ tests/__build-tstamp__: $(OUT) tests/[a-z]* tests/[a-z]*/*
 	cd tests && ./build
 	touch $@
 
-test: tests/__build-tstamp__
+tests/prlimit-nofile: tests/prlimit-nofile.c
+	$(CC) $(CFLAGS) -o $@ $^
+
+test: tests/__build-tstamp__ tests/prlimit-nofile
 	cd tests && env $(TEST_ENV) ./run

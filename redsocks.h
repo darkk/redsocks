@@ -32,25 +32,16 @@ typedef struct redsocks_config_t {
 	char *type;
 	char *login;
 	char *password;
-	uint16_t min_backoff_ms;
-	uint16_t max_backoff_ms; // backoff capped by 65 seconds is enough :)
 	uint16_t listenq;
 	bool use_splice;
 	enum disclose_src_e disclose_src;
 	enum on_proxy_fail_e on_proxy_fail;
 } redsocks_config;
 
-struct tracked_event {
-	struct event ev;
-	struct timeval inserted;
-};
-
 typedef struct redsocks_instance_t {
 	list_head       list;
 	redsocks_config config;
-	struct tracked_event listener;
-	struct tracked_event accept_backoff;
-	uint16_t        accept_backoff_ms;
+	struct event    listener;
 	list_head       clients;
 	relay_subsys   *relay_ss;
 } redsocks_instance;
@@ -67,8 +58,8 @@ typedef struct redsocks_client_t {
 	int                 state;         // it's used by bottom layer
 	evshut_t            client_evshut;
 	evshut_t            relay_evshut;
-	time_t              first_event;
-	time_t              last_event;
+	struct timeval      first_event;
+	struct timeval      last_event;
 } redsocks_client;
 
 typedef struct splice_pipe_t {
@@ -112,6 +103,7 @@ void redsocks_drop_client(redsocks_client *client);
 void redsocks_touch_client(redsocks_client *client);
 void redsocks_connect_relay(redsocks_client *client);
 void redsocks_start_relay(redsocks_client *client);
+bool redsocks_has_splice_instance();
 
 typedef int (*size_comparator)(size_t a, size_t b);
 int sizes_equal(size_t a, size_t b);

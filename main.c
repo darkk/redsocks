@@ -27,6 +27,7 @@
 #include "utils.h"
 #include "version.h"
 #include "config.h"
+#include "base.h"
 
 extern app_subsys redsocks_subsys;
 extern app_subsys debug_subsys;
@@ -161,7 +162,7 @@ int main(int argc, char **argv)
 		log_error(LOG_WARNING, "libevent version mismatch! headers %8x, runtime %8x\n", LIBEVENT_VERSION_NUMBER, event_get_version_number());
 	}
 
-	log_error(LOG_NOTICE, "redsocks started");
+	log_error(LOG_NOTICE, "redsocks started, conn_max=%u", redsocks_conn_max());
 
 	event_dispatch();
 

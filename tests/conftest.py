@@ -1,6 +1,6 @@
 from functools import partial
 from multiprocessing.dummy import Pool as ThrPool
-from subprocess import check_call, check_output
+from subprocess import check_call, check_output, STDOUT
 import multiprocessing
 import os
 import time
@@ -24,11 +24,13 @@ GW = {
 }
 
 SLEEPING_BEAST = 'sleep 3600'
+DOCKER_CMD = os.environ.get('DOCKER_CMD', '/usr/bin/docker')
+PIPEWORK_CMD = os.environ.get('PIPEWORK_CMD', '/usr/bin/pipework')
 
 class VM(object):
     def __init__(self, name, tag, ip4=None, cmd='', docker_opt=''):
-        self.docker = os.environ.get('DOCKER_CMD', '/usr/bin/docker')
-        self.pipework = os.environ.get('PIPEWORK_CMD', '/usr/bin/pipework')
+        self.docker = DOCKER_CMD
+        self.pipework = PIPEWORK_CMD
         self.netns = '/var/run/netns'
         self.dns = '8.8.8.8'
 
@@ -75,9 +77,13 @@ class VM(object):
     def vethif(self):
         return ('v' + self.intif + self.name)[:15] # IFNAMSIZ 16
 
+    def assert_good_death(self):
+        pass
+
     def close(self):
         if hasattr(self, 'sha'):
             self.call('sudo docker stop --time 1 {sha}')
+            self.assert_good_death()
             if not getattr(self, 'preserve_root', False):
                 self.call('sudo docker rm {sha}')
             del self.sha
@@ -91,14 +97,26 @@ class VM(object):
                 key = e.args[0]
                 ctx[key] = getattr(self, key)
         return ret
-    def output(self, cmd):
-        return check_output(self.fmt(cmd))
+    def output(self, cmd, **kwargs):
+        return check_output(self.fmt(cmd), **kwargs)
+    def logs(self, since=None):
+        out = self.output('sudo docker logs {sha}', stderr=STDOUT)
+        out = [_.split(None, 1) for _ in out.split('\n')]
+        out = [(float(_[0]), _[1]) for _ in out if len(_) == 2 and _[0][:10].isdigit()]
+        if since is not None:
+            out = [_ for _ in out if _[0] >= since]
+        return out
     def call(self, cmd):
         check_call(self.fmt(cmd))
     def do(self, cmd):
         return self.output('sudo docker exec {sha} ' + cmd)
     def netcall(self, cmd):
         return self.output('sudo ip netns exec {name} ' + cmd)
+    def lsfd(self):
+        out = self.output('sudo lsof -p {pid} -F f')
+        out = [int(_[1:]) for _ in out.split() if _[0] == 'f' and _[1:].isdigit()]
+        assert len(out) > 0
+        return out
 
 class WebVM(VM):
     def __init__(self):
@@ -136,6 +154,7 @@ class GwVM(VM):
         self.net_br_nogw()
         del self.ip4
         self.netcall('ip route replace unreachable 10.0.2.0/24')
+        self.netcall('iptables -A FORWARD --destination 10.0.1.66/32 -j DROP')
 
 class TankVM(VM):
     def __init__(self, no):
@@ -144,15 +163,15 @@ class TankVM(VM):
 
 class RegwVM(VM):
     def __init__(self):
-        debug = os.environ.get('DEBUG_TEST', '')
-        if debug:
+        kw = {}
+        self.debug = os.environ.get('DEBUG_TEST', '')
+        if self.debug:
             self.preserve_root = True
-            kw = {'cmd': {
-                'valgrind': 'valgrind --leak-check=full --show-leak-kinds=all /usr/local/sbin/redsocks -c /usr/local/etc/redsocks.conf',
-                'strace': 'strace -ttt /usr/local/sbin/redsocks -c /usr/local/etc/redsocks.conf',
-            }[debug]}
-        else:
-            kw = {}
+            if self.debug != 'logs':
+                kw['cmd'] = {
+                    'valgrind': 'valgrind --leak-check=full --show-leak-kinds=all /usr/local/sbin/redsocks -c /usr/local/etc/redsocks.conf',
+                    'strace': 'strace -ttt /usr/local/sbin/redsocks -c /usr/local/etc/redsocks.conf',
+                }[self.debug]
         VM.__init__(self, 'regw', 'redsocks/regw', **kw)
     def net_br(self):
         self.ip4 = '10.0.2.123'
@@ -162,6 +181,10 @@ class RegwVM(VM):
         del self.ip4
         for t in TANKS.values():
             self.netcall('iptables -t nat -A PREROUTING --source 10.0.2.%d/32 --dest 10.0.1.0/24 -p tcp -j REDIRECT --to-port %d' % (t, 12340 + t - TANKS_BASE))
+    def assert_good_death(self):
+        out = self.output('sudo docker logs {sha}', stderr=STDOUT)
+        assert 'redsocks goes down' in out and 'There are connected clients during shutdown' not in out
+        assert self.debug != 'valgrind' or 'no leaks are possible' in out
 
 CPU = object()
 MAX = object()
@@ -195,11 +218,17 @@ TANKS = {
     'httperr_connect_baduser': TANKS_BASE + 12,
     'httperr_connect_badpass': TANKS_BASE + 13,
     'httperr_connect_digest': TANKS_BASE + 14,
+    'httperr_proxy_refuse': TANKS_BASE + 15,
+    'httperr_proxy_timeout': TANKS_BASE + 16,
 }
 
 class _Network(object):
     def __init__(self):
-        check_output('sudo docker ps'.split())
+        assert os.path.exists(PIPEWORK_CMD)
+        running = check_output('sudo docker ps -q'.split()).split()
+        assert running == []
+        names = check_output('sudo docker ps -a --format {{.Names}}'.split()).split()
+        assert 'regw' not in names
         vm = [
             GwVM,
             WebVM,
@@ -212,7 +241,7 @@ class _Network(object):
         ]
         for t in TANKS.values():
             vm.append(partial(TankVM, t))
-        self.vm = {_.name: _ for _ in pmap(vm)} # pmap saves ~5 seconds
+        self.vm = {_.name: _ for _ in pmap(vm, j=CPU)} # pmap saves ~5 seconds
     def close(self):
         check_output('sudo docker ps'.split())
         pmap([_.close for _ in self.vm.values()]) # pmap saves ~7 seconds

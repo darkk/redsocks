@@ -335,6 +335,18 @@ static int vp_uint16(parser_context *context, void *addr, const char *token)
 	return 0;
 }
 
+static int vp_uint32(parser_context *context, void *addr, const char *token)
+{
+	char *end;
+	uint32_t uli = strtoul(token, &end, 0);
+	if (*end != '\0') {
+		parser_error(context, "integer is not parsed");
+		return -1;
+	}
+	*(uint32_t*)addr = uli;
+	return 0;
+}
+
 static int vp_in_addr(parser_context *context, void *addr, const char *token)
 {
 	struct in_addr ia;
@@ -430,15 +442,30 @@ static int vp_in_addr2(parser_context *context, void *addr, const char *token)
 	return retval;
 }
 
+static int vp_obsolete(parser_context *context, void *addr, const char *token)
+{
+	parser_error(context, "obsolete key, delete it");
+	return -1;
+}
+
+static int vp_redsocks_max_accept_backoff(parser_context *context, void *addr, const char *token)
+{
+	parser_error(context, "max_accept_backoff is not per-port setting anymore, move it from `redsocks` to `base`");
+	return -1;
+}
+
 static value_parser value_parser_by_type[] =
 {
 	[pt_bool] = vp_pbool,
 	[pt_pchar] = vp_pchar,
 	[pt_uint16] = vp_uint16,
+	[pt_uint32] = vp_uint32,
 	[pt_in_addr] = vp_in_addr,
 	[pt_in_addr2] = vp_in_addr2,
 	[pt_disclose_src] = vp_disclose_src,
 	[pt_on_proxy_fail] = vp_on_proxy_fail,
+	[pt_obsolete] = vp_obsolete,
+	[pt_redsocks_max_accept_backoff] = vp_redsocks_max_accept_backoff,
 };
 
 int parser_run(parser_context *context)
@@ -571,7 +598,7 @@ int parser_run(parser_context *context)
 					parser_error(context, "assignment termination outside of any section");
 				}
 				else if (key_token && !value_token) {
-					parser_error(context, "assignment has only key but no value");
+					parser_error(context, "assignment has only key <%s> but no value", key_token);
 				}
 				else if (key_token && value_token) {
 					parser_entry *e;
@@ -580,7 +607,7 @@ int parser_run(parser_context *context)
 							break;
 					if (e->key) {
 						if ( (value_parser_by_type[e->type])(context, e->addr, value_token) == -1 )
-							parser_error(context, "value can't be parsed");
+							parser_error(context, "value <%s> can't be parsed for key <%s>", value_token, key_token);
 					}
 					else {
 						parser_error(context, "assignment with unknown key <%s>", key_token);

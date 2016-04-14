@@ -1,5 +1,5 @@
 from functools import partial
-from subprocess import check_call, CalledProcessError
+from subprocess import check_call, CalledProcessError, Popen, PIPE
 import time
 
 import conftest
@@ -10,9 +10,9 @@ def test_vmdebug(net):
     check_call('sleep 365d'.split())
 
 GOOD_AUTH = 'connect_none connect_basic connect_digest socks5_none socks5_auth httperr_connect_digest'.split()
-BAD_AUTH = 'connect_nopass connect_baduser connect_badpass socks5_nopass socks5_baduser socks5_badpass'.split()
+BAD_AUTH = 'connect_nopass connect_baduser connect_badpass socks5_nopass socks5_baduser socks5_badpass httperr_proxy_refuse'.split()
 UGLY_AUTH = 'httperr_connect_nopass httperr_connect_baduser httperr_connect_badpass'.split()
-assert set(conftest.TANKS) == set(GOOD_AUTH + BAD_AUTH + UGLY_AUTH)
+assert set(conftest.TANKS) == set(GOOD_AUTH + BAD_AUTH + UGLY_AUTH + ['httperr_proxy_timeout'])
 
 @pytest.mark.parametrize('tank', GOOD_AUTH)
 def test_smoke(net, tank):
@@ -38,7 +38,10 @@ def test_econnrefused(net, tank):
     vm = net.vm['tank%d' % conftest.TANKS[tank]]
     with pytest.raises(CalledProcessError) as excinfo:
         vm.do('curl --max-time 0.5 http://10.0.1.80:81/')
-    assert excinfo.value.returncode == 52 # Empty reply from server
+    if tank == 'httperr_proxy_timeout':
+        assert excinfo.value.returncode == 28 # Operation timed out
+    else:
+        assert excinfo.value.returncode == 52 # Empty reply from server
 
 def test_econnrefused_httperr(net):
     tank = 'httperr_connect_digest'
@@ -103,3 +106,87 @@ def test_nonce_reuse(slow_net):
         assert code == 200 and size == 612
         assert connect < 0.005 and LATENCY[tank]-RTT*.2 < total and total < LATENCY[tank]+RTT*.2
         assert total_sum < total * 1.5
+
+@pytest.mark.parametrize('tank, delay', [(t, d)
+    for t in set(conftest.TANKS) & set(LATENCY)
+    for d in [_*0.001 for _ in range(1, LATENCY[t]+RTT, RTT/2)]
+] + [
+    ('httperr_proxy_refuse', (1 + 0*RTT/2) * 0.001),
+    ('httperr_proxy_refuse', (1 + 1*RTT/2) * 0.001),
+    ('httperr_proxy_refuse', (1 + 2*RTT/2) * 0.001),
+    ('httperr_proxy_refuse', (1 + 3*RTT/2) * 0.001),
+    ('httperr_proxy_timeout', (1 + 3*RTT/2) * 0.001),
+])
+def test_impacient_client(slow_net, tank, delay):
+    vm, regw = slow_net.vm['tank%d' % conftest.TANKS[tank]], slow_net.vm['regw']
+    before, start = regw.lsfd(), time.time()
+    try:
+        page = vm.do('curl --max-time %s http://10.0.1.80/1M' % delay)
+        #assert 'Welcome to nginx!' in page
+    except CalledProcessError, e:
+        if tank == 'httperr_proxy_refuse':
+            assert e.returncode in (28, 52) # Operation timeout / Empty reply
+        else:
+            assert e.returncode == 28 # Operation timeout
+    curl_time = time.time() - start
+    assert curl_time < delay + RTT*0.001 # sanity check
+    time.sleep( (LATENCY.get(tank, delay*1000) + 4*RTT)*0.001 )
+    if tank == 'httperr_proxy_timeout':
+        time.sleep(135) # default connect() timeout is long
+    assert before == regw.lsfd() # no leaks
+
+@pytest.fixture(scope='function', params=range(80, 60, -1))
+def lowfd_net(request, net):
+    def close():
+        net.vm['regw'].call('sudo ./prlimit-nofile {pid} 1024')
+    request.addfinalizer(close)
+    net.vm['regw'].call('sudo ./prlimit-nofile {pid} %d' % request.param)
+    return net
+
+def test_accept_overflow(lowfd_net):
+    tank = 'connect_none'
+    vm, regw = lowfd_net.vm['tank%d' % conftest.TANKS[tank]], lowfd_net.vm['regw']
+    lsfd = regw.lsfd()
+    year = str(time.gmtime().tm_year)
+    discard_cmd = vm.fmt('sudo docker exec --interactive {sha} nc 10.0.1.13 discard')
+    daytime_cmd = vm.fmt('sudo docker exec --interactive {sha} nc 10.0.1.13 daytime')
+
+    dtstart = time.time()
+    time.sleep(0.5)
+    proc = [Popen(discard_cmd, stdin=PIPE, stdout=PIPE) for i in xrange(7)]
+    time.sleep(0.5)
+    dt = Popen(daytime_cmd, stdin=PIPE, stdout=PIPE)
+    time.sleep(0.5)
+    logs = regw.logs(since=dtstart)
+    if any(['Too many open files' in _[1] for _ in logs]):
+        # anything may happen, except leaks
+        proc[0].communicate('/dev/null\x0d\x0a')
+        dt.communicate('')
+        time.sleep(1)
+        for p in proc[1:]:
+            p.communicate('/dev/null\x0d\x0a')
+    else:
+        assert any(['reached redsocks_conn_max limit' in _[1] for _ in logs])
+        # RLIMIT_NOFILE was not hit, this `daytime` call actually returns data
+        daytime, _ = dt.communicate('')
+        assert year in daytime and dt.returncode == 0
+        time.sleep(0.5)
+        dtdeath = time.time()
+        proc.append(Popen(discard_cmd, stdin=PIPE, stdout=PIPE))
+        time.sleep(0.5)
+        logs = regw.logs(since=dtdeath)
+        assert any(['reached redsocks_conn_max limit' in _[1] for _ in logs])
+        time.sleep(0.5)
+        dt = Popen(daytime_cmd, stdin=PIPE, stdout=PIPE)
+        time.sleep(0.5)
+        assert all([p.poll() is None for p in proc]) and dt.poll() is None # processes are running
+        out, _ = proc[0].communicate('/dev/null\x0d\x0a')
+        daytime, _ = dt.communicate('')
+        assert year in daytime and dt.returncode == 0
+        time.sleep(1)
+        for p in proc[1:]:
+            out, _ = p.communicate('/dev/null\x0d\x0a')
+            assert out == ''
+
+    time.sleep(1)
+    assert lsfd == regw.lsfd() # no leaks

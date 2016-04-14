@@ -43,6 +43,33 @@ base {
 	//tcp_keepalive_time = 0;
 	//tcp_keepalive_probes = 0;
 	//tcp_keepalive_intvl = 0;
+
+	// Every `redsocks` connection needs two file descriptors for sockets.
+	// If `splice` is enabled, it also needs four file descriptors for
+	// pipes.  `redudp` is not accounted at the moment.  When max number of
+	// connection is reached, redsocks tries to close idle connections. If
+	// there are no idle connections, it stops accept()'ing new
+	// connections, although kernel continues to fill listenq.
+
+	// Set maximum number of open file descriptors (also known as `ulimit -n`).
+	//  0 -- do not modify startup limit (default)
+	// rlimit_nofile = 0;
+
+	// Set maximum number of served connections. Default is to deduce safe
+	// limit from `splice` setting and RLIMIT_NOFILE.
+	// redsocks_conn_max = 0;
+
+	// Close connections idle for N seconds when/if connection count
+	// limit is hit.
+	//  0 -- do not close idle connections
+	//  7440 -- 2 hours 4 minutes, see RFC 5382 (default)
+	// connpres_idle_timeout = 7440;
+
+	// `max_accept_backoff` is a delay in milliseconds to retry `accept()`
+	// after failure (e.g. due to lack of file descriptors). It's just a
+	// safety net for misconfigured `redsocks_conn_max`, you should tune
+	// redsocks_conn_max if accept backoff happens.
+	// max_accept_backoff = 60000;
 }
 
 redsocks {
@@ -61,20 +88,11 @@ redsocks {
 	// Default value depends on your kernel version, true for 2.6.27.13+
 	// splice = false;
 
-	// `max_accept_backoff` is a delay to retry `accept()` after accept
-	// failure (e.g. due to lack of file descriptors). It's measured in
-	// milliseconds and maximal value is 65535. `min_accept_backoff` is
-	// used as initial backoff value and as a damper for `accept() after
-	// close()` logic.
-	// min_accept_backoff = 100;
-	// max_accept_backoff = 60000;
-
 	// `ip' and `port' are IP and tcp-port of proxy-server
 	// You can also use hostname instead of IP, only one (random)
 	// address of multihomed host will be used.
 	ip = example.org;
 	port = 1080;
-
 
 	// known types: socks4, socks5, http-connect, http-relay
 	type = socks5;

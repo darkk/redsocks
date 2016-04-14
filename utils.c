@@ -107,6 +107,14 @@ time_t redsocks_time(time_t *t)
 	return retval;
 }
 
+int redsocks_gettimeofday(struct timeval *tv)
+{
+	int retval = gettimeofday(tv, NULL);
+	if (retval != 0)
+		log_errno(LOG_WARNING, "gettimeofday");
+	return retval;
+}
+
 char *redsocks_evbuffer_readline(struct evbuffer *buf)
 {
 #if _EVENT_NUMERIC_VERSION >= 0x02000000
