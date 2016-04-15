@@ -67,7 +67,7 @@ static void ss_client_fini(redudp_client *client)
 {
     ss_client *ssclient = (void*)(client + 1);
     if (event_initialized(&ssclient->udprelay)) {
-        close(EVENT_FD(&ssclient->udprelay));
+        close(event_get_fd(&ssclient->udprelay));
         if (event_del(&ssclient->udprelay) == -1)
             redudp_log_errno(client, LOG_ERR, "event_del");
     }
@@ -121,7 +121,7 @@ static void ss_forward_pkt(redudp_client *client, struct sockaddr * destaddr, vo
     io[0].iov_base = ss->buff;
     io[0].iov_len = fwdlen;
 
-    outgoing = sendmsg(EVENT_FD(&ssclient->udprelay), &msg, 0);
+    outgoing = sendmsg(event_get_fd(&ssclient->udprelay), &msg, 0);
     if (outgoing == -1) {
         redudp_log_errno(client, LOG_DEBUG, "sendmsg: Can't forward packet, dropping it");
         return;
@@ -143,7 +143,7 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
     struct sockaddr_in udprelayaddr;
     int rc;
 
-    assert(fd == EVENT_FD(&ssclient->udprelay));
+    assert(fd == event_get_fd(&ssclient->udprelay));
 
     pktlen = red_recv_udp_pkt(fd, ss->buff, SHARED_BUFF_SIZE, &udprelayaddr, NULL);
     if (pktlen == -1)

@@ -25,8 +25,6 @@
 #include "encrypt.h"
 #include "shadowsocks.h"
 
-#define INITIAL_BUFFER_SIZE 8192
-
 typedef enum ss_state_t {
     ss_new,
     ss_connected,
@@ -292,24 +290,18 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
     The two peers will handle it. */
     bufferevent_set_timeouts(client->relay, NULL, NULL);
 
-    if (!redsocks_start_relay(client))
-    {
-        /* overwrite theread callback to my function */
-        bufferevent_setcb(client->client, ss_client_readcb,
-                                         ss_client_writecb,
-                                         redsocks_event_error,
-                                         client);
-        bufferevent_setcb(client->relay, ss_relay_readcb,
-                                         ss_relay_writecb,
-                                         redsocks_event_error,
-                                         client);
-    }
-    else
-    {
-        redsocks_log_error(client, LOG_DEBUG, "failed to start relay");
-        redsocks_drop_client(client);
+    if (redsocks_start_relay(client))
+        // redsocks_start_relay() drops client on failure
         return;
-    }
+    /* overwrite theread callback to my function */
+    bufferevent_setcb(client->client, ss_client_readcb,
+                                     ss_client_writecb,
+                                     redsocks_event_error,
+                                     client);
+    bufferevent_setcb(client->relay, ss_relay_readcb,
+                                     ss_relay_writecb,
+                                     redsocks_event_error,
+                                     client);
 
     /* build and send header */
     // TODO: Better implementation and IPv6 Support
@@ -335,10 +327,6 @@ static int ss_connect_relay(redsocks_client *client)
 
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
-    /* use default timeout if timeout is not configured */
-    if (tv.tv_sec == 0)
-        tv.tv_sec = DEFAULT_CONNECT_TIMEOUT; 
-    
     client->relay = red_connect_relay2(&client->instance->config.relayaddr,
                     NULL, ss_relay_connected, redsocks_event_error, client, 
                     &tv);

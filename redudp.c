@@ -282,7 +282,7 @@ void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len,
     // When working with TPROXY, we have to get sender FD from tree on
     // receipt of each packet from relay.
     fd = do_tproxy(client->instance) ? bound_udp4_get(srcaddr)
-                                     : EVENT_FD(&client->instance->listener);
+                                     : event_get_fd(&client->instance->listener);
     if (fd == -1) {
         redudp_log_error(client, LOG_WARNING, "bound_udp4_get failure");
         return;
@@ -392,7 +392,7 @@ static void redudp_pkt_from_client(int fd, short what, void *_arg)
 
     pdestaddr = do_tproxy(self) ? &destaddr : NULL;
 
-    assert(fd == EVENT_FD(&self->listener));
+    assert(fd == event_get_fd(&self->listener));
     // destaddr will be filled with true destination if it is available
     pktlen = red_recv_udp_pkt(fd, recv_buff, sizeof(recv_buff), &clientaddr, pdestaddr);
     if (pktlen == -1)
@@ -628,7 +628,7 @@ static void redudp_fini_instance(redudp_instance *instance)
     if (event_initialized(&instance->listener)) {
         if (event_del(&instance->listener) != 0)
             log_errno(LOG_WARNING, "event_del");
-        close(EVENT_FD(&instance->listener));
+        close(event_get_fd(&instance->listener));
         memset(&instance->listener, 0, sizeof(instance->listener));
     }
 

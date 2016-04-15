@@ -126,7 +126,7 @@ static void tcpdns_readcb(struct bufferevent *from, void *_arg)
                 case DNS_RC_FORMERR:
                 case DNS_RC_NXDOMAIN:
                     {
-                        int fd = EVENT_FD(&req->instance->listener);
+                        int fd = event_get_fd(&req->instance->listener);
                         if (sendto(fd, &buff.raw[2], read_size - 2, 0,
                                 (struct sockaddr*)&req->client_addr,
                                 sizeof(req->client_addr)) != read_size - 2) {
@@ -276,7 +276,7 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
     struct sockaddr_in * destaddr;
     ssize_t pktlen;
 
-    assert(fd == EVENT_FD(&self->listener));
+    assert(fd == event_get_fd(&self->listener));
     /* allocate and initialize request structure */
     req = (dns_request *)calloc(sizeof(dns_request), 1);
     if (!req)
@@ -493,7 +493,7 @@ static void tcpdns_fini_instance(tcpdns_instance *instance)
     if (event_initialized(&instance->listener)) {
         if (event_del(&instance->listener) != 0)
             log_errno(LOG_WARNING, "event_del");
-        if (close(EVENT_FD(&instance->listener)) != 0)
+        if (close(event_get_fd(&instance->listener)) != 0)
             log_errno(LOG_WARNING, "close");
     }
 

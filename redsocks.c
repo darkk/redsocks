@@ -207,6 +207,8 @@ static int redsocks_onexit(parser_section *section)
     if (err)
         parser_error(section->context, "%s", err);
 
+    if (instance->config.timeout == 0)
+        instance->config.timeout = DEFAULT_CONNECT_TIMEOUT;
     return err ? -1 : 0;
 }
 
@@ -638,9 +640,6 @@ int redsocks_connect_relay(redsocks_client *client)
     struct timeval tv;
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
-    if (tv.tv_sec == 0)
-        tv.tv_sec = DEFAULT_CONNECT_TIMEOUT;
-
 
     client->relay = red_connect_relay2(&client->instance->config.relayaddr,
                                       NULL, 
@@ -713,7 +712,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
         if (errno == ENFILE || errno == EMFILE || errno == ENOBUFS || errno == ENOMEM) {
             self->accept_backoff_ms = (self->accept_backoff_ms << 1) + 1;
             clamp_value(self->accept_backoff_ms, self->config.min_backoff_ms, self->config.max_backoff_ms);
-            int delay = (random() % self->accept_backoff_ms) + 1;
+            int delay = (red_randui32() % self->accept_backoff_ms) + 1;
             log_errno(LOG_WARNING, "accept: out of file descriptors, backing off for %u ms", delay);
             struct timeval tvdelay = { delay / 1000, (delay % 1000) * 1000 };
             if (tracked_event_del(&self->listener) != 0)
@@ -1015,7 +1014,7 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
         if (timerisset(&instance->listener.inserted))
             if (tracked_event_del(&instance->listener) != 0)
                 log_errno(LOG_WARNING, "event_del");
-        redsocks_close(EVENT_FD(&instance->listener.ev));
+        redsocks_close(event_get_fd(&instance->listener.ev));
         memset(&instance->listener, 0, sizeof(instance->listener));
     }
 

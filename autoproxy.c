@@ -159,7 +159,18 @@ static autoproxy_config * get_config(redsocks_client * client)
     }
 }
 
-#define get_autoproxy_client(client) (void*)(client + 1) + client->instance->relay_ss->payload_len;
+#define get_autoproxy_client(client) ((void*)(client + 1) + client->instance->relay_ss->payload_len)
+
+static void auto_release_recv_timer(autoproxy_client * aclient)
+{
+    // Cancel timer and release event object for timer
+    if (aclient->recv_timer_event)
+    {
+        event_del(aclient->recv_timer_event);
+        event_free(aclient->recv_timer_event);
+        aclient->recv_timer_event = NULL;
+    }
+}
 
 static void auto_client_init(redsocks_client *client)
 {
@@ -172,13 +183,7 @@ static void auto_client_init(redsocks_client *client)
 static void auto_client_fini(redsocks_client *client)
 {
     autoproxy_client * aclient = get_autoproxy_client(client);
-
-    if (aclient->recv_timer_event)
-    {
-        event_del(aclient->recv_timer_event);
-        event_free(aclient->recv_timer_event);
-        aclient->recv_timer_event = NULL;
-    }
+    auto_release_recv_timer(aclient);
 }
 
 static void on_connection_confirmed(redsocks_client *client)
@@ -204,13 +209,7 @@ static void auto_confirm_connection(redsocks_client * client)
         evbuffer_drain(bufferevent_get_input(client->client), aclient->data_sent);
         aclient->data_sent = 0;
     }
-    // Cancel timer and release event object for timer
-    if (aclient->recv_timer_event)
-    {
-        event_del(aclient->recv_timer_event);
-        event_free(aclient->recv_timer_event);
-        aclient->recv_timer_event = NULL;
-    }
+    auto_release_recv_timer(aclient);
     on_connection_confirmed(client);
 }
 
@@ -497,16 +496,9 @@ static int auto_retry(redsocks_client * client, int updcache)
                             inet_ntoa(client->destaddr.sin_addr));
         }
     }
-    // Release timer
-    if (aclient->recv_timer_event)
-    {
-        event_del(aclient->recv_timer_event);
-        event_free(aclient->recv_timer_event);
-        aclient->recv_timer_event = NULL;
-    }
 
+    auto_release_recv_timer(aclient);
     auto_drop_relay(client);
-
     // restore callbacks for ordinary client.
     bufferevent_setcb(client->client, NULL, NULL, redsocks_event_error, client);
     // enable reading to handle EOF from client
@@ -540,8 +532,7 @@ static int auto_retry_or_drop(redsocks_client * client)
     if (aclient->state == AUTOPROXY_NEW || aclient->state == AUTOPROXY_CONNECTED)
     {
         on_connection_blocked(client);  
-        auto_retry(client, 0);
-        return 0; 
+        return auto_retry(client, 0);
     }
     /* drop */
     return 1;
@@ -573,24 +564,18 @@ static void auto_relay_connected(struct bufferevent *buffev, void *_arg)
     The two peers will handle it. */
     bufferevent_set_timeouts(client->relay, NULL, NULL);
 
-    if (!redsocks_start_relay(client))
-    {
-        /* overwrite theread callback to my function */
-        bufferevent_setcb(client->client, direct_relay_clientreadcb,
-                                         direct_relay_clientwritecb,
-                                         auto_event_error,
-                                         client);
-        bufferevent_setcb(client->relay, direct_relay_relayreadcb,
-                                         direct_relay_relaywritecb,
-                                         auto_event_error,
-                                         client);
-    }
-    else
-    {
-        redsocks_log_error(client, LOG_DEBUG, "failed to start relay");
-        redsocks_drop_client(client);
+    if (redsocks_start_relay(client))
+        // redsocks_start_relay() drops client on failure
         return;
-    }
+    /* overwrite theread callback to my function */
+    bufferevent_setcb(client->client, direct_relay_clientreadcb,
+                                     direct_relay_clientwritecb,
+                                     auto_event_error,
+                                     client);
+    bufferevent_setcb(client->relay, direct_relay_relayreadcb,
+                                     direct_relay_relaywritecb,
+                                     auto_event_error,
+                                     client);
     // Write any data received from client side to relay.
     if (evbuffer_get_length(bufferevent_get_input(client->client)))
         direct_relay_relaywritecb(client->relay, client);
@@ -695,10 +680,6 @@ static int auto_connect_relay(redsocks_client *client)
     time_t * acc_time = NULL;
     time_t now = redsocks_time(NULL);   
 
-    /* use default timeout if timeout is not configured */
-    if (tv.tv_sec == 0)
-        tv.tv_sec = DEFAULT_CONNECT_TIMEOUT; 
-    
     if (aclient->state == AUTOPROXY_NEW)
     {
         acc_time = cache_get_addr_time(&client->destaddr);

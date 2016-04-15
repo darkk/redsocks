@@ -87,7 +87,7 @@ static void socks5_client_fini(redudp_client *client)
 	int fd;
 
 	if (event_initialized(&socks5client->udprelay)) {
-		fd = EVENT_FD(&socks5client->udprelay);
+		fd = event_get_fd(&socks5client->udprelay);
 		if (event_del(&socks5client->udprelay) == -1)
 			redudp_log_errno(client, LOG_ERR, "event_del");
 		close(fd);
@@ -127,7 +127,7 @@ static void socks5_forward_pkt(redudp_client *client, struct sockaddr *destaddr,
 	io[1].iov_base = buf;
 	io[1].iov_len = pktlen;
 
-	outgoing = sendmsg(EVENT_FD(&socks5client->udprelay), &msg, 0);
+	outgoing = sendmsg(event_get_fd(&socks5client->udprelay), &msg, 0);
 	if (outgoing == -1) {
 		redudp_log_errno(client, LOG_WARNING, "sendmsg: Can't forward packet, dropping it");
 		return;
@@ -149,7 +149,7 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
 	ssize_t pktlen, fwdlen;
 	struct sockaddr_in udprelayaddr;
 
-	assert(fd == EVENT_FD(&socks5client->udprelay));
+	assert(fd == event_get_fd(&socks5client->udprelay));
 
 	pktlen = red_recv_udp_pkt(fd, pkt.buf, sizeof(pkt.buf), &udprelayaddr, NULL);
 	if (pktlen == -1)

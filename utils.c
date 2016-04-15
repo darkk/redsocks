@@ -143,7 +143,7 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
 
     error = evutil_make_socket_nonblocking(relay_fd);
     if (error) {
-        log_errno(LOG_ERR, "fcntl");
+        log_errno(LOG_ERR, "evutil_make_socket_nonblocking");
         goto fail;
     }
 
@@ -173,7 +173,7 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
 //  if (error) {
     error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
     if (error && errno != EINPROGRESS) {
-        log_errno(LOG_NOTICE, "bufferevent_socket_connect");
+        log_errno(LOG_NOTICE, "connect");
         goto fail;
     }
 
@@ -218,7 +218,7 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
 
     error = evutil_make_socket_nonblocking(relay_fd);
     if (error) {
-        log_errno(LOG_ERR, "fcntl");
+        log_errno(LOG_ERR, "evutil_make_socket_nonblocking");
         goto fail;
     }
 
@@ -250,7 +250,7 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
 //  if (error) {
     error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
     if (error && errno != EINPROGRESS) {
-        log_errno(LOG_NOTICE, "bufferevent_socket_connect");
+        log_errno(LOG_NOTICE, "connect");
         goto fail;
     }
 
@@ -270,9 +270,9 @@ int red_socket_geterrno(struct bufferevent *buffev)
     int pseudo_errno;
     socklen_t optlen = sizeof(pseudo_errno);
 
-    assert(EVENT_FD(&buffev->ev_read) == EVENT_FD(&buffev->ev_write));
+    assert(event_get_fd(&buffev->ev_read) == event_get_fd(&buffev->ev_write));
 
-    error = getsockopt(EVENT_FD(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
+    error = getsockopt(event_get_fd(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
     if (error) {
         log_errno(LOG_ERR, "getsockopt");
         return -1;
@@ -344,10 +344,10 @@ size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, s
     maxlen = EVBUFFER_LENGTH(src->input) - skip> maxlen?maxlen: EVBUFFER_LENGTH(src->input)-skip;
 
     n = evbuffer_peek(src->input, maxlen+skip, NULL, NULL, 0);
-    if (n>sizeof(quick_v)/sizeof(struct evbuffer_iovec))
+    if (n > sizeof(quick_v)/sizeof(struct evbuffer_iovec))
         v = malloc(sizeof(struct evbuffer_iovec)*n);
     else
-        v = quick_v;
+        v = &quick_v[0];
     n = evbuffer_peek(src->input, maxlen+skip, NULL, v, n);
     for (i=0; i<n; ++i) {
         size_t len = v[i].iov_len;
@@ -370,7 +370,7 @@ size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, s
         * us over the limit. */
         written += len;
     }
-    if (n>sizeof(quick_v)/sizeof(struct evbuffer_iovec))
+    if (v != &quick_v[0])
         free(v);
     return written;
 }
