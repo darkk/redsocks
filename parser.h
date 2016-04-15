@@ -8,6 +8,7 @@ typedef enum {
 	pt_bool,      // "bool" from stdbool.h, not "_Bool" or anything else
 	pt_pchar,
 	pt_uint16,
+	pt_uint32,
 	pt_in_addr,
 	pt_in_addr2,  // inaddr[0] = net, inaddr[1] = netmask
 } parser_type;

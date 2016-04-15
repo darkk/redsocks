@@ -297,6 +297,22 @@ static int vp_uint16(parser_context *context, void *addr, const char *token)
 	return 0;
 }
 
+static int vp_uint32(parser_context *context, void *addr, const char *token)
+{
+	char *end;
+	unsigned long int uli = strtoul(token, &end, 0);
+	if (uli > 0xFFFFFFFF) {
+		parser_error(context, "integer out of 32bit range");
+		return -1;
+	}
+	if (*end != '\0') {
+		parser_error(context, "integer is not parsed");
+		return -1;
+	}
+	*(uint32_t*)addr = (uint32_t)uli;
+	return 0;
+}
+
 static int vp_in_addr(parser_context *context, void *addr, const char *token)
 {
 	struct in_addr ia;
@@ -397,6 +413,7 @@ static value_parser value_parser_by_type[] =
 	[pt_bool] = vp_pbool,
 	[pt_pchar] = vp_pchar,
 	[pt_uint16] = vp_uint16,
+	[pt_uint32] = vp_uint32,
 	[pt_in_addr] = vp_in_addr,
 	[pt_in_addr2] = vp_in_addr2,
 };

@@ -42,9 +42,9 @@ typedef struct cache_config_t {
     // Values to be read from config file
     uint16_t    cache_size;
     uint16_t    port_check;
-    uint16_t    stale_time;
-    char *          cache_file;
-    uint16_t    autosave_interval;
+    uint32_t    stale_time;
+    char *      cache_file;
+    uint32_t    autosave_interval;
     // Dynamically calculated values.
     unsigned int    block_size;
     unsigned int    block_count;
@@ -63,9 +63,9 @@ static parser_entry cache_entries[] =
 {
     { .key = "cache_size",  .type = pt_uint16 },
     { .key = "port_check",  .type = pt_uint16 },
-    { .key = "stale_time",  .type = pt_uint16 },
+    { .key = "stale_time",  .type = pt_uint32 },
     { .key = "cache_file",  .type = pt_pchar },
-    { .key = "autosave_interval",  .type = pt_uint16 },
+    { .key = "autosave_interval",  .type = pt_uint32 },
     { }
 };
 
