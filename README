@@ -91,7 +91,7 @@ Packages
 Compilation
 ===========
 
-libevent[5] is required.
+libevent-2.0.x[5] is required.
 
 gcc and clang are supported right now, other compilers can be used
 but may require some code changes.
