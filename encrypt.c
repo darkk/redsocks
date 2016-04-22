@@ -487,8 +487,8 @@ const cipher_kt_t *get_cipher_type(int method)
         return NULL;
     }
 */
-    const char *ciphername = supported_ciphers[method];
 #if defined(USE_CRYPTO_OPENSSL)
+    const char *ciphername = supported_ciphers[method];
     return EVP_get_cipherbyname(ciphername);
 #elif defined(USE_CRYPTO_POLARSSL)
     const char *polarname = supported_ciphers_polarssl[method];
@@ -528,7 +528,6 @@ static int cipher_context_init(const enc_info * info, cipher_ctx_t *ctx, int enc
         return;
     }
 */
-    const char *ciphername = supported_ciphers[method];
 #if defined(USE_CRYPTO_APPLECC)
     cipher_cc_t *cc = &ctx->cc;
     cc->cryptor = NULL;
@@ -742,9 +741,9 @@ size_t ss_calc_buffer_size(struct enc_ctx * ctx, size_t ilen)
         return ilen;
     }
     if (ctx->init)
-        return ilen + cipher_get_block_size(cipher); 
+        return ilen + cipher_get_block_size(&ctx->evp.evp);
     else
-        return cipher->iv_size + ilen + cipher_get_block_size(cipher); 
+        return cipher->iv_size + ilen + cipher_get_block_size(&ctx->evp.evp);
 #endif
 }
 
