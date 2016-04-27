@@ -288,7 +288,7 @@ int process_shutdown_on_write_(redsocks_client *client, struct bufferevent *from
 
     if ((from_evshut & EV_READ) && !(to_evshut & EV_WRITE)
         &&  evbuffer_get_length(bufferevent_get_input(from)) == 0) {
-        redsocks_shutdown(client, to, SHUT_WR);
+        redsocks_shutdown(client, to, SHUT_WR, 0);
         return 1;
     }
     return 0;
@@ -394,17 +394,15 @@ void redsocks_drop_client(redsocks_client *client)
 
     if (client->client) {
         fd = bufferevent_getfd(client->client);
+        bufferevent_disable(client->client, EV_READ|EV_WRITE);
         bufferevent_free(client->client);
-        if (!(client->client_evshut & EV_WRITE))
-            shutdown(fd, SHUT_WR);
         redsocks_close(fd);
     }
 
     if (client->relay) {
         fd = bufferevent_getfd(client->relay);
+        bufferevent_disable(client->relay, EV_READ|EV_WRITE);
         bufferevent_free(client->relay);
-        if (!(client->relay_evshut & EV_WRITE))
-            shutdown(fd, SHUT_WR);
         redsocks_close(fd);
     }
 
@@ -412,7 +410,7 @@ void redsocks_drop_client(redsocks_client *client)
     free(client);
 }
 
-void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how)
+void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how, int pseudo)
 {
     short evhow = 0;
     char *strev, *strhow = NULL, *strevhow = NULL;
@@ -448,9 +446,14 @@ void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int 
     // if EV_WRITE is already shut and we're going to shutdown read then
     // we're either going to abort data flow (bad behaviour) or confirm EOF
     // and in this case socket is already SHUT_RD'ed
-    if ( !(how == SHUT_RD && (*pevshut & EV_WRITE)) )
-        if (shutdown(bufferevent_getfd(buffev), how) != 0)
-            redsocks_log_errno(client, LOG_ERR, "shutdown(%s, %s)", strev, strhow);
+    if (!pseudo)
+        if ( !(how == SHUT_RD && (*pevshut & EV_WRITE)) )
+            if (shutdown(bufferevent_getfd(buffev), how) != 0) {
+                redsocks_log_errno(client, LOG_ERR, "shutdown(%s, %s)", strev, strhow);
+                // In case of 'Transport endpoint is not connected', shutdown as SHUT_RDWR.
+                if (errno == ENOTCONN)
+                    evhow = EV_READ|EV_WRITE;
+            }
 
     *pevshut |= evhow;
 
@@ -485,7 +488,7 @@ void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg)
                             event_fmt(what));
 
     if (what == (BEV_EVENT_READING|BEV_EVENT_EOF)) {
-        redsocks_shutdown(client, buffev, SHUT_RD);
+        redsocks_shutdown(client, buffev, SHUT_RD, 1);
         // Ensure the other party could send remaining data and SHUT_WR also
         if (buffev == client->client)
         {

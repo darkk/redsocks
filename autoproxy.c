@@ -48,7 +48,6 @@ typedef struct autoproxy_client_t {
 } autoproxy_client;
 
 
-void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg);
 static int auto_retry_or_drop(redsocks_client * client);
 static void direct_relay_clientreadcb(struct bufferevent *from, void *_client);
@@ -430,7 +429,7 @@ static int process_shutdown_on_write_2(redsocks_client *client, struct buffereve
         if (input_size == 0
             || (input_size == aclient->data_sent && aclient->state == AUTOPROXY_CONNECTED))
         {
-            redsocks_shutdown(client, to, SHUT_WR);
+            redsocks_shutdown(client, to, SHUT_WR, 0);
             return 1;
         }
     }
@@ -470,6 +469,7 @@ static void auto_drop_relay(redsocks_client *client)
     {
         redsocks_log_error(client, LOG_DEBUG, "dropping relay only ");
         fd = bufferevent_getfd(client->relay);
+        bufferevent_disable(client->relay, EV_READ|EV_WRITE);
         bufferevent_free(client->relay);
         redsocks_close(fd);
         client->relay = NULL;
@@ -650,7 +650,7 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
         if (aclient->recv_timer_event && buffev == client->relay)
             auto_confirm_connection(client);
 
-        redsocks_shutdown(client, buffev, SHUT_RD);
+        redsocks_shutdown(client, buffev, SHUT_RD, 1);
         // Ensure the other party could send remaining data and SHUT_WR also
         if (buffev == client->client)
         {

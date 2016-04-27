@@ -180,8 +180,10 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
     return retval;
 
 fail:
-    if (retval)
+    if (retval){
+        bufferevent_disable(retval, EV_READ|EV_WRITE);
         bufferevent_free(retval);
+    }
     if (relay_fd != -1)
         redsocks_close(relay_fd);
     return NULL;
@@ -257,8 +259,10 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
     return retval;
 
 fail:
-    if (retval)
+    if (retval) {
+        bufferevent_disable(retval, EV_READ|EV_WRITE);
         bufferevent_free(retval);
+    }
     if (relay_fd != -1)
         redsocks_close(relay_fd);
     return NULL;
