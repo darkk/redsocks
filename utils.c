@@ -123,7 +123,6 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
                                 void *cbarg)
 {
     struct bufferevent *retval = NULL;
-    int on = 1;
     int relay_fd = -1;
     int error;
 
@@ -144,12 +143,6 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
     error = evutil_make_socket_nonblocking(relay_fd);
     if (error) {
         log_errno(LOG_ERR, "evutil_make_socket_nonblocking");
-        goto fail;
-    }
-
-    error = setsockopt(relay_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
-    if (error) {
-        log_errno(LOG_WARNING, "setsockopt");
         goto fail;
     }
 
@@ -208,7 +201,6 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
                                     const struct timeval *timeout_write)
 {
     struct bufferevent *retval = NULL;
-    int on = 1;
     int relay_fd = -1;
     int error;
 
@@ -221,12 +213,6 @@ struct bufferevent* red_connect_relay2(struct sockaddr_in *addr,
     error = evutil_make_socket_nonblocking(relay_fd);
     if (error) {
         log_errno(LOG_ERR, "evutil_make_socket_nonblocking");
-        goto fail;
-    }
-
-    error = setsockopt(relay_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
-    if (error) {
-        log_errno(LOG_WARNING, "setsockopt");
         goto fail;
     }
 
