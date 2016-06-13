@@ -182,7 +182,7 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, redsocks_client
 	socks5_method_reply reply;
 	const char *error = NULL;
 
-	if (redsocks_read_expected(client, buffev->input, &reply, sizes_equal, sizeof(reply)) < 0)
+	if (redsocks_read_expected(client, bufferevent_get_input(buffev), &reply, sizes_equal, sizeof(reply)) < 0)
 		return;
 
 	error = socks5_is_known_auth_method(&reply, socks5->do_password);
@@ -208,7 +208,7 @@ static void socks5_read_auth_reply(struct bufferevent *buffev, redsocks_client *
 {
 	socks5_auth_reply reply;
 
-	if (redsocks_read_expected(client, buffev->input, &reply, sizes_equal, sizeof(reply)) < 0)
+	if (redsocks_read_expected(client, bufferevent_get_input(buffev), &reply, sizes_equal, sizeof(reply)) < 0)
 		return;
 
 	if (reply.ver != socks5_password_ver) {
@@ -228,7 +228,7 @@ static void socks5_read_reply(struct bufferevent *buffev, redsocks_client *clien
 {
 	socks5_reply reply;
 
-	if (redsocks_read_expected(client, buffev->input, &reply, sizes_greater_equal, sizeof(reply)) < 0)
+	if (redsocks_read_expected(client, bufferevent_get_input(buffev), &reply, sizes_greater_equal, sizeof(reply)) < 0)
 		return;
 
 	if (reply.ver != socks5_ver) {
@@ -290,7 +290,7 @@ static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 	else if (client->state == socks5_skip_domain) {
 		socks5_addr_ipv4 ipv4; // all socks5_addr*.port are equal
 		uint8_t size;
-		if (redsocks_read_expected(client, buffev->input, &size, sizes_greater_equal, sizeof(size)) < 0)
+		if (redsocks_read_expected(client, bufferevent_get_input(buffev), &size, sizes_greater_equal, sizeof(size)) < 0)
 			return;
 		socks5->to_skip = size + sizeof(ipv4.port);
 		redsocks_write_helper(
@@ -300,7 +300,7 @@ static void socks5_read_cb(struct bufferevent *buffev, void *_arg)
 	}
 	else if (client->state == socks5_skip_address) {
 		uint8_t data[socks5->to_skip];
-		if (redsocks_read_expected(client, buffev->input, data, sizes_greater_equal, socks5->to_skip) < 0)
+		if (redsocks_read_expected(client, bufferevent_get_input(buffev), data, sizes_greater_equal, socks5->to_skip) < 0)
 			return;
 		redsocks_start_relay(client);
 	}

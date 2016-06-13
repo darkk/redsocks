@@ -260,7 +260,7 @@ static void redsocks_relay_readcb(redsocks_client *client, struct bufferevent *f
     redsocks_log_error(client, LOG_DEBUG, "RCB %s, in: %u", from == client->client?"client":"relay",
                                             evbuffer_get_length(bufferevent_get_input(from)));
 
-    if (evbuffer_get_length(to->output) < to->wm_write.high) {
+    if (evbuffer_get_length(bufferevent_get_output(to)) < to->wm_write.high) {
         if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
         if (bufferevent_enable(from, EV_READ) == -1)
@@ -301,7 +301,7 @@ static void redsocks_relay_writecb(redsocks_client *client, struct bufferevent *
 
     if (process_shutdown_on_write_(client, from, to))
         return;
-    if (evbuffer_get_length(to->output) < to->wm_write.high) {
+    if (evbuffer_get_length(bufferevent_get_output(to)) < to->wm_write.high) {
         if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
         if (!(from_evshut & EV_READ) && bufferevent_enable(from, EV_READ) == -1)

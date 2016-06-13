@@ -147,6 +147,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 	redsocks_client *client = _arg;
 	httpr_client *httpr = (void*)(client + 1);
 	int dropped = 0;
+	struct evbuffer * evbinput = bufferevent_get_input(buffev);
 
 	assert(client->state >= httpr_request_sent);
 
@@ -156,8 +157,8 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 	httpr_buffer_init(&httpr->relay_buffer);
 
 	if (client->state == httpr_request_sent) {
-		size_t len = EVBUFFER_LENGTH(buffev->input);
-		char *line = redsocks_evbuffer_readline(buffev->input);
+		size_t len = evbuffer_get_length(evbinput);
+		char *line = redsocks_evbuffer_readline(evbinput);
 		if (line) {
 			httpr_buffer_append(&httpr->relay_buffer, line, strlen(line));
 			httpr_buffer_append(&httpr->relay_buffer, "\r\n", 2);
@@ -177,7 +178,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 
 						dropped = 1;
 					} else {
-						char *auth_request = get_auth_request_header(buffev->input);
+						char *auth_request = get_auth_request_header(evbinput);
 
 						if (!auth_request) {
 							redsocks_log_error(client, LOG_NOTICE, "403 found, but no proxy auth challenge");
@@ -238,7 +239,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 		return;
 
 	while (client->state == httpr_reply_came) {
-		char *line = redsocks_evbuffer_readline(buffev->input);
+		char *line = redsocks_evbuffer_readline(evbinput);
 		if (line) {
 			httpr_buffer_append(&httpr->relay_buffer, line, strlen(line));
 			httpr_buffer_append(&httpr->relay_buffer, "\r\n", 2);
@@ -456,7 +457,7 @@ static void httpr_client_read_content(struct bufferevent *buffev, redsocks_clien
 	}
 	int error;
 	while (true) {
-		error = evbuffer_remove(buffev->input, post_buffer, post_buffer_len);
+		error = evbuffer_remove(bufferevent_get_input(buffev), post_buffer, post_buffer_len);
 		if (error < 0) {
 			free(post_buffer);
 			redsocks_log_error(client, LOG_ERR, "evbuffer_remove");
@@ -494,7 +495,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 	char *line = NULL;
 	int connect_relay = 0;
 
-	while (!connect_relay && (line = redsocks_evbuffer_readline(buffev->input))) {
+	while (!connect_relay && (line = redsocks_evbuffer_readline(bufferevent_get_input(buffev)))) {
 		int skip_line = 0;
 		int do_drop = 0;
 

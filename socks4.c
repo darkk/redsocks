@@ -72,7 +72,7 @@ static void socks4_read_cb(struct bufferevent *buffev, void *_arg)
 	if (client->state == socks4_request_sent) {
 		socks4_reply reply;
 
-		if (redsocks_read_expected(client, buffev->input, &reply, sizes_greater_equal, sizeof(reply)) < 0)
+		if (redsocks_read_expected(client, bufferevent_get_input(buffev), &reply, sizes_greater_equal, sizeof(reply)) < 0)
 			return;
 
 		client->state = socks4_reply_came;

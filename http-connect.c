@@ -79,14 +79,15 @@ void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 {
 	redsocks_client *client = _arg;
 	int dropped = 0;
+	struct evbuffer * evbinput = bufferevent_get_input(buffev);
 
 	assert(client->state >= httpc_request_sent);
 
 	redsocks_touch_client(client);
 
 	if (client->state == httpc_request_sent) {
-		size_t len = EVBUFFER_LENGTH(buffev->input);
-		char *line = redsocks_evbuffer_readline(buffev->input);
+		size_t len = evbuffer_get_length(evbinput);
+		char *line = redsocks_evbuffer_readline(evbinput);
 		if (line) {
 			unsigned int code;
 			if (sscanf(line, "HTTP/%*u.%*u %u", &code) == 1) { // 1 == one _assigned_ match
@@ -104,7 +105,7 @@ void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 
 						dropped = 1;
 					} else {
-						char *auth_request = get_auth_request_header(buffev->input);
+						char *auth_request = get_auth_request_header(evbinput);
 
 						if (!auth_request) {
 							redsocks_log_error(client, LOG_NOTICE, "403 found, but no proxy auth challenge");
@@ -164,7 +165,7 @@ void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 		return;
 
 	while (client->state == httpc_reply_came) {
-		char *line = redsocks_evbuffer_readline(buffev->input);
+		char *line = redsocks_evbuffer_readline(evbinput);
 		if (line) {
 			if (strlen(line) == 0) {
 				client->state = httpc_headers_skipped;

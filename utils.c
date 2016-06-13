@@ -219,12 +219,11 @@ int red_socket_geterrno(struct bufferevent *buffev)
     int error;
     int pseudo_errno;
     socklen_t optlen = sizeof(pseudo_errno);
+    int fd = bufferevent_getfd(buffev);
 
-    assert(event_get_fd(&buffev->ev_read) == event_get_fd(&buffev->ev_write));
-
-    error = getsockopt(event_get_fd(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
+    error = getsockopt(fd, SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
     if (error) {
-        log_errno(LOG_ERR, "getsockopt");
+        log_errno(LOG_ERR, "getsockopt(fd=%d)", fd);
         return -1;
     }
     return pseudo_errno;
@@ -283,22 +282,22 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
 /* copy event buffer from source to destination as much as possible. 
  * If parameter skip is not zero, copy will start from the number of skip bytes.
  */
-size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, size_t skip)
+size_t copy_evbuffer(struct bufferevent * dst, struct bufferevent * src, size_t skip)
 {
     int n, i;
     size_t written = 0;
     struct evbuffer_iovec *v;
     struct evbuffer_iovec quick_v[5];/* a vector with 5 elements is usually enough */
+    struct evbuffer * evbinput = bufferevent_get_input(src);
+    size_t maxlen = dst->wm_write.high - evbuffer_get_length(bufferevent_get_output(dst));
+    maxlen = evbuffer_get_length(evbinput) - skip > maxlen ? maxlen: evbuffer_get_length(evbinput)-skip;
 
-    size_t maxlen = dst->wm_write.high - EVBUFFER_LENGTH(dst->output);
-    maxlen = EVBUFFER_LENGTH(src->input) - skip> maxlen?maxlen: EVBUFFER_LENGTH(src->input)-skip;
-
-    n = evbuffer_peek(src->input, maxlen+skip, NULL, NULL, 0);
+    n = evbuffer_peek(evbinput, maxlen+skip, NULL, NULL, 0);
     if (n > sizeof(quick_v)/sizeof(struct evbuffer_iovec))
         v = malloc(sizeof(struct evbuffer_iovec)*n);
     else
         v = &quick_v[0];
-    n = evbuffer_peek(src->input, maxlen+skip, NULL, v, n);
+    n = evbuffer_peek(evbinput, maxlen+skip, NULL, v, n);
     for (i=0; i<n; ++i) {
         size_t len = v[i].iov_len;
         if (skip >= len)

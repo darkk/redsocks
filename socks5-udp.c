@@ -191,7 +191,7 @@ static void socks5_read_assoc_reply(struct bufferevent *buffev, void *_arg)
 	redudp_client *client = _arg;
 	socks5_client *socks5client = (void*)(client + 1);
 	socks5_expected_assoc_reply reply;
-	int read = evbuffer_remove(buffev->input, &reply, sizeof(reply));
+	int read = evbuffer_remove(bufferevent_get_input(buffev), &reply, sizeof(reply));
 	int fd = -1;
 	int error;
 	redudp_log_error(client, LOG_DEBUG, "<trace>");
@@ -266,7 +266,7 @@ static void socks5_read_auth_reply(struct bufferevent *buffev, void *_arg)
 	redudp_client *client = _arg;
 	socks5_client *socks5client = (void*)(client + 1);
 	socks5_auth_reply reply;
-	int read = evbuffer_remove(buffev->input, &reply, sizeof(reply));
+	int read = evbuffer_remove(bufferevent_get_input(buffev), &reply, sizeof(reply));
 	int error;
 	redudp_log_error(client, LOG_DEBUG, "<trace>");
 
@@ -303,7 +303,7 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, void *_arg)
 	socks5_client *socks5client = (void*)(client + 1);
 	int do_password = socks5_is_valid_cred(client->instance->config.login, client->instance->config.password);
 	socks5_method_reply reply;
-	int read = evbuffer_remove(buffev->input, &reply, sizeof(reply));
+	int read = evbuffer_remove(bufferevent_get_input(buffev), &reply, sizeof(reply));
 	const char *error = NULL;
 	int ierror = 0;
 	redudp_log_error(client, LOG_DEBUG, "<trace>");
