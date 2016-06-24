@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <event.h>
+#include <event2/event.h>
 #include "utils.h"
 #include "log.h"
 

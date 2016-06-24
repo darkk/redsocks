@@ -237,9 +237,10 @@ void redudp_drop_client(redudp_client *client)
     if (client->instance->relay_ss->fini)
         client->instance->relay_ss->fini(client);
 
-    if (event_initialized(&client->timeout)) {
-        if (event_del(&client->timeout) == -1)
+    if (client->timeoutev) {
+        if (evtimer_del(client->timeoutev) == -1)
             redudp_log_errno(client, LOG_ERR, "event_del");
+        event_free(client->timeoutev);
     }
     list_for_each_entry_safe(q, tmp, &client->queue, list) {
         list_del(&q->list);
@@ -255,8 +256,8 @@ void redudp_bump_timeout(redudp_client *client)
     tv.tv_sec = client->instance->config.udp_timeout;
     tv.tv_usec = 0;
     // TODO: implement udp_timeout_stream
-    if (event_add(&client->timeout, &tv) != 0) {
-        redudp_log_error(client, LOG_WARNING, "event_add(&client->timeout, ...)");
+    if (event_add(client->timeoutev, &tv) != 0) {
+        redudp_log_error(client, LOG_WARNING, "event_add(&client->timeoutev, ...)");
         redudp_drop_client(client);
     }
 }
@@ -272,7 +273,7 @@ void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len,
     // When working with TPROXY, we have to get sender FD from tree on
     // receipt of each packet from relay.
     fd = do_tproxy(client->instance) ? bound_udp4_get(srcaddr)
-                                     : event_get_fd(&client->instance->listener);
+                                     : event_get_fd(client->instance->listener);
     if (fd == -1) {
         redudp_log_error(client, LOG_WARNING, "bound_udp4_get failure");
         return;
@@ -351,7 +352,7 @@ static void redudp_first_pkt_from_client(redudp_instance *self, struct sockaddr_
     // TODO: remove client->destaddr
     if (destaddr)
         memcpy(&client->destaddr, destaddr, sizeof(client->destaddr));
-    evtimer_assign(&client->timeout, get_event_base(), redudp_timeout, client);
+    client->timeoutev = evtimer_new(get_event_base(), redudp_timeout, client);
     self->relay_ss->init(client);
 
     redsocks_time(&client->first_event);
@@ -382,7 +383,7 @@ static void redudp_pkt_from_client(int fd, short what, void *_arg)
 
     pdestaddr = do_tproxy(self) ? &destaddr : NULL;
 
-    assert(fd == event_get_fd(&self->listener));
+    assert(fd == event_get_fd(self->listener));
     // destaddr will be filled with true destination if it is available
     pktlen = red_recv_udp_pkt(fd, self->shared_buff, MAX_UDP_PACKET_SIZE, &clientaddr, pdestaddr);
     if (pktlen == -1)
@@ -583,8 +584,12 @@ static int redudp_init_instance(redudp_instance *instance)
         goto fail;
     }
 
-    event_assign(&instance->listener, get_event_base(), fd, EV_READ | EV_PERSIST, redudp_pkt_from_client, instance);
-    error = event_add(&instance->listener, NULL);
+    instance->listener = event_new(get_event_base(), fd, EV_READ | EV_PERSIST, redudp_pkt_from_client, instance);
+    if (!instance->listener) {
+        log_errno(LOG_ERR, "event_new");
+        goto fail;
+    }
+    error = event_add(instance->listener, NULL);
     if (error) {
         log_errno(LOG_ERR, "event_add");
         goto fail;
@@ -616,10 +621,10 @@ static void redudp_fini_instance(redudp_instance *instance)
         }
     }
 
-    if (event_initialized(&instance->listener)) {
-        if (event_del(&instance->listener) != 0)
+    if (instance->listener) {
+        if (event_del(instance->listener) != 0)
             log_errno(LOG_WARNING, "event_del");
-        close(event_get_fd(&instance->listener));
+        close(event_get_fd(instance->listener));
         memset(&instance->listener, 0, sizeof(instance->listener));
     }
 
@@ -627,7 +632,7 @@ static void redudp_fini_instance(redudp_instance *instance)
         instance->relay_ss->instance_fini(instance);
 
     list_del(&instance->list);
-
+    free(instance->config.type);
     free(instance->config.login);
     free(instance->config.password);
 
@@ -635,7 +640,7 @@ static void redudp_fini_instance(redudp_instance *instance)
     free(instance);
 }
 
-static struct event audit_event;
+static struct event * audit_event = NULL;
 
 static void redudp_audit(int sig, short what, void *_arg)
 {
@@ -653,12 +658,11 @@ static int redudp_init()
             goto fail;
     }
 
-    memset(&audit_event, 0, sizeof(audit_event));
     /* Start audit */
     audit_time.tv_sec = REDUDP_AUDIT_INTERVAL;
     audit_time.tv_usec = 0;
-    event_assign(&audit_event, base, 0, EV_TIMEOUT|EV_PERSIST, redudp_audit, NULL);
-    evtimer_add(&audit_event, &audit_time);
+    audit_event = event_new(base, -1, EV_TIMEOUT|EV_PERSIST, redudp_audit, NULL);
+    evtimer_add(audit_event, &audit_time);
 
     return 0;
 
@@ -672,9 +676,11 @@ static int redudp_fini()
     redudp_instance *tmp, *instance = NULL;
 
     /* stop audit */
-    if (event_initialized(&audit_event))
-        evtimer_del(&audit_event);
-
+    if (audit_event) {
+        evtimer_del(audit_event);
+        event_free(audit_event);
+        audit_event = NULL;
+    }
     list_for_each_entry_safe(instance, tmp, &instances, list)
         redudp_fini_instance(instance);
 

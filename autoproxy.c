@@ -23,6 +23,8 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <event2/bufferevent.h>
+#include <event2/bufferevent_struct.h>
 #include "utils.h"
 #include "log.h"
 #include "redsocks.h"
@@ -243,7 +245,7 @@ static void auto_recv_timeout_cb(evutil_socket_t fd, short events, void * arg)
 
 static void direct_relay_readcb_helper(redsocks_client *client, struct bufferevent *from, struct bufferevent *to)
 {
-    if (evbuffer_get_length(bufferevent_get_output(to)) < to->wm_write.high)
+    if (evbuffer_get_length(bufferevent_get_output(to)) < get_write_hwm(to))
     {
         if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
@@ -403,7 +405,7 @@ static void direct_relay_clientwritecb(struct bufferevent *to, void *_client)
         return;
     if (handle_write_to_client(client))
         return;
-    if (output_size < to->wm_write.high) 
+    if (output_size < get_write_hwm(to)) 
     {
         if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
@@ -455,7 +457,7 @@ static void direct_relay_relaywritecb(struct bufferevent *to, void *_client)
         return;
     if (aclient->state == AUTOPROXY_CONFIRMED)
     {
-        if (output_size < to->wm_write.high) 
+        if (output_size < get_write_hwm(to)) 
         {
             if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
                 redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");

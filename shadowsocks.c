@@ -19,6 +19,8 @@
 #include <string.h>
 #include <assert.h>
 #include <sys/socket.h>
+#include <event2/bufferevent.h>
+#include <event2/bufferevent_struct.h>
 #include "utils.h"
 #include "log.h"
 #include "redsocks.h"
@@ -161,7 +163,7 @@ static void ss_client_writecb(struct bufferevent *buffev, void *_arg)
     if (client->state == ss_connected) 
     {
         /* encrypt and forward data received from client side */
-        if (output_size < to->wm_write.high)
+        if (output_size < get_write_hwm(to))
         {
             if (input_size)
                 decrypt_buffer(client, from, to);
@@ -188,7 +190,7 @@ static void ss_client_readcb(struct bufferevent *buffev, void *_arg)
     if (client->state == ss_connected)
     {
         /* encrypt and forward data to the other side  */
-        if (output_size < to->wm_write.high)
+        if (output_size < get_write_hwm(to))
         {
             encrypt_buffer(client, from, to);
             if (bufferevent_enable(from, EV_READ) == -1)
@@ -224,7 +226,7 @@ static void ss_relay_writecb(struct bufferevent *buffev, void *_arg)
     if (client->state == ss_connected) 
     {
         /* encrypt and forward data received from client side */
-        if (output_size < to->wm_write.high)
+        if (output_size < get_write_hwm(to))
         {
             if (input_size)
                 encrypt_buffer(client, from, to);
@@ -252,7 +254,7 @@ static void ss_relay_readcb(struct bufferevent *buffev, void *_arg)
     if (client->state == ss_connected)
     {
         /* decrypt and forward data to client side */
-        if (output_size < to->wm_write.high)
+        if (output_size < get_write_hwm(to))
         {
             if (input_size)
                 decrypt_buffer(client, from, to);

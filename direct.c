@@ -20,11 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <event.h>
 #include "parser.h"
 #include "log.h"
 #include "main.h"
-#include "base.h"
 #include "redsocks.h"
 #include "utils.h"
 

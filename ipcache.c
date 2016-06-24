@@ -144,7 +144,7 @@ static int * addr_cache_counters = NULL;
 static int * addr_cache_pointers = NULL;
 static cache_data * addr_cache = NULL;
 static char  cache_changed = 0;
-static struct event timer_event;
+static struct event * timer_event = NULL;
 
 static inline cache_data * get_cache_data(unsigned int block, unsigned int index);
 
@@ -253,7 +253,6 @@ static int cache_init()
     }
     memset((void *)addr_cache_pointers, 0, size);
 
-    memset(&timer_event, 0, sizeof(timer_event));
     if (config->cache_file)
     {
         if (load_cache(config->cache_file))
@@ -264,8 +263,9 @@ static int cache_init()
         {
             tv.tv_sec = config->autosave_interval;
             tv.tv_usec = 0;
-            event_assign(&timer_event, get_event_base(), 0, EV_TIMEOUT|EV_PERSIST, cache_auto_saver, NULL);
-            evtimer_add(&timer_event, &tv);
+            timer_event =  event_new(get_event_base(), -1, EV_TIMEOUT|EV_PERSIST, cache_auto_saver, NULL);
+            if (timer_event)
+                evtimer_add(timer_event, &tv);
         }
     }
     set_cache_changed(0);
@@ -282,9 +282,11 @@ static int cache_fini()
         save_cache(config->cache_file);
         set_cache_changed(0);
     }
-    if (event_initialized(&timer_event))
+    if (timer_event)
     {
-        evtimer_del(&timer_event);
+        evtimer_del(timer_event);
+        event_free(timer_event);
+        timer_event = NULL;
     }
     // Free buffers allocated for cache
     if (addr_cache)

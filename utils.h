@@ -3,8 +3,10 @@
 
 #include <stddef.h>
 #include <time.h>
-#include <event.h>
 #include <netinet/in.h>
+#include <event2/event.h>
+#include <event2/buffer.h>
+#include <event2/bufferevent.h>
 
 struct sockaddr_in;
 
@@ -52,22 +54,23 @@ uint32_t red_randui32();
 time_t redsocks_time(time_t *t);
 char *redsocks_evbuffer_readline(struct evbuffer *buf);
 struct bufferevent* red_prepare_relay(const char *ifname,
-                                evbuffercb readcb,
-                                evbuffercb writecb,
-                                everrorcb errorcb,
+                                bufferevent_data_cb readcb,
+                                bufferevent_data_cb writecb,
+                                bufferevent_event_cb errorcb,
                                 void *cbarg);
 struct bufferevent* red_connect_relay(const char *ifname,
                                 struct sockaddr_in *addr,
-                                evbuffercb readcb,
-                                evbuffercb writecb,
-                                everrorcb errorcb,
+                                bufferevent_data_cb readcb,
+                                bufferevent_data_cb writecb,
+                                bufferevent_event_cb errorcb,
                                 void *cbarg,
                                 const struct timeval *timeout_write);
 int red_socket_geterrno(struct bufferevent *buffev);
 int red_is_socket_connected_ok(struct bufferevent *buffev);
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *fromaddr, struct sockaddr_in *toaddr);
 
-size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, size_t skip);
+size_t copy_evbuffer(struct bufferevent * dst, struct bufferevent * src, size_t skip);
+size_t get_write_hwm(struct bufferevent *bufev);
 int make_socket_transparent(int fd);
 int apply_tcp_fastopen(int fd);
 

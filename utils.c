@@ -22,6 +22,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <event2/bufferevent.h>
+#include <event2/bufferevent_struct.h>
 #include "config.h"
 #include "main.h"
 #include "log.h"
@@ -117,9 +119,9 @@ char *redsocks_evbuffer_readline(struct evbuffer *buf)
 }
 
 struct bufferevent* red_prepare_relay(const char *ifname,
-                                evbuffercb readcb,
-                                evbuffercb writecb,
-                                everrorcb errorcb,
+                                bufferevent_data_cb readcb,
+                                bufferevent_data_cb writecb,
+                                bufferevent_event_cb errorcb,
                                 void *cbarg)
 {
     struct bufferevent *retval = NULL;
@@ -178,9 +180,9 @@ fail:
 
 struct bufferevent* red_connect_relay(const char *ifname,
                                     struct sockaddr_in *addr,
-                                    evbuffercb readcb,
-                                    evbuffercb writecb,
-                                    everrorcb errorcb,
+                                    bufferevent_data_cb readcb,
+                                    bufferevent_data_cb writecb,
+                                    bufferevent_event_cb errorcb,
                                     void *cbarg,
                                     const struct timeval *timeout_write)
 {
@@ -289,7 +291,7 @@ size_t copy_evbuffer(struct bufferevent * dst, struct bufferevent * src, size_t 
     struct evbuffer_iovec *v;
     struct evbuffer_iovec quick_v[5];/* a vector with 5 elements is usually enough */
     struct evbuffer * evbinput = bufferevent_get_input(src);
-    size_t maxlen = dst->wm_write.high - evbuffer_get_length(bufferevent_get_output(dst));
+    size_t maxlen = get_write_hwm(dst) - evbuffer_get_length(bufferevent_get_output(dst));
     maxlen = evbuffer_get_length(evbinput) - skip > maxlen ? maxlen: evbuffer_get_length(evbinput)-skip;
 
     n = evbuffer_peek(evbinput, maxlen+skip, NULL, NULL, 0);
@@ -322,6 +324,17 @@ size_t copy_evbuffer(struct bufferevent * dst, struct bufferevent * src, size_t 
     if (v != &quick_v[0])
         free(v);
     return written;
+}
+
+size_t get_write_hwm(struct bufferevent *bufev)
+{
+#ifdef bufferevent_getwatermark
+    size_t high;
+    bufferevent_getwatermark(bufev, EV_WRITE, NULL, &high);
+    return high;
+#else
+    return bufev->wm_write.high;
+#endif
 }
 
 int make_socket_transparent(int fd)

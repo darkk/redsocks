@@ -20,6 +20,7 @@
  * under the License.
  */
 
+#include <malloc.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -30,7 +31,9 @@
 #include <time.h>
 #include <errno.h>
 #include <assert.h>
-#include <event.h>
+#include <event2/buffer.h>
+#include <event2/bufferevent.h>
+#include <event2/bufferevent_struct.h>
 #include "list.h"
 #include "parser.h"
 #include "log.h"
@@ -38,7 +41,6 @@
 #include "base.h"
 #include "redsocks.h"
 #include "utils.h"
-#include "libevent-compat.h"
 
 
 #define REDSOCKS_RELAY_HALFBUFF 1024*16
@@ -90,13 +92,13 @@ static void tracked_event_set(
         struct tracked_event *tev, evutil_socket_t fd, short events,
         void (*callback)(evutil_socket_t, short, void *), void *arg)
 {
-    event_assign(&tev->ev, get_event_base(), fd, events, callback, arg);
+    tev->ev = event_new(get_event_base(), fd, events, callback, arg);
     timerclear(&tev->inserted);
 }
 
 static int tracked_event_add(struct tracked_event *tev, const struct timeval *tv)
 {
-    int ret = event_add(&tev->ev, tv);
+    int ret = event_add(tev->ev, tv);
     if (ret == 0)
         gettimeofday(&tev->inserted, NULL);
     return ret;
@@ -104,10 +106,26 @@ static int tracked_event_add(struct tracked_event *tev, const struct timeval *tv
 
 static int tracked_event_del(struct tracked_event *tev)
 {
-    int ret = event_del(&tev->ev);
-    if (ret == 0)
-        timerclear(&tev->inserted);
+    int ret = -1;
+    if (tev->ev) {
+        ret = event_del(tev->ev);
+        if (ret == 0) {
+            timerclear(&tev->inserted);
+        }
+    }
     return ret;
+}
+
+static void tracked_event_free(struct tracked_event *tev)
+{
+    if (tev->ev) {
+        if (timerisset(&tev->inserted)) {
+            event_del(tev->ev);
+            timerclear(&tev->inserted);
+        }
+        event_free(tev->ev);
+        tev->ev = NULL;
+    }
 }
 
 static int redsocks_onenter(parser_section *section)
@@ -260,7 +278,7 @@ static void redsocks_relay_readcb(redsocks_client *client, struct bufferevent *f
     redsocks_log_error(client, LOG_DEBUG, "RCB %s, in: %u", from == client->client?"client":"relay",
                                             evbuffer_get_length(bufferevent_get_input(from)));
 
-    if (evbuffer_get_length(bufferevent_get_output(to)) < to->wm_write.high) {
+    if (evbuffer_get_length(bufferevent_get_output(to)) < get_write_hwm(to)) {
         if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
         if (bufferevent_enable(from, EV_READ) == -1)
@@ -301,7 +319,7 @@ static void redsocks_relay_writecb(redsocks_client *client, struct bufferevent *
 
     if (process_shutdown_on_write_(client, from, to))
         return;
-    if (evbuffer_get_length(bufferevent_get_output(to)) < to->wm_write.high) {
+    if (evbuffer_get_length(bufferevent_get_output(to)) < get_write_hwm(to)) {
         if (bufferevent_write_buffer(to, bufferevent_get_input(from)) == -1)
             redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
         if (!(from_evshut & EV_READ) && bufferevent_enable(from, EV_READ) == -1)
@@ -591,8 +609,7 @@ int redsocks_write_helper_ex_plain(
 
     if (client)
         client->state = state;
-    buffev->wm_read.low = wm_low;
-    buffev->wm_read.high = wm_high;
+    bufferevent_setwatermark(buffev, EV_READ, wm_low, wm_high);
     bufferevent_enable(buffev, EV_READ);
     drop = 0;
 
@@ -870,12 +887,32 @@ static void redsocks_dump_instance(redsocks_instance *instance)
     log_error(LOG_INFO, "End of client list.");
 }
 
+static void
+display_mallinfo(void)
+{
+    struct mallinfo mi;
+
+    mi = mallinfo();
+
+    log_error(LOG_INFO, "Total non-mmapped bytes (arena):       %d\n", mi.arena);
+    log_error(LOG_INFO, "# of free chunks (ordblks):            %d\n", mi.ordblks);
+    log_error(LOG_INFO, "# of free fastbin blocks (smblks):     %d\n", mi.smblks);
+    log_error(LOG_INFO, "# of mapped regions (hblks):           %d\n", mi.hblks);
+    log_error(LOG_INFO, "Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
+    log_error(LOG_INFO, "Max. total allocated space (usmblks):  %d\n", mi.usmblks);
+    log_error(LOG_INFO, "Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
+    log_error(LOG_INFO, "Total allocated space (uordblks):      %d\n", mi.uordblks);
+    log_error(LOG_INFO, "Total free space (fordblks):           %d\n", mi.fordblks);
+    log_error(LOG_INFO, "Topmost releasable block (keepcost):   %d\n", mi.keepcost);
+}
+
 static void redsocks_debug_dump()
 {
     redsocks_instance *instance = NULL;
 
     list_for_each_entry(instance, &instances, list)
         redsocks_dump_instance(instance);
+    display_mallinfo();
 }
 
 /* Audit is required to clean up hung connections. 
@@ -1016,26 +1053,21 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
     if (instance->relay_ss->instance_fini)
         instance->relay_ss->instance_fini(instance);
 
-    if (event_initialized(&instance->listener.ev)) {
-        if (timerisset(&instance->listener.inserted))
-            if (tracked_event_del(&instance->listener) != 0)
-                log_errno(LOG_WARNING, "event_del");
-        redsocks_close(event_get_fd(&instance->listener.ev));
+    if (instance->listener.ev) {
+        int fd = event_get_fd(instance->listener.ev);
+        tracked_event_free(&instance->listener);
+        redsocks_close(fd);
         memset(&instance->listener, 0, sizeof(instance->listener));
     }
-
-    if (event_initialized(&instance->accept_backoff.ev)) {
-        if (timerisset(&instance->accept_backoff.inserted))
-            if (tracked_event_del(&instance->accept_backoff) != 0)
-                log_errno(LOG_WARNING, "event_del");
-        memset(&instance->accept_backoff, 0, sizeof(instance->accept_backoff));
-    }
+    tracked_event_free(&instance->accept_backoff);
+    memset(&instance->accept_backoff, 0, sizeof(instance->accept_backoff));
 
     list_del(&instance->list);
 
     free(instance->config.type);
     free(instance->config.login);
     free(instance->config.password);
+    free(instance->config.interface);
 
     memset(instance, 0, sizeof(*instance));
     free(instance);
@@ -1043,19 +1075,21 @@ static void redsocks_fini_instance(redsocks_instance *instance) {
 
 static int redsocks_fini();
 
-static struct event audit_event;
+static struct event * audit_event = NULL;
 
 static int redsocks_init() {
     redsocks_instance *tmp, *instance = NULL;
     struct timeval audit_time;
     struct event_base * base = get_event_base();
 
-    memset(&audit_event, 0, sizeof(audit_event));
     /* Start audit */
     audit_time.tv_sec = REDSOCKS_AUDIT_INTERVAL;
     audit_time.tv_usec = 0;
-    event_assign(&audit_event, base, 0, EV_TIMEOUT|EV_PERSIST, redsocks_audit, NULL);
-    evtimer_add(&audit_event, &audit_time);
+    audit_event = event_new(base, -1, EV_TIMEOUT|EV_PERSIST, redsocks_audit, NULL);
+    if (!audit_event)
+        goto fail;
+    if (evtimer_add(audit_event, &audit_time))
+        goto fail;
 
     list_for_each_entry_safe(instance, tmp, &instances, list) {
         if (redsocks_init_instance(instance) != 0)
@@ -1079,9 +1113,11 @@ static int redsocks_fini()
         redsocks_fini_instance(instance);
 
     /* stop audit */
-    if (event_initialized(&audit_event))
-        evtimer_del(&audit_event);
-
+    if (audit_event) {
+        evtimer_del(audit_event);
+        event_free(audit_event);
+        audit_event = NULL;
+    }
     return 0;
 }
 

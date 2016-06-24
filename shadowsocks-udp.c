@@ -29,7 +29,7 @@
 #include "shadowsocks.h"
 
 typedef struct ss_client_t {
-    struct event   udprelay;
+    struct event * udprelay;
 } ss_client;
 
 typedef struct ss_instance_t {
@@ -63,10 +63,11 @@ static void ss_client_init(redudp_client *client)
 static void ss_client_fini(redudp_client *client)
 {
     ss_client *ssclient = (void*)(client + 1);
-    if (event_initialized(&ssclient->udprelay)) {
-        int fd = event_get_fd(&ssclient->udprelay);
-        if (event_del(&ssclient->udprelay) == -1)
+    if (ssclient->udprelay) {
+        int fd = event_get_fd(ssclient->udprelay);
+        if (event_del(ssclient->udprelay) == -1)
             redudp_log_errno(client, LOG_ERR, "event_del");
+        event_free(ssclient->udprelay);
         close(fd);
     }
 }
@@ -120,7 +121,7 @@ static void ss_forward_pkt(redudp_client *client, struct sockaddr * destaddr, vo
     io[0].iov_base = buff;
     io[0].iov_len = fwdlen;
 
-    outgoing = sendmsg(event_get_fd(&ssclient->udprelay), &msg, 0);
+    outgoing = sendmsg(event_get_fd(ssclient->udprelay), &msg, 0);
     if (outgoing == -1) {
         redudp_log_errno(client, LOG_DEBUG, "sendmsg: Can't forward packet, dropping it");
         return;
@@ -144,7 +145,7 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
     void * buff = client->instance->shared_buff;
     void * buff2 = ss->buff;
 
-    assert(fd == event_get_fd(&ssclient->udprelay));
+    assert(fd == event_get_fd(ssclient->udprelay));
 
     pktlen = red_recv_udp_pkt(fd, buff, MAX_UDP_PACKET_SIZE, &udprelayaddr, NULL);
     if (pktlen == -1)
@@ -212,8 +213,12 @@ static void ss_connect_relay(redudp_client *client)
         goto fail;
     }
 
-    event_assign(&ssclient->udprelay, get_event_base(), fd, EV_READ | EV_PERSIST, ss_pkt_from_server, client);
-    error = event_add(&ssclient->udprelay, NULL);
+    ssclient->udprelay = event_new(get_event_base(), fd, EV_READ | EV_PERSIST, ss_pkt_from_server, client);
+    if (!ssclient->udprelay) {
+        redudp_log_errno(client, LOG_ERR, "event_new");
+        goto fail;
+    }
+    error = event_add(ssclient->udprelay, NULL);
     if (error) {
         redudp_log_errno(client, LOG_ERR, "event_add");
         goto fail;

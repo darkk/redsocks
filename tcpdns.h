@@ -13,7 +13,7 @@ typedef struct tcpdns_config_t {
 typedef struct tcpdns_instance_t {
 	list_head       list;
 	tcpdns_config   config;
-	struct event    listener;
+	struct event *  listener;
 	list_head       requests;
     // Data for DNS resolver status tracking/checking
     int             udp1_delay_ms;

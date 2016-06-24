@@ -20,6 +20,8 @@
 #include <string.h>
 #include <assert.h>
 #include <sys/socket.h>
+#include <event2/bufferevent.h>
+#include <event2/bufferevent_struct.h>
 #include "main.h"
 #include "utils.h"
 #include "log.h"
