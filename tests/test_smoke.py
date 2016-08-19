@@ -117,7 +117,7 @@ def test_nonce_reuse(slow_net):
     ('httperr_proxy_refuse', (1 + 3*RTT/2) * 0.001),
     ('httperr_proxy_timeout', (1 + 3*RTT/2) * 0.001),
 ])
-def test_impacient_client(slow_net, tank, delay):
+def test_impatient_client(slow_net, tank, delay):
     vm, regw = slow_net.vm['tank%d' % conftest.TANKS[tank]], slow_net.vm['regw']
     before, start = regw.lsfd(), time.time()
     try:
