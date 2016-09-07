@@ -633,7 +633,8 @@ int parser_run(parser_context *context)
 					token = 0;
 				}
 				else {
-					parser_error(context, "invalid token order");
+					parser_error(context, "invalid token order: key_token=%s, value_token=%s, next token=%s",
+					             key_token, value_token, token);
 				}
 			}
 			free(token);
