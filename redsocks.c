@@ -952,6 +952,10 @@ static int redsocks_init_instance(redsocks_instance *instance)
         goto fail;
     }
 
+    // iptables TPROXY target does not send packets to non-transparent sockets
+    if (make_socket_transparent(fd))
+        log_error(LOG_WARNING, "Continue without TPROXY support");
+
     error = bind(fd, (struct sockaddr*)&instance->config.bindaddr, sizeof(instance->config.bindaddr));
     if (error) {
         log_errno(LOG_ERR, "bind");

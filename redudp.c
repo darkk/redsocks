@@ -50,7 +50,6 @@ static char shared_buff[MAX_UDP_PACKET_SIZE];// max size of UDP packet is less t
 
 static void redudp_fini_instance(redudp_instance *instance);
 static int redudp_fini();
-static int redudp_transparent(int fd);
 
 struct bound_udp4_key {
     struct in_addr sin_addr;
@@ -120,7 +119,7 @@ static int bound_udp4_get(const struct sockaddr_in *addr)
         goto fail;
     }
 
-    if (0 != redudp_transparent(node->fd))
+    if (0 != make_socket_transparent(node->fd))
         goto fail;
 
     if (evutil_make_listen_socket_reuseable(node->fd)) {
@@ -212,15 +211,6 @@ static void bound_udp4_action(const void *nodep, const VISIT which, const int de
             }
             break;
     }
-}
-
-static int redudp_transparent(int fd)
-{
-    int on = 1;
-    int error = setsockopt(fd, SOL_IP, IP_TRANSPARENT, &on, sizeof(on));
-    if (error)
-        log_errno(LOG_ERR, "setsockopt(..., SOL_IP, IP_TRANSPARENT)");
-    return error;
 }
 
 static int do_tproxy(redudp_instance* instance)
@@ -564,7 +554,7 @@ static int redudp_init_instance(redudp_instance *instance)
     if (do_tproxy(instance)) {
         int on = 1;
         // iptables TPROXY target does not send packets to non-transparent sockets
-        if (0 != redudp_transparent(fd))
+        if (0 != make_socket_transparent(fd))
             goto fail;
 
         error = setsockopt(fd, SOL_IP, IP_RECVORIGDSTADDR, &on, sizeof(on));

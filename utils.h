@@ -63,6 +63,7 @@ int red_is_socket_connected_ok(struct bufferevent *buffev);
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *fromaddr, struct sockaddr_in *toaddr);
 
 size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, size_t skip);
+int make_socket_transparent(int fd);
 
 #define event_fmt_str "%s|%s|%s|%s|%s|%s|0x%x"
 #define event_fmt(what) \

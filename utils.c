@@ -365,5 +365,13 @@ size_t copy_evbuffer(struct bufferevent * dst, const struct bufferevent * src, s
     return written;
 }
 
+int make_socket_transparent(int fd)
+{
+    int on = 1;
+    int error = setsockopt(fd, SOL_IP, IP_TRANSPARENT, &on, sizeof(on));
+    if (error)
+        log_errno(LOG_ERR, "setsockopt(..., SOL_IP, IP_TRANSPARENT)");
+    return error;
+}
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
