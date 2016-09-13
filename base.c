@@ -32,12 +32,18 @@
 # include <limits.h>
 # include <linux/netfilter_ipv4.h>
 #endif
+
 #if defined USE_PF
 # include <net/if.h>
 # include <net/pfvar.h>
 # include <sys/ioctl.h>
 #endif
-# include <errno.h>
+#ifdef __FreeBSD__
+# include <netinet/ip_fil.h>
+# include <netinet/ip_nat.h>
+#endif
+
+#include <errno.h>
 #include "log.h"
 #include "main.h"
 #include "parser.h"

@@ -6,10 +6,15 @@ CONF := config.h
 DEPS := .depend
 OUT := redsocks2
 VERSION := 0.65
+OS := $(shell uname)
 
 LIBS := -levent
 CFLAGS +=-fPIC -O3
-override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
+override CFLAGS += -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
+ifeq ($(OS), Linux)
+override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600
+endif
+
 #LDFLAGS += -fwhole-program
 ifdef USE_CRYPTO_POLARSSL
 override LIBS += -lpolarssl
@@ -35,9 +40,12 @@ tags: *.c *.h
 	ctags -R
 
 $(CONF):
-	@case `uname` in \
+	@case $(OS) in \
 	Linux*) \
 		echo "#define USE_IPTABLES" >$(CONF) \
+		;; \
+	FreeBSD) \
+		echo "#define USE_PF" >$(CONF) \
 		;; \
 	OpenBSD) \
 		echo "#define USE_PF" >$(CONF) \

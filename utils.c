@@ -22,6 +22,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "config.h"
 #include "main.h"
 #include "log.h"
 #include "base.h"
@@ -131,15 +132,17 @@ struct bufferevent* red_connect_relay_if(const char *ifname,
         log_errno(LOG_ERR, "socket");
         goto fail;
     }
-
     if (ifname) {
+#ifdef USE_PF // BSD
+        error = setsockopt(relay_fd, SOL_SOCKET, IP_RECVIF, ifname, strlen(ifname));
+#else // Linux
         error = setsockopt(relay_fd, SOL_SOCKET, SO_BINDTODEVICE, ifname, strlen(ifname));
+#endif
         if (error) {
             log_errno(LOG_ERR, "bind");
             goto fail;
         }
     }
-
     error = evutil_make_socket_nonblocking(relay_fd);
     if (error) {
         log_errno(LOG_ERR, "evutil_make_socket_nonblocking");

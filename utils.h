@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <time.h>
 #include <event.h>
+#include <netinet/in.h>
 
 struct sockaddr_in;
 

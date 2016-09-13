@@ -22,4 +22,15 @@
 #   define IP_TRANSPARENT 19
 #endif
 
+#ifndef SOL_IP
+#   warning Using hardcoded value for SOL_IP as libc headers do not define it.
+#   define SOL_IP IPPROTO_IP
+#endif
+
+#ifdef __FreeBSD__
+#ifndef INADDR_LOOPBACK
+#   warning Using hardcoded value for INADDR_LOOPBACK for FreeBSD.
+#   define INADDR_LOOPBACK		0x7F000001
+#endif
+#endif
 #endif // 67C91670_FCCB_4855_BDF7_609F1EECB8B4
