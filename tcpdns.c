@@ -43,7 +43,7 @@ static int tcpdns_fini();
 
 #define DNS_QR 0x80
 #define DNS_TC 0x02
-#define DNS_Z  0x70
+#define DNS_Z  0x40
 #define DNS_RC_MASK      0x0F
 
 #define DNS_RC_NOERROR   0
