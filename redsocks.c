@@ -20,7 +20,6 @@
  * under the License.
  */
 
-#include <malloc.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -887,32 +886,12 @@ static void redsocks_dump_instance(redsocks_instance *instance)
     log_error(LOG_INFO, "End of client list.");
 }
 
-static void
-display_mallinfo(void)
-{
-    struct mallinfo mi;
-
-    mi = mallinfo();
-
-    log_error(LOG_INFO, "Total non-mmapped bytes (arena):       %d\n", mi.arena);
-    log_error(LOG_INFO, "# of free chunks (ordblks):            %d\n", mi.ordblks);
-    log_error(LOG_INFO, "# of free fastbin blocks (smblks):     %d\n", mi.smblks);
-    log_error(LOG_INFO, "# of mapped regions (hblks):           %d\n", mi.hblks);
-    log_error(LOG_INFO, "Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
-    log_error(LOG_INFO, "Max. total allocated space (usmblks):  %d\n", mi.usmblks);
-    log_error(LOG_INFO, "Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
-    log_error(LOG_INFO, "Total allocated space (uordblks):      %d\n", mi.uordblks);
-    log_error(LOG_INFO, "Total free space (fordblks):           %d\n", mi.fordblks);
-    log_error(LOG_INFO, "Topmost releasable block (keepcost):   %d\n", mi.keepcost);
-}
-
 static void redsocks_debug_dump()
 {
     redsocks_instance *instance = NULL;
 
     list_for_each_entry(instance, &instances, list)
         redsocks_dump_instance(instance);
-    display_mallinfo();
 }
 
 /* Audit is required to clean up hung connections. 
