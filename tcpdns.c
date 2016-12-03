@@ -304,7 +304,7 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
     if ( (req->data.header.qr_opcode_aa_tc_rd & DNS_QR) == 0 /* query */
         && (req->data.header.ra_z_rcode & DNS_Z) == 0 /* Z is Zero */
         && req->data.header.qdcount /* some questions */
-        && !req->data.header.ancount && !req->data.header.nscount && !req->data.header.arcount /* no answers */
+        && !req->data.header.ancount && !req->data.header.nscount
     ) 
     {
         tv.tv_sec = self->config.timeout;
