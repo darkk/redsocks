@@ -12,7 +12,7 @@ VERSION := 0.4
 # -levent_extra is required only for `http` and `debug`
 # -levent_core may be used for space reduction
 LIBS := -levent
-CFLAGS += -g -O2
+CFLAGS += -g -O2 -I/usr/local/include/
 # _GNU_SOURCE is used to get splice(2), it also implies _BSD_SOURCE
 override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_DEFAULT_SOURCE -D_GNU_SOURCE -Wall
 
