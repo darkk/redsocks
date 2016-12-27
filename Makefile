@@ -7,7 +7,7 @@ SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks
-VERSION := 0.4
+VERSION := 0.5
 
 LIBS := -levent_core
 ifeq ($(DBG_BUILD),1)
