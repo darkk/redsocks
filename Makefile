@@ -30,7 +30,7 @@ $(CONF):
 	Linux*) \
 		echo "#define USE_IPTABLES" >$(CONF) \
 		;; \
-	OpenBSD) \
+	OpenBSD|GNU/kFreeBSD) \
 		echo "#define USE_PF" >$(CONF) \
 		;; \
 	*) \

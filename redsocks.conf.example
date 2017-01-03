@@ -32,7 +32,7 @@ base {
 	/* possible `redirector' values are:
 	 *   iptables   - for Linux
 	 *   ipf        - for FreeBSD
-	 *   pf         - for OpenBSD
+	 *   pf         - for OpenBSD and Debian GNU/kFreeBSD
 	 *   generic    - some generic redirector that MAY work
 	 */
 	redirector = iptables;
