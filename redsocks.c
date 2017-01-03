@@ -94,6 +94,11 @@ static bool is_splice_good()
 		return false;
 	}
 
+	/* splice(2) is Linux-specific */
+	if (strcmp(u.sysname, "Linux") != 0) {
+		return false;
+	}
+
 	unsigned long int v[4] = { 0, 0, 0, 0 };
 	char *rel = u.release;
 	for (int i = 0; i < SIZEOF_ARRAY(v); ++i) {
@@ -1410,6 +1415,11 @@ static int redsocks_init_instance(redsocks_instance *instance)
 	if (error) {
 		log_errno(LOG_ERR, "event_add");
 		goto fail;
+	}
+
+	if (instance->config.use_splice && !is_splice_good()) {
+		log_error(LOG_WARNING, "splice(2) support requested but unavailable; ignoring");
+		instance->config.use_splice = false;
 	}
 
 	if (instance->relay_ss->instance_init)
