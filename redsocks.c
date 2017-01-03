@@ -27,7 +27,6 @@
 #include <time.h>
 #include <errno.h>
 #include <assert.h>
-#include <fcntl.h>
 #include <event.h>
 #include "list.h"
 #include "parser.h"
@@ -40,10 +39,6 @@
 
 
 #define REDSOCKS_RELAY_HALFBUFF  4096
-
-#ifdef SPLICE_F_MOVE
-# define USE_SPLICE
-#endif
 
 enum pump_state_t {
 	pump_active = -1,

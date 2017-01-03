@@ -1,6 +1,7 @@
 #ifndef MAIN_H_TUE_JAN_23_15_38_25_2007
 #define MAIN_H_TUE_JAN_23_15_38_25_2007
 
+#include <fcntl.h>
 #include "parser.h"
 
 struct event_base;
@@ -15,6 +16,9 @@ typedef struct app_subsys_t {
 #define FOREACH(ptr, array)      for (ptr = array; ptr < array + SIZEOF_ARRAY(array); ptr++)
 #define FOREACH_REV(ptr, array)  for (ptr = array + SIZEOF_ARRAY(array) - 1; ptr >= array; ptr--)
 
+#ifdef SPLICE_F_MOVE
+# define USE_SPLICE
+#endif
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */
