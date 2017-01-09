@@ -190,9 +190,23 @@ static int redsocks_onexit(parser_section *section)
 		return -1;
 	}
 
-	if (instance->config.disclose_src != DISCLOSE_NONE && instance->relay_ss != &http_connect_subsys) {
-		parser_error(section->context, "only `http-connect` supports `disclose_src` at the moment");
-		return -1;
+	switch(instance->config.disclose_src) {
+		case DISCLOSE_X_FORWARDED_FOR:
+		case DISCLOSE_FORWARDED_IP:
+		case DISCLOSE_FORWARDED_IPPORT:
+			if (instance->relay_ss != &http_connect_subsys) {
+				parser_error(section->context, "only `http-connect` supports the configured `disclose_src` option at the moment");
+				return -1;
+			}
+		case DISCLOSE_USERNAME_APPEND_IP:
+		case DISCLOSE_USERNAME_APPEND_IPPORT:
+			if (instance->relay_ss != &socks4_subsys) {
+				parser_error(section->context, "only `socks4` supports the configured `disclose_src` option at the moment");
+				return -1;
+			}
+		case DISCLOSE_NONE:
+		default:
+			break;
 	}
 
 	if (instance->config.on_proxy_fail != ONFAIL_CLOSE && instance->relay_ss != &http_connect_subsys) {

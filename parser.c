@@ -280,6 +280,8 @@ static int vp_disclose_src(parser_context *context, void *addr, const char *toke
 		{ "X-Forwarded-For", DISCLOSE_X_FORWARDED_FOR },
 		{ "Forwarded_ip", DISCLOSE_FORWARDED_IP },
 		{ "Forwarded_ipport", DISCLOSE_FORWARDED_IPPORT },
+		{ "username_append_ip", DISCLOSE_USERNAME_APPEND_IP },
+		{ "username_append_ipport", DISCLOSE_USERNAME_APPEND_IPPORT },
 	};
 	for (int i = 0; i < SIZEOF_ARRAY(opt); ++i) {
 		if (strcmp(token, opt[i].name) == 0) {
