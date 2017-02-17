@@ -65,6 +65,16 @@ struct bufferevent* red_connect_relay(const char *ifname,
                                 bufferevent_event_cb errorcb,
                                 void *cbarg,
                                 const struct timeval *timeout_write);
+struct bufferevent* red_connect_relay_tfo(const char *ifname,
+                                struct sockaddr_in *addr,
+                                bufferevent_data_cb readcb,
+                                bufferevent_data_cb writecb,
+                                bufferevent_event_cb errorcb,
+                                void *cbarg,
+                                const struct timeval *timeout_write,
+                                void *data,
+                                size_t *len);
+
 int red_socket_geterrno(struct bufferevent *buffev);
 int red_is_socket_connected_ok(struct bufferevent *buffev);
 int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *fromaddr, struct sockaddr_in *toaddr);

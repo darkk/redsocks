@@ -216,6 +216,76 @@ fail:
     return NULL;
 }
 
+struct bufferevent* red_connect_relay_tfo(const char *ifname,
+                                    struct sockaddr_in *addr,
+                                    bufferevent_data_cb readcb,
+                                    bufferevent_data_cb writecb,
+                                    bufferevent_event_cb errorcb,
+                                    void *cbarg,
+                                    const struct timeval *timeout_write,
+                                    void *data,
+                                    size_t *len)
+{
+    struct bufferevent *retval = NULL;
+    int relay_fd = -1;
+    int error;
+
+    retval = red_prepare_relay(ifname, readcb, writecb, errorcb, cbarg);
+    if (retval) {
+        relay_fd = bufferevent_getfd(retval);
+        if (timeout_write)
+            bufferevent_set_timeouts(retval, NULL, timeout_write);
+
+#ifdef MSG_FASTOPEN
+        size_t s = sendto(relay_fd, data, * len, MSG_FASTOPEN,
+                (struct sockaddr *)addr, sizeof(*addr)
+                );
+        *len = 0; // Assume nothing sent, caller needs to write data again when connection is setup.
+        if (s == -1) {
+            if (errno == EINPROGRESS || errno == EAGAIN
+                    || errno == EWOULDBLOCK) {
+                // Remote server doesn't support tfo or it's the first connection to the server.
+                // Connection will automatically fall back to conventional TCP.
+                log_error(LOG_DEBUG, "TFO: no cookie");
+                return retval;
+            } else if (errno == EOPNOTSUPP || errno == EPROTONOSUPPORT ||
+                    errno == ENOPROTOOPT) {
+                // Disable fast open as it's not supported
+                log_error(LOG_DEBUG, "TFO: not support");
+                goto fallback;
+            } else {
+                log_errno(LOG_NOTICE, "sendto");
+                goto fail;
+            }
+        }
+        else {
+            log_error(LOG_DEBUG, "TFO: cookie found");
+            *len = s; // data is put into socket buffer
+            return retval;
+        }
+fallback:
+#endif
+
+        *len = 0; // Nothing sent, caller needs to write data again when connection is setup.
+        error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+        if (error && errno != EINPROGRESS) {
+            log_errno(LOG_NOTICE, "connect");
+            goto fail;
+        }
+    }
+    return retval;
+
+fail:
+    if (retval) {
+        bufferevent_disable(retval, EV_READ|EV_WRITE);
+        bufferevent_free(retval);
+    }
+    if (relay_fd != -1)
+        redsocks_close(relay_fd);
+    return NULL;
+}
+
+
 int red_socket_geterrno(struct bufferevent *buffev)
 {
     int error;
