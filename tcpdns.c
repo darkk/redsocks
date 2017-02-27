@@ -105,7 +105,7 @@ static void tcpdns_readcb(struct bufferevent *from, void *_arg)
     size_t input_size = evbuffer_get_length(bufferevent_get_input(from));
     size_t read_size;
 
-    tcpdns_log_error(LOG_DEBUG, "response size: %d", input_size);
+    tcpdns_log_error(LOG_DEBUG, "response size: %zu", input_size);
 
     if (input_size == 0 || input_size > sizeof(buff))
         // EOF or response is too large. Drop it.

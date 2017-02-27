@@ -222,7 +222,7 @@ static void auto_recv_timeout_cb(evutil_socket_t fd, short events, void * arg)
     redsocks_client *client = arg;
     autoproxy_client * aclient = get_autoproxy_client(client);
 
-    redsocks_log_error(client, LOG_DEBUG, "RECV Timeout, state: %d, data_sent: %u", aclient->state, aclient->data_sent); 
+    redsocks_log_error(client, LOG_DEBUG, "RECV Timeout, state: %d, data_sent: %zu", aclient->state, aclient->data_sent); 
     assert(events & EV_TIMEOUT);
 
     redsocks_touch_client(client);
@@ -270,7 +270,7 @@ static int handle_write_to_relay(redsocks_client *client)
 
     if (aclient->state == AUTOPROXY_CONNECTED )
     {
-        redsocks_log_error(client, LOG_DEBUG, "sent: %u, recv: %u, in:%u, out:%u",
+        redsocks_log_error(client, LOG_DEBUG, "sent: %zu, recv: %zu, in:%zu, out:%zu",
                                     aclient->data_sent,
                                     aclient->data_recv,
                                     input_size,
@@ -374,7 +374,7 @@ static void direct_relay_clientreadcb(struct bufferevent *from, void *_client)
     redsocks_client *client = _client;
     size_t input_size = evbuffer_get_length(bufferevent_get_input(from));
 
-    redsocks_log_error(client, LOG_DEBUG, "client in: %u", input_size); 
+    redsocks_log_error(client, LOG_DEBUG, "client in: %zu", input_size); 
     redsocks_touch_client(client);
     if (handle_write_to_relay(client))
         return;
@@ -387,7 +387,7 @@ static void direct_relay_relayreadcb(struct bufferevent *from, void *_client)
     redsocks_client *client = _client;
     size_t input_size = evbuffer_get_length(bufferevent_get_input(from));
 
-    redsocks_log_error(client, LOG_DEBUG, "relay in: %u", input_size); 
+    redsocks_log_error(client, LOG_DEBUG, "relay in: %zu", input_size); 
     redsocks_touch_client(client);
     if (handle_write_to_client(client))
         return;
@@ -421,7 +421,7 @@ static int process_shutdown_on_write_2(redsocks_client *client, struct buffereve
     unsigned short from_evshut = from == client->client ? client->client_evshut : client->relay_evshut;
     unsigned short to_evshut = to == client->client ? client->client_evshut : client->relay_evshut;
 
-    redsocks_log_error(client, LOG_DEBUG, "WCB %s, fs: %u, ts: %u, fin: %u, fout: %u, tin: %u",
+    redsocks_log_error(client, LOG_DEBUG, "WCB %s, fs: %u, ts: %u, fin: %zu, fout: %zu, tin: %zu",
                                 to == client->client?"client":"relay",
                                 from_evshut,
                                 to_evshut,

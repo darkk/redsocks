@@ -274,7 +274,7 @@ static inline const char* bufname(redsocks_client *client, struct bufferevent *b
 
 static void redsocks_relay_readcb(redsocks_client *client, struct bufferevent *from, struct bufferevent *to)
 {
-    redsocks_log_error(client, LOG_DEBUG, "RCB %s, in: %u", from == client->client?"client":"relay",
+    redsocks_log_error(client, LOG_DEBUG, "RCB %s, in: %zu", from == client->client?"client":"relay",
                                             evbuffer_get_length(bufferevent_get_input(from)));
 
     if (evbuffer_get_length(bufferevent_get_output(to)) < get_write_hwm(to)) {
@@ -295,7 +295,7 @@ int process_shutdown_on_write_(redsocks_client *client, struct bufferevent *from
     unsigned short from_evshut = from == client->client ? client->client_evshut : client->relay_evshut;
     unsigned short to_evshut = to == client->client ? client->client_evshut : client->relay_evshut;
 
-    redsocks_log_error(client, LOG_DEBUG, "WCB %s, fs: %u, ts: %u, fin: %u, fout: %u, tin: %u",
+    redsocks_log_error(client, LOG_DEBUG, "WCB %s, fs: %u, ts: %u, fin: %zu, fout: %zu, tin: %zu",
                                 to == client->client?"client":"relay",
                                 from_evshut,
                                 to_evshut,
@@ -857,7 +857,7 @@ void redsocks_dump_client(redsocks_client * client, int loglevel)
     const char *s_client_evshut = redsocks_evshut_str(client->client_evshut);
     const char *s_relay_evshut = redsocks_evshut_str(client->relay_evshut);
 
-    redsocks_log_error(client, loglevel, "client(%i): (%s)%s%s input %u output %u, relay(%i): (%s)%s%s input %u output %u, age: %li sec, idle: %li sec.",
+    redsocks_log_error(client, loglevel, "client(%i): (%s)%s%s input %zu output %zu, relay(%i): (%s)%s%s input %zu output %zu, age: %li sec, idle: %li sec.",
         client->client ? bufferevent_getfd(client->client) : -1,
             redsocks_event_str(client->client ?  bufferevent_get_enabled(client->client) : 0),
             s_client_evshut[0] ? " " : "", s_client_evshut,
