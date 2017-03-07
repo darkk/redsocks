@@ -138,6 +138,13 @@ int main(int argc, char **argv)
             break;
         case 'v':
             puts(redsocks_version);
+            printf("Built with libevent-%s\n", LIBEVENT_VERSION);
+            printf("Runs  with libevent-%s\n", event_get_version());
+            if (LIBEVENT_VERSION_NUMBER != event_get_version_number()) {
+                printf("Warning: libevent version number mismatch.\n"
+                       "  Headers: %8x\n"
+                       "  Runtime: %8x\n", LIBEVENT_VERSION_NUMBER, event_get_version_number());
+            }
             return EXIT_SUCCESS;
         default:
             printf(
