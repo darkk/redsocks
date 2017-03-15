@@ -39,6 +39,8 @@ typedef struct ss_client_t {
     short e_ctx_init;
     short d_ctx_init;
     bool  tfo;
+    size_t tfo_size;
+    char  tfo_buff[512];
 } ss_client;
 
 typedef struct ss_instance_t {
@@ -277,8 +279,6 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
 {
     redsocks_client *client = _arg;
     ss_client *sclient = (void*)(client + 1);
-    ss_header_ipv4 header;
-    size_t len = 0;
 
     assert(buffev == client->relay);
     assert(client->state == ss_new);
@@ -310,13 +310,7 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
                                      redsocks_event_error,
                                      client);
     if(!sclient->tfo) {
-        /* build and send header */
-        // TODO: Better implementation and IPv6 Support
-        header.addr_type = ss_addrtype_ipv4;
-        header.addr = client->destaddr.sin_addr.s_addr;
-        header.port = client->destaddr.sin_port;
-        len += sizeof(header);
-        encrypt_mem(client, (char *)&header, len, bufferevent_get_output(client->relay), 0);
+        bufferevent_write(client->relay, &sclient->tfo_buff[0], sclient->tfo_size);
     }
     // Write any data received from client side to relay.
     if (evbuffer_get_length(bufferevent_get_input(client->client)))
@@ -354,20 +348,19 @@ static int ss_connect_relay(redsocks_client *client)
     header.addr = client->destaddr.sin_addr.s_addr;
     header.port = client->destaddr.sin_port;
     len += sizeof(header);
-    char buff[1024];
-    size_t sz = sizeof(buff);
-    if (!ss_encrypt(&sclient->e_ctx, (char *)&header, len, buff, &sz)) {
+    size_t sz = sizeof(sclient->tfo_buff);
+    if (!ss_encrypt(&sclient->e_ctx, (char *)&header, len, &sclient->tfo_buff[0], &sz)) {
         log_error(LOG_ERR, "Encryption error.");
         redsocks_drop_client(client);
         return -1;
     }
-    len = sz;
+    sclient->tfo_size = len = sz;
 
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
     client->relay = red_connect_relay_tfo(interface, &client->instance->config.relayaddr,
                     NULL, ss_relay_connected, redsocks_event_error, client, 
-                    &tv, buff, &sz);
+                    &tv, &sclient->tfo_buff[0], &sz);
 
     if (!client->relay) {
         redsocks_drop_client(client);
