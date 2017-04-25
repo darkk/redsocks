@@ -34,6 +34,7 @@ extern app_subsys debug_subsys;
 extern app_subsys base_subsys;
 extern app_subsys redudp_subsys;
 extern app_subsys dnstc_subsys;
+extern app_subsys rdns_subsys;
 
 app_subsys *subsystems[] = {
 	&redsocks_subsys,
@@ -43,6 +44,7 @@ app_subsys *subsystems[] = {
 	&base_subsys,
 	&redudp_subsys,
 	&dnstc_subsys,
+	&rdns_subsys,
 };
 
 static const char *confname = "redsocks.conf";
