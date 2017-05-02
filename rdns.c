@@ -32,16 +32,22 @@
 #include "parser.h"
 #include "main.h"
 #include "redsocks.h"
-#include "rdns.h"
 #include "utils.h"
-#include "hashtable.h"
+#include "rdns.h"
 
 #define rdns_log_error(prio, msg...) \
 	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 0, &clientaddr, &self->config.host_fifo, prio, ## msg)
 #define rdns_log_errno(prio, msg...) \
 	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 1, &clientaddr, &self->config.host_fifo, prio, ## msg)
 
+struct host_entry_t {
+    struct hlist_node_t node;
+    char *addr;
+    char *name;
+};
+
 static void rdns_fini_instance(rdns_instance *instance);
+static int rdns_init_instance(rdns_instance *instance);
 static int rdns_fini();
 
 /***********************************************************************
@@ -67,10 +73,10 @@ static int rdns_onenter(parser_section *section)
 
 	INIT_LIST_HEAD(&instance->list);
 
-        for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
-                entry->addr =
-                        (strcmp(entry->key, "fifo") == 0) ? (void*)&instance->config.host_fifo_name :
-                        NULL;
+	for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
+		entry->addr =
+			(strcmp(entry->key, "fifo") == 0) ? (void*)&instance->config.host_fifo_name :
+			NULL;
 
 	section->data = instance;
 	return 0;
@@ -88,30 +94,114 @@ static int rdns_onexit(parser_section *section)
 
 	return 0;
 }
+unsigned long
+hash(char *str)
+{
+    unsigned long hash = 5381;
+    int c;
+
+    while (c = *str++)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+}
+
+static void store_name_for_address(char *addr, char *name) {
+	struct host_entry_t *entry;
+	struct hlist_node_t *node;
+
+	hash_for_each_possible(hostnames, entry, node, node, hash(addr)) {
+		if (!strcmp(addr, entry->addr)) {
+			if (strcmp(name, entry->name)) {
+				fprintf(stdout, "Replacing %s %s with %s %s\n", addr, entry->name, addr, name);
+				free(entry->name);
+				entry->name = strdup(name);
+			}
+			return;
+		}
+	}
+
+	entry = malloc(sizeof(struct host_entry_t));
+	if (!entry)
+		perror("malloc entry");
+	entry->addr = strdup(addr);
+	if (!entry->addr)
+		perror("strdup entry->addr");
+	entry->name = strdup(name);
+	if (!entry->name)
+		perror("strdup entry->name");
+	hash_add(hostnames, &entry->node, hash(entry->addr));
+}
+
+static char * get_hostname_for_addr(char *addr);
+
+static void clear_hostnames() {
+    struct host_entry_t *entry;
+    struct hlist_node_t *node;
+	int bkt;
+
+	fprintf(stdout, "Purging hostnames\n");
+	hash_for_each(hostnames, bkt, node, entry, node) {
+		fprintf(stdout, "%d: '%s'->'%s'\n", bkt, entry->addr, entry->name);
+		free(entry->addr);
+		free(entry->name);
+		hash_del(&entry->node);
+		free(entry);
+	}
+
+}
+
+static char * get_hostname_for_addr(char *addr) {
+    struct host_entry_t *entry;
+    struct hlist_node_t *node;
+
+	hash_for_each_possible(hostnames, entry, node, node, hash(addr)) {
+		if (!strcmp(addr, entry->addr)) {
+			return entry->name;
+		}
+	}
+	return addr;
+}
+
+static void interpret_host_line(char *line)
+{
+	char *addr, *name, *sp = " \t";
+	addr = strtok_r(line, sp, &line);
+	if (addr == NULL)
+		return;
+	name = strtok_r(line, sp, &line);
+	if (name == NULL)
+		return;
+
+	store_name_for_address(addr, name);
+
+}
 
 static void rdns_host_entries_added(int fd, short what, void *_arg)
 {
-	char buf[255];
+	char buf[1024];
 	int len;
-        rdns_instance *self = _arg;
+	rdns_instance *instance = _arg;
 
-	fprintf(stderr, "fifo_read called with fd: %d, event: %d, arg: %p\n",
-	    (int)fd, what, _arg);
 	len = read(fd, buf, sizeof(buf) - 1);
 
 	if (len <= 0) {
-		if (len == 0)
-			return;
-		perror("read");
-		fprintf(stderr, "Connection closed\n");
-/*		event_del(_arg);
-		event_base_loopbreak(event_get_base(_arg));
-*/
+		fprintf(stderr, "Disconnected\n");
+		clear_hostnames();
+		rdns_fini_instance(instance);
+		rdns_init_instance(instance);
 		return;
 	}
 
 	buf[len] = '\0';
-	fprintf(stdout, "Read: %s\n", buf);
+	char *ptr = buf, *line, *lf = "\r\n";
+
+	line = strtok_r(ptr, lf, &ptr);
+	while (line != NULL) {
+		if (line[0] != '#')
+			interpret_host_line(line);
+		line = strtok_r(ptr, lf, &ptr);
+	}
 }
 
 static int rdns_init_instance(rdns_instance *instance)
@@ -179,10 +269,12 @@ static void rdns_fini_instance(rdns_instance *instance)
 		memset(&instance->listener, 0, sizeof(instance->listener));
 	}
 
-	list_del(&instance->list);
+	close(instance->host_fifo);
 
-	memset(instance, 0, sizeof(*instance));
-	free(instance);
+//	list_del(&instance->list);
+
+//	memset(instance, 0, sizeof(*instance));
+//	free(instance);
 }
 
 static int rdns_init()
@@ -195,6 +287,8 @@ static int rdns_init()
 		if (rdns_init_instance(instance) != 0)
 			goto fail;
 	}
+
+	hash_init(hostnames);
 
 	return 0;
 
