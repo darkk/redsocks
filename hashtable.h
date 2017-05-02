@@ -11,6 +11,13 @@
 // #include <linux/kernel.h>
 #include "hash.h"
 
+unsigned int ilog2( unsigned int x )
+{
+  unsigned int ans = 0 ;
+  while( x>>=1 ) ans++;
+  return ans ;
+}
+
 #define DEFINE_HASHTABLE(name, bits)						\
 	struct hlist_head_t name[1 << (bits)] =					\
 			{ [0 ... ((1 << (bits)) - 1)] = HLIST_HEAD_INIT }
@@ -18,6 +25,7 @@
 #define DECLARE_HASHTABLE(name, bits)                                   	\
 	struct hlist_head_t name[1 << (bits)]
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define HASH_SIZE(name) (ARRAY_SIZE(name))
 #define HASH_BITS(name) ilog2(HASH_SIZE(name))
 
