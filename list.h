@@ -539,7 +539,7 @@ static inline void hlist_move_list(struct hlist_head_t *old,
 #define hlist_for_each_entry(tpos, pos, head, member)			 \
 	for (pos = (head)->first;					 \
 	     pos &&							 \
-		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+		({ tpos = hlist_entry(pos, __typeof(*tpos), member); 1;}); \
 	     pos = pos->next)
 
 /**
@@ -551,7 +551,7 @@ static inline void hlist_move_list(struct hlist_head_t *old,
 #define hlist_for_each_entry_continue(tpos, pos, member)		 \
 	for (pos = (pos)->next;						 \
 	     pos &&							 \
-		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+		({ tpos = hlist_entry(pos, __typeof(*tpos), member); 1;}); \
 	     pos = pos->next)
 
 /**
@@ -562,7 +562,7 @@ static inline void hlist_move_list(struct hlist_head_t *old,
  */
 #define hlist_for_each_entry_from(tpos, pos, member)			 \
 	for (; pos &&							 \
-		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+		({ tpos = hlist_entry(pos, __typeof(*tpos), member); 1;}); \
 	     pos = pos->next)
 
 /**
@@ -576,7 +576,7 @@ static inline void hlist_move_list(struct hlist_head_t *old,
 #define hlist_for_each_entry_safe(tpos, pos, n, head, member) 		 \
 	for (pos = (head)->first;					 \
 	     pos && ({ n = pos->next; 1; }) && 				 \
-		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+		({ tpos = hlist_entry(pos, __typeof(*tpos), member); 1;}); \
 	     pos = n)
 
 #endif
