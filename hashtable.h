@@ -11,7 +11,7 @@
 // #include <linux/kernel.h>
 #include "hash.h"
 
-unsigned int ilog2( unsigned int x )
+static unsigned int ilog2( unsigned int x )
 {
   unsigned int ans = 0 ;
   while( x>>=1 ) ans++;
