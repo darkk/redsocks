@@ -1,5 +1,5 @@
 -include make.conf
-OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
+OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o rdns.o gen/version.o
 ifeq ($(DBG_BUILD),1)
 OBJS += debug.o
 endif

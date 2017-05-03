@@ -30,6 +30,7 @@
 #include "log.h"
 #include "redsocks.h"
 #include "http-auth.h"
+#include "rdns.h"
 
 typedef enum httpc_state_t {
 	httpc_new,
@@ -246,7 +247,7 @@ static struct evbuffer *httpc_mkconnect(redsocks_client *client)
 
 	// TODO: do accurate evbuffer_expand() while cleaning up http-auth
 	len = evbuffer_add_printf(buff, "CONNECT %s:%u HTTP/1.0\r\n",
-		inet_ntoa(client->destaddr.sin_addr),
+		get_hostname_for_addr(inet_ntoa(client->destaddr.sin_addr)),
 		ntohs(client->destaddr.sin_port));
 	if (len < 0) {
 		redsocks_log_errno(client, LOG_ERR, "evbufer_add_printf");
