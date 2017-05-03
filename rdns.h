@@ -15,6 +15,8 @@ typedef struct rdns_instance_t {
 	int				host_fifo;
 } rdns_instance;
 
+char * get_hostname_for_addr(char *addr);
+
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */
 #endif /* RDNS_H */

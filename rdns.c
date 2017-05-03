@@ -133,8 +133,6 @@ static void store_name_for_address(char *addr, char *name) {
 	hash_add(hostnames, &entry->node, hash(entry->addr));
 }
 
-static char * get_hostname_for_addr(char *addr);
-
 static void clear_hostnames() {
     struct host_entry_t *entry;
     struct hlist_node_t *node;
@@ -151,7 +149,7 @@ static void clear_hostnames() {
 
 }
 
-static char * get_hostname_for_addr(char *addr) {
+char * get_hostname_for_addr(char *addr) {
     struct host_entry_t *entry;
     struct hlist_node_t *node;
 
