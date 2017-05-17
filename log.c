@@ -44,7 +44,7 @@ static void fprint_timestamp(
 
 static void stderr_msg(const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
 {
-#ifndef ANDROID
+#ifndef __ANDROID__
 	fprint_timestamp(stderr, file, line, func, priority, message, appendix);
 #endif
 }

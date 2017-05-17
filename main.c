@@ -29,7 +29,7 @@
 
 extern app_subsys redsocks_subsys;
 extern app_subsys base_subsys;
-#ifndef ANDROID
+#ifndef __ANDROID__
 extern app_subsys redudp_subsys;
 extern app_subsys dnstc_subsys;
 #endif
@@ -37,7 +37,7 @@ extern app_subsys dnstc_subsys;
 app_subsys *subsystems[] = {
 	&redsocks_subsys,
 	&base_subsys,
-#ifndef ANDROID
+#ifndef __ANDROID__
 	&redudp_subsys,
 	&dnstc_subsys,
 #endif
