@@ -1,5 +1,5 @@
 /* redsocks2 - transparent TCP-to-proxy redirector
- * Copyright (C) 2013-2015 Zhuofei Wang <semigodking@gmail.com>
+ * Copyright (C) 2013-2017 Zhuofei Wang <semigodking@gmail.com>
  *
  * This code is based on redsocks project developed by Leonid Evdokimov.
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
@@ -518,7 +518,7 @@ static int auto_retry(redsocks_client * client, int updcache)
         // it maybe is waiting for client read event.
         // Take 'http-relay' for example.
         if (!rc && !client->relay && evbuffer_get_length(bufferevent_get_input(client->client)))
-#ifdef bufferevent_trigger_event
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
             bufferevent_trigger_event(client->client, EV_READ, 0);
 #else
             client->client->readcb(client->client, client);

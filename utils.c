@@ -95,9 +95,9 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
 
 uint32_t red_randui32()
 {
-	uint32_t ret;
-	evutil_secure_rng_get_bytes(&ret, sizeof(ret));
-	return ret;
+    uint32_t ret;
+    evutil_secure_rng_get_bytes(&ret, sizeof(ret));
+    return ret;
 }
 
 time_t redsocks_time(time_t *t)
@@ -107,15 +107,6 @@ time_t redsocks_time(time_t *t)
     if (retval == ((time_t) -1))
         log_errno(LOG_WARNING, "time");
     return retval;
-}
-
-char *redsocks_evbuffer_readline(struct evbuffer *buf)
-{
-#if _EVENT_NUMERIC_VERSION >= 0x02000000
-    return evbuffer_readln(buf, NULL, EVBUFFER_EOL_CRLF);
-#else
-    return evbuffer_readline(buf);
-#endif
 }
 
 struct bufferevent* red_prepare_relay(const char *ifname,
@@ -157,10 +148,12 @@ struct bufferevent* red_prepare_relay(const char *ifname,
     }
 
     bufferevent_setcb(retval, readcb, writecb, errorcb, cbarg);
-    error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
-    if (error) {
-        log_errno(LOG_ERR, "bufferevent_enable");
-        goto fail;
+    if (writecb) {
+        error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
+        if (error) {
+            log_errno(LOG_ERR, "bufferevent_enable");
+            goto fail;
+        }
     }
 
     if (apply_tcp_keepalive(relay_fd))
@@ -215,6 +208,70 @@ fail:
         redsocks_close(relay_fd);
     return NULL;
 }
+
+#if defined(ENABLE_HTTPS_PROXY)
+struct bufferevent* red_connect_relay_ssl(const char *ifname,
+                                    struct sockaddr_in *addr,
+                                    SSL * ssl,
+                                    bufferevent_data_cb readcb,
+                                    bufferevent_data_cb writecb,
+                                    bufferevent_event_cb errorcb,
+                                    void *cbarg,
+                                    const struct timeval *timeout_write)
+{
+    struct bufferevent *retval = NULL;
+    struct bufferevent *underlying = NULL;
+    int relay_fd = -1;
+    int error;
+
+    underlying = red_prepare_relay(ifname, NULL, NULL, NULL, NULL);
+    if (!underlying)
+        goto fail;
+    relay_fd = bufferevent_getfd(underlying);
+    if (timeout_write)
+        bufferevent_set_timeouts(underlying, NULL, timeout_write);
+
+    error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+    if (error && errno != EINPROGRESS) {
+        log_errno(LOG_NOTICE, "connect");
+        goto fail;
+    }
+    retval = bufferevent_openssl_filter_new(bufferevent_get_base(underlying),
+                                            underlying,
+                                            ssl,
+                                            BUFFEREVENT_SSL_CONNECTING,
+                                            BEV_OPT_DEFER_CALLBACKS);
+    if (!retval) {
+        log_errno(LOG_NOTICE, "bufferevent_openssl_filter_new");
+        goto fail;
+    }
+    if (timeout_write)
+        bufferevent_set_timeouts(retval, NULL, timeout_write);
+
+    bufferevent_setcb(retval, readcb, writecb, errorcb, cbarg);
+    if (writecb) {
+        error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
+        if (error) {
+            log_errno(LOG_ERR, "bufferevent_enable");
+            goto fail;
+        }
+    }
+    return retval;
+
+fail:
+    if (retval) {
+        bufferevent_disable(retval, EV_READ|EV_WRITE);
+        bufferevent_free(retval);
+    }
+    if (underlying) {
+        bufferevent_disable(underlying, EV_READ|EV_WRITE);
+        bufferevent_free(underlying);
+    }
+    if (relay_fd != -1)
+        redsocks_close(relay_fd);
+    return NULL;
+}
+#endif
 
 struct bufferevent* red_connect_relay_tfo(const char *ifname,
                                     struct sockaddr_in *addr,
@@ -325,7 +382,7 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
     uint16_t port;
     const char placeholder[] = "???:???";
 
-    assert(buffer_size >= sizeof(placeholder));
+    assert(buffer_size >= RED_INET_ADDRSTRLEN);
 
     memset(buffer, 0, buffer_size);
     if (sa->sin_family == AF_INET) {
@@ -398,7 +455,7 @@ size_t copy_evbuffer(struct bufferevent * dst, struct bufferevent * src, size_t 
 
 size_t get_write_hwm(struct bufferevent *bufev)
 {
-#ifdef bufferevent_getwatermark
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
     size_t high;
     bufferevent_getwatermark(bufev, EV_WRITE, NULL, &high);
     return high;

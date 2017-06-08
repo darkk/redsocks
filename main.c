@@ -22,6 +22,10 @@
 #include <string.h>
 #include <assert.h>
 #include <event2/event.h>
+#if defined(ENABLE_HTTPS_PROXY)
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
 #include "log.h"
 #include "main.h"
 #include "utils.h"
@@ -159,6 +163,12 @@ int main(int argc, char **argv)
         }
     }
 
+#if defined(ENABLE_HTTPS_PROXY)
+  SSL_library_init ();
+  ERR_load_crypto_strings();
+  SSL_load_error_strings ();
+  OpenSSL_add_all_algorithms ();
+#endif
     // Wait for network ready before further initializations so that
     // parser can resolve domain names.
     if (wait)
@@ -268,6 +278,10 @@ shutdown:
     if (g_event_base)
         event_base_free(g_event_base);
     
+#if defined(ENABLE_HTTPS_PROXY)
+    EVP_cleanup();
+    ERR_free_strings();
+#endif
     return !error ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 

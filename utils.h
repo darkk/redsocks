@@ -7,6 +7,10 @@
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#if defined(ENABLE_HTTPS_PROXY)
+#include <openssl/ssl.h>
+#include <event2/bufferevent_ssl.h>
+#endif
 
 struct sockaddr_in;
 
@@ -65,6 +69,16 @@ struct bufferevent* red_connect_relay(const char *ifname,
                                 bufferevent_event_cb errorcb,
                                 void *cbarg,
                                 const struct timeval *timeout_write);
+#if defined(ENABLE_HTTPS_PROXY)
+struct bufferevent* red_connect_relay_ssl(const char *ifname,
+                                struct sockaddr_in *addr,
+                                SSL * ssl,
+                                bufferevent_data_cb readcb,
+                                bufferevent_data_cb writecb,
+                                bufferevent_event_cb errorcb,
+                                void *cbarg,
+                                const struct timeval *timeout_write);
+#endif
 struct bufferevent* red_connect_relay_tfo(const char *ifname,
                                 struct sockaddr_in *addr,
                                 bufferevent_data_cb readcb,

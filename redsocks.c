@@ -1,5 +1,5 @@
 /* redsocks2 - transparent TCP/UDP-to-proxy redirector
- * Copyright (C) 2013-2015 Zhuofei Wang <semigodking@gmail.com>
+ * Copyright (C) 2013-2017 Zhuofei Wang <semigodking@gmail.com>
  *
  * This code is based on redsocks project developed by Leonid Evdokimov.
  * Licensed under the Apache License, Version 2.0 (the "License").
@@ -50,6 +50,9 @@ void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg);
 
 extern relay_subsys direct_connect_subsys;
 extern relay_subsys http_connect_subsys;
+#if defined(ENABLE_HTTPS_PROXY)
+extern relay_subsys https_connect_subsys;
+#endif
 extern relay_subsys http_relay_subsys;
 extern relay_subsys socks4_subsys;
 extern relay_subsys socks5_subsys;
@@ -62,6 +65,9 @@ static relay_subsys *relay_subsystems[] =
     &socks4_subsys,
     &socks5_subsys,
     &shadowsocks_subsys,
+#if defined(ENABLE_HTTPS_PROXY)
+    &https_connect_subsys,
+#endif
 };
 extern relay_subsys autoproxy_subsys;
 
@@ -362,7 +368,7 @@ int redsocks_start_relay(redsocks_client *client)
 
     bufferevent_setwatermark(client->client, EV_READ|EV_WRITE, 0, REDSOCKS_RELAY_HALFBUFF);
     bufferevent_setwatermark(client->relay, EV_READ|EV_WRITE, 0, REDSOCKS_RELAY_HALFBUFF);
-#ifdef bufferevent_getcb
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
     bufferevent_getcb(client->client, NULL, NULL, &event_cb, NULL);
 #else
     event_cb = client->client->errorcb;
@@ -371,7 +377,7 @@ int redsocks_start_relay(redsocks_client *client)
                                      redsocks_relay_clientwritecb,
                                      event_cb,
                                      client);
-#ifdef bufferevent_getcb
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
     bufferevent_getcb(client->relay, NULL, NULL, &event_cb, NULL);
 #else
     event_cb = client->relay->errorcb;

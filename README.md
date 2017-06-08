@@ -12,7 +12,8 @@ need of blacklist.
 4. Redirect TCP connections without proxy.
 5. Redirect TCP connections via specified network interface.
 6. UDP transparent proxy via shadowsocks proxy.
-7. Support Ful-cone NAT Traversal when working with shadowsocks proxy.
+7. Support Ful-cone NAT Traversal when working with shadowsocks or socks5 proxy.
+8. Integrated HTTPS proxy support(HTTP CONNECT over SSL).
 
 [Chinese Reference](https://github.com/semigodking/redsocks/wiki)
 
@@ -36,6 +37,11 @@ To compile with PolarSSL
 To compile static binaries (with Tomatoware)
 
 	make ENABLE_STATIC=true
+
+By default, HTTPS proxy support is disabled. To enable this feature, you need to
+compile like (Require libevent2 compiled with OpenSSL support):
+
+	make ENABLE_HTTPS_PROXY=true
 
 Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
