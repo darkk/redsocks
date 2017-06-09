@@ -26,10 +26,11 @@ $(info Compile with OpenSSL by default. To compile with PolarSSL, run 'make USE_
 CRYPTO := OpenSSL
 ifdef ENABLE_HTTPS_PROXY
 override OBJS += https-connect.o
+override LIBS += -levent_openssl
 override CFLAGS += -DENABLE_HTTPS_PROXY
 $(info Compile with HTTPS proxy enabled.)
 endif
-override LIBS += -levent -lssl -lcrypto
+override LIBS += -lssl -lcrypto
 override CFLAGS += -DUSE_CRYPTO_OPENSSL
 endif
 ifdef ENABLE_STATIC
