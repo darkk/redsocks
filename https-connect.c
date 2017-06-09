@@ -136,7 +136,11 @@ static void httpsc_event_cb(struct bufferevent *buffev, short what, void *_arg)
 
     if (!(what & BEV_EVENT_ERROR))
         errno = red_socket_geterrno(buffev);
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
     else if (!bufferevent_openssl_get_allow_dirty_shutdown(client->relay))
+#else
+    else
+#endif
         log_ssl_error(client, client->relay);
     redsocks_log_errno(client, LOG_DEBUG, "%s, what: " event_fmt_str, 
                             buffev == client->client?"client":"relay",
@@ -153,7 +157,9 @@ static void httpsc_event_cb(struct bufferevent *buffev, short what, void *_arg)
         }
         else
         {
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
             if (bufferevent_openssl_get_allow_dirty_shutdown(client->relay))
+#endif
                 log_ssl_error(client, client->relay);
             if (!(client->client_evshut & EV_WRITE))
                 bufferevent_enable(client->client, EV_WRITE);
