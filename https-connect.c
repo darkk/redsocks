@@ -101,7 +101,7 @@ static int httpsc_instance_init(struct redsocks_instance_t *instance)
     httpsc_instance * httpsc = (httpsc_instance *)(instance + 1);
     SSL_CTX * ctx = NULL;
     
-    ctx = SSL_CTX_new(SSLv3_client_method());
+    ctx = SSL_CTX_new(SSLv23_client_method());
     if (!ctx)
     {
         unsigned long err = ERR_get_error();
