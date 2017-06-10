@@ -169,15 +169,13 @@ static void httpsc_event_cb(struct bufferevent *buffev, short what, void *_arg)
         // usually this event is not generated as 'connect' is used to
         // setup connection. For openssl socket, this event is generated.
         client->relay_connected = 1;
-        if (!process_shutdown_on_write_(client, client->client, client->relay)) {
-            /* We do not need to detect timeouts any more.
-               The two peers will handle it. */
-            bufferevent_set_timeouts(client->relay, NULL, NULL);
-            redsocks_write_helper_ex(
-                    buffev, client,
-                    httpc_mkconnect, httpc_request_sent, 1, HTTP_HEAD_WM_HIGH
-                    );
-        }
+        /* We do not need to detect timeouts any more.
+           The two peers will handle it. */
+        bufferevent_set_timeouts(client->relay, NULL, NULL);
+        redsocks_write_helper_ex(
+                buffev, client,
+                httpc_mkconnect, httpc_request_sent, 0, HTTP_HEAD_WM_HIGH
+                );
     }
     else {
         redsocks_drop_client(client);
@@ -206,10 +204,20 @@ static void httpsc_read_cb(struct bufferevent *buffev, void *_arg)
 #if LIBEVENT_VERSION_NUMBER >= 0x02010100
                 bufferevent_trigger(client->relay, EV_WRITE, 0);
 #else
-                client->relay->writecb(client->relay, client);
+                if (client->relay->writecb)
+                    client->relay->writecb(client->relay, client);
 #endif
         }
     }
+}
+
+static void httpsc_write_cb(struct bufferevent *buffev, void *_arg)
+{
+    redsocks_client *client = _arg;
+    struct bufferevent * from = client->client;
+    struct bufferevent * to = client->relay;
+
+    process_shutdown_on_write_(client, from, to);
 }
 
 static int httpsc_connect_relay(redsocks_client *client)
@@ -242,6 +250,7 @@ relay_subsys https_connect_subsys =
     .payload_len          = sizeof(httpsc_client),
     .instance_payload_len = sizeof(httpsc_instance),
     .readcb               = httpsc_read_cb,
+    .writecb              = httpsc_write_cb,
     .init                 = httpsc_client_init,
     .fini                 = httpsc_client_fini,
     .connect_relay        = httpsc_connect_relay,

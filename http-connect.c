@@ -126,7 +126,10 @@ void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 							client->state = httpc_new;
 
 							/* and reconnect */
-							redsocks_connect_relay(client);
+							if (client->instance->relay_ss->connect_relay)
+								client->instance->relay_ss->connect_relay(client);
+							else
+								redsocks_connect_relay(client);
 							return;
 						}
 					}
