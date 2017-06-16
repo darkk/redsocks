@@ -653,7 +653,12 @@ void redsocks_relay_connected(struct bufferevent *buffev, void *_arg)
                                      client->instance->relay_ss->writecb,
                                      redsocks_event_error,
                                      client);
-    client->instance->relay_ss->writecb(client->relay, client);
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
+    bufferevent_trigger(client->relay, EV_WRITE, 0);
+#else
+    if (client->instance->relay_ss->writecb)
+        client->instance->relay_ss->writecb(client->relay, client);
+#endif
     return;
 
 fail:

@@ -490,4 +490,44 @@ int apply_tcp_fastopen(int fd)
 #endif
 }
 
+
+void replace_readcb(struct bufferevent * buffev, bufferevent_data_cb readcb)
+{
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
+    bufferevent_event_cb eventcb;
+    bufferevent_data_cb  writecb;
+    void * arg;
+    bufferevent_getcb(buffev, NULL, &writecb, &eventcb, &arg);
+    bufferevent_setcb(buffev, readcb, writecb, eventcb, arg);
+#else
+    buffev->readcb = readcb;
+#endif
+}
+
+void replace_writecb(struct bufferevent * buffev, bufferevent_data_cb writecb)
+{
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
+    bufferevent_event_cb eventcb;
+    bufferevent_data_cb  readcb;
+    void * arg;
+    bufferevent_getcb(buffev, &readcb, NULL, &eventcb, &arg);
+    bufferevent_setcb(buffev, readcb, writecb, eventcb, arg);
+#else
+    buffev->writecb = writecb;
+#endif
+}
+
+void replace_eventcb(struct bufferevent * buffev, bufferevent_event_cb eventcb)
+{
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
+    bufferevent_data_cb  readcb, writecb;
+    void * arg;
+    bufferevent_getcb(buffev, &readcb, &writecb, NULL, &arg);
+    bufferevent_setcb(buffev, readcb, writecb, eventcb, arg);
+#else
+    buffev->errorcb = eventcb;
+#endif
+}
+
+
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

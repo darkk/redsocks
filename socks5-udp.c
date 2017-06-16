@@ -290,8 +290,7 @@ static void socks5_read_auth_reply(struct bufferevent *buffev, void *_arg)
 	if (error)
 		goto fail;
 
-	socks5client->relay->readcb = socks5_read_assoc_reply;
-
+	replace_readcb(socks5client->relay, socks5_read_assoc_reply);
 	return;
 
 fail:
@@ -328,7 +327,7 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, void *_arg)
 		if (ierror)
 			goto fail;
 
-		socks5client->relay->readcb = socks5_read_assoc_reply;
+		replace_readcb(socks5client->relay, socks5_read_assoc_reply);
 	}
 	else if (reply.method == socks5_auth_password) {
 		ierror = redsocks_write_helper_ex_plain(
@@ -337,7 +336,7 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, void *_arg)
 		if (ierror)
 			goto fail;
 
-		socks5client->relay->readcb = socks5_read_auth_reply;
+		replace_readcb(socks5client->relay, socks5_read_auth_reply);
 	}
 
 	return;
@@ -366,8 +365,8 @@ static void socks5_relay_connected(struct bufferevent *buffev, void *_arg)
 	if (error)
 		goto fail;
 
-	socks5client->relay->readcb = socks5_read_auth_methods;
-	socks5client->relay->writecb = 0;
+	replace_readcb(socks5client->relay, socks5_read_auth_methods);
+	replace_writecb(socks5client->relay, NULL);
 	//bufferevent_disable(buffev, EV_WRITE); // I don't want to check for writeability.
 	return;
 

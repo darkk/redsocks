@@ -191,23 +191,15 @@ static void httpsc_read_cb(struct bufferevent *buffev, void *_arg)
     if (client->state == httpc_headers_skipped) {
         bufferevent_data_cb read_cb, write_cb;
 
+        replace_eventcb(client->client, httpsc_event_cb);
+        struct evbuffer * input = bufferevent_get_input(client->client);
+        if (evbuffer_get_length(input))
 #if LIBEVENT_VERSION_NUMBER >= 0x02010100
-        bufferevent_getcb(client->client, &read_cb, &write_cb, NULL, NULL);
+            bufferevent_trigger(client->relay, EV_WRITE, 0);
 #else
-        read_cb = client->client->readcb;
-        write_cb = client->client->writecb;
+            if (client->relay->writecb)
+                client->relay->writecb(client->relay, client);
 #endif
-        bufferevent_setcb(client->client, read_cb, write_cb, httpsc_event_cb, client);
-        if (client->client) {
-            struct evbuffer * input = bufferevent_get_input(client->client);
-            if (evbuffer_get_length(input))
-#if LIBEVENT_VERSION_NUMBER >= 0x02010100
-                bufferevent_trigger(client->relay, EV_WRITE, 0);
-#else
-                if (client->relay->writecb)
-                    client->relay->writecb(client->relay, client);
-#endif
-        }
     }
 }
 
@@ -227,7 +219,8 @@ static int httpsc_connect_relay(redsocks_client *client)
     char * interface = client->instance->config.interface;
     struct timeval tv = {client->instance->config.timeout, 0};
 
-    sclient->ssl = SSL_new(httpsc->ctx); 
+    if (!sclient->ssl)
+        sclient->ssl = SSL_new(httpsc->ctx); 
 
     // Allowing binding relay socket to specified IP for outgoing connections
     client->relay = red_connect_relay_ssl(interface, &client->instance->config.relayaddr,

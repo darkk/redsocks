@@ -564,7 +564,7 @@ static int httpr_connect_relay(redsocks_client *client)
 {
 	int error;
 
-	client->client->readcb = httpr_client_read_cb;
+	replace_readcb(client->client, httpr_client_read_cb);
 	error = bufferevent_enable(client->client, EV_READ);
 	if (error) {
 		redsocks_log_errno(client, LOG_ERR, "bufferevent_enable");

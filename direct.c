@@ -52,8 +52,10 @@ static void direct_write_cb(struct bufferevent *buffev, void *_arg)
             // Failed to start relay. Connection is dropped.
             return;
         // Write any data received from client to relay
-        if (evbuffer_get_length(bufferevent_get_input(client->client)))
-            client->instance->relay_ss->writecb(buffev, client);
+        struct evbuffer * input = bufferevent_get_input(client->client);
+        if (evbuffer_get_length(input))
+            if (bufferevent_write_buffer(client->relay, input) == -1)
+                redsocks_log_errno(client, LOG_ERR, "bufferevent_write_buffer");
     }
 }
 

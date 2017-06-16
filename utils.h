@@ -97,6 +97,9 @@ size_t copy_evbuffer(struct bufferevent * dst, struct bufferevent * src, size_t 
 size_t get_write_hwm(struct bufferevent *bufev);
 int make_socket_transparent(int fd);
 int apply_tcp_fastopen(int fd);
+void replace_readcb(struct bufferevent * buffev, bufferevent_data_cb readcb);
+void replace_writecb(struct bufferevent * buffev, bufferevent_data_cb writecb);
+void replace_eventcb(struct bufferevent * buffev, bufferevent_event_cb eventcb);
 
 #define event_fmt_str "%s|%s|%s|%s|%s|%s|0x%x"
 #define event_fmt(what) \
