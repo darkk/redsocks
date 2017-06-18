@@ -32,8 +32,10 @@
 extern app_subsys redsocks_subsys;
 extern app_subsys debug_subsys;
 extern app_subsys base_subsys;
+#ifndef __ANDROID__
 extern app_subsys redudp_subsys;
 extern app_subsys dnstc_subsys;
+#endif
 
 app_subsys *subsystems[] = {
 	&redsocks_subsys,
@@ -41,8 +43,10 @@ app_subsys *subsystems[] = {
 	&debug_subsys,
 #endif
 	&base_subsys,
+#ifndef __ANDROID__
 	&redudp_subsys,
 	&dnstc_subsys,
+#endif
 };
 
 static const char *confname = "redsocks.conf";
