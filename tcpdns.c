@@ -362,7 +362,9 @@ static parser_entry tcpdns_entries[] =
     { .key = "local_ip",   .type = pt_in_addr },
     { .key = "local_port", .type = pt_uint16 },
     { .key = "tcpdns1",    .type = pt_in_addr },
+    { .key = "tcpdns1_port", .type = pt_uint16 },
     { .key = "tcpdns2",    .type = pt_in_addr },
+    { .key = "tcpdns2_port", .type = pt_uint16 },
     { .key = "timeout",    .type = pt_uint16 },
     { }
 };
@@ -389,10 +391,10 @@ static int tcpdns_onenter(parser_section *section)
     instance->config.udpdns2_addr.sin_port = htons(53);
     instance->config.tcpdns1_addr.sin_family = AF_INET;
     instance->config.tcpdns1_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    instance->config.tcpdns1_addr.sin_port = htons(53);
+    instance->config.tcpdns1_addr.sin_port = 53;
     instance->config.tcpdns2_addr.sin_family = AF_INET;
     instance->config.tcpdns2_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    instance->config.tcpdns2_addr.sin_port = htons(53);
+    instance->config.tcpdns2_addr.sin_port = 53;
 
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
         entry->addr =
@@ -401,7 +403,9 @@ static int tcpdns_onenter(parser_section *section)
             (strcmp(entry->key, "udpdns1") == 0)   ? (void*)&instance->config.udpdns1_addr.sin_addr :
             (strcmp(entry->key, "udpdns2") == 0)   ? (void*)&instance->config.udpdns2_addr.sin_addr :
             (strcmp(entry->key, "tcpdns1") == 0)   ? (void*)&instance->config.tcpdns1_addr.sin_addr :
+            (strcmp(entry->key, "tcpdns1_port") == 0) ? (void*)&instance->config.tcpdns1_addr.sin_port :
             (strcmp(entry->key, "tcpdns2") == 0)   ? (void*)&instance->config.tcpdns2_addr.sin_addr :
+            (strcmp(entry->key, "tcpdns2_port") == 0) ? (void*)&instance->config.tcpdns2_addr.sin_port :
             (strcmp(entry->key, "timeout") == 0) ? (void*)&instance->config.timeout :
             NULL;
     section->data = instance;
@@ -425,6 +429,15 @@ static int tcpdns_onexit(parser_section *section)
     if (instance->config.tcpdns1_addr.sin_addr.s_addr == htonl(INADDR_ANY)
         && instance->config.tcpdns2_addr.sin_addr.s_addr == htonl(INADDR_ANY))
         err = "At least one TCP DNS resolver must be configured.";
+
+    if (instance->config.tcpdns1_addr.sin_port == 0)
+        err = "Incorrect port number for TCP DNS1";
+    else
+        instance->config.tcpdns1_addr.sin_port = htons(instance->config.tcpdns1_addr.sin_port);
+    if (instance->config.tcpdns2_addr.sin_port == 0)
+        err = "Incorrect port number for TCP DNS2";
+    else
+        instance->config.tcpdns2_addr.sin_port = htons(instance->config.tcpdns2_addr.sin_port);
 
     if (err)
         parser_error(section->context, "%s", err);

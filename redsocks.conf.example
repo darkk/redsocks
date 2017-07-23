@@ -140,7 +140,9 @@ tcpdns {
 	local_ip = 192.168.1.1; // Local server to act as DNS server
 	local_port = 1053;      // UDP port to receive UDP DNS requests
 	tcpdns1 = 8.8.4.4;      // DNS server that supports TCP DNS requests
+	tcpdns1_port = 53;      // DNS server port, default 53
 	tcpdns2 = 8.8.8.8;      // DNS server that supports TCP DNS requests
+	tcpdns2_port = 53;      // DNS server port, default 53
 	timeout = 4;            // Timeout value for TCP DNS requests
 }
 
