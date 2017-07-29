@@ -25,8 +25,6 @@ The following libraries are required.
 * libevent2
 * OpenSSL or PolarSSL
 
-## Build
-
 ### Steps
 On general linux, simply run command below to build with OpenSSL.
 
@@ -56,12 +54,6 @@ Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
 to cross compile.
 
-Configurations
---------------
-Please see 'redsocks.conf.example' for whole picture of configuration file.
-Below are additional sample configuration sections for different usage.
-Operations required to iptables are not listed here.
-
 ### MacOS
 To build on a MacOS system, you will have to install OpenSSL headers and libevent2
 For this, brew is your best friends
@@ -74,7 +66,11 @@ To build with PF and run on MacOS, you will need some pf headers that are not in
 You can find them on this repository : https://github.com/opensource-apple/xnu
 And the Makefile will going find this file for you
 
-## Configuration
+Configurations
+--------------
+Please see 'redsocks.conf.example' for whole picture of configuration file.
+Below are additional sample configuration sections for different usage.
+Operations required to iptables are not listed here.
 
 ### Redirect Blocked Traffic via Proxy Automatically
 To use the autoproxy feature, please change the redsocks section in
