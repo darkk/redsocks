@@ -14,6 +14,11 @@ override CFLAGS += -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
 ifeq ($(OS), Linux)
 override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600
 endif
+ifeq ($(OS), Darwin)
+override CFLAGS +=-I/usr/local/opt/openssl/include -L/usr/local/opt/openssl/lib
+override CFLAGS +=-Ixnu/10.12/
+endif
+
 
 #LDFLAGS += -fwhole-program
 ifdef USE_CRYPTO_POLARSSL
@@ -56,6 +61,9 @@ $(CONF):
 	OpenBSD) \
 		echo "#define USE_PF" >$(CONF) \
 		;; \
+	Darwin) \
+		echo "#define USE_PF\n#define _APPLE_" >$(CONF) \
+		;; \
 	*) \
 		echo "Unknown system, only generic firewall code is compiled" 1>&2; \
 		echo "/* Unknown system, only generic firewall code is compiled */" >$(CONF) \
@@ -86,27 +94,7 @@ gen/.build:
 base.c: $(CONF)
 
 $(DEPS): $(SRCS)
-	$(CC) -MM $(SRCS) 2>/dev/null >$(DEPS) || \
-	( \
-		for I in $(wildcard *.h); do \
-			export $${I//[-.]/_}_DEPS="`sed '/^\#[ \t]*include \?"\(.*\)".*/!d;s//\1/' $$I`"; \
-		done; \
-		echo -n >$(DEPS); \
-		for SRC in $(SRCS); do \
-			echo -n "$${SRC%.c}.o: " >>$(DEPS); \
-			export SRC_DEPS="`sed '/\#[ \t]*include \?"\(.*\)".*/!d;s//\1/' $$SRC | sort`"; \
-			while true; do \
-				export SRC_DEPS_OLD="$$SRC_DEPS"; \
-				export SRC_DEEP_DEPS=""; \
-				for HDR in $$SRC_DEPS; do \
-					eval export SRC_DEEP_DEPS="\"$$SRC_DEEP_DEPS \$$$${HDR//[-.]/_}_DEPS\""; \
-				done; \
-				export SRC_DEPS="`echo $$SRC_DEPS $$SRC_DEEP_DEPS | sed 's/  */\n/g' | sort -u`"; \
-				test "$$SRC_DEPS" = "$$SRC_DEPS_OLD" && break; \
-			done; \
-			echo $$SRC $$SRC_DEPS >>$(DEPS); \
-		done; \
-	)
+	$(CC) -MM $(CFLAGS) $(SRCS) 2>/dev/null >$(DEPS)
 
 -include $(DEPS)
 
