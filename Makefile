@@ -115,9 +115,10 @@ $(OUT): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 clean:
-	$(RM) $(OUT) $(CONF) $(OBJS)
+	$(RM) $(CONF) $(OBJS)
 
 distclean: clean
+	$(RM) $(OUT)
 	$(RM) tags $(DEPS)
 	$(RM) -r gen
 	$(RM) -r $(OSX_ROOT_PATH)
