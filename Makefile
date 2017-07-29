@@ -14,6 +14,15 @@ override CFLAGS += -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
 ifeq ($(OS), Linux)
 override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600
 endif
+ifeq ($(OS), Darwin)
+override CFLAGS +=-I/usr/local/opt/openssl/include -L/usr/local/opt/openssl/lib
+OSX_VERSION := $(shell sw_vers -productVersion | cut -d '.' -f 1,2)
+OSX_ROOT_PATH := xnu
+OSX_HEADERS_PATH := $(OSX_ROOT_PATH)/$(OSX_VERSION)
+OSX_HEADERS := $(OSX_HEADERS_PATH)/net/pfvar.h $(OSX_HEADERS_PATH)/net/radix.h $(OSX_HEADERS_PATH)/libkern/tree.h
+override CFLAGS +=-I$(OSX_HEADERS_PATH)
+endif
+
 
 #LDFLAGS += -fwhole-program
 ifdef USE_CRYPTO_POLARSSL
@@ -56,6 +65,9 @@ $(CONF):
 	OpenBSD) \
 		echo "#define USE_PF" >$(CONF) \
 		;; \
+	Darwin) \
+		echo "#define USE_PF\n#define _APPLE_" >$(CONF) \
+		;; \
 	*) \
 		echo "Unknown system, only generic firewall code is compiled" 1>&2; \
 		echo "/* Unknown system, only generic firewall code is compiled */" >$(CONF) \
@@ -64,8 +76,8 @@ $(CONF):
 
 # Dependency on .git is useful to rebuild `version.c' after commit, but it breaks non-git builds.
 gen/version.c: *.c *.h gen/.build
-	rm -f $@.tmp
-	echo '/* this file is auto-generated during build */' > $@.tmp
+	$(RM) -f $@.tmp
+	echo '/* this file is -generated during build */' > $@.tmp
 	echo '#include "../version.h"' >> $@.tmp
 	echo 'const char* redsocks_version = ' >> $@.tmp
 	if [ -d .git ]; then \
@@ -85,28 +97,17 @@ gen/.build:
 
 base.c: $(CONF)
 
-$(DEPS): $(SRCS)
-	$(CC) -MM $(SRCS) 2>/dev/null >$(DEPS) || \
-	( \
-		for I in $(wildcard *.h); do \
-			export $${I//[-.]/_}_DEPS="`sed '/^\#[ \t]*include \?"\(.*\)".*/!d;s//\1/' $$I`"; \
-		done; \
-		echo -n >$(DEPS); \
-		for SRC in $(SRCS); do \
-			echo -n "$${SRC%.c}.o: " >>$(DEPS); \
-			export SRC_DEPS="`sed '/\#[ \t]*include \?"\(.*\)".*/!d;s//\1/' $$SRC | sort`"; \
-			while true; do \
-				export SRC_DEPS_OLD="$$SRC_DEPS"; \
-				export SRC_DEEP_DEPS=""; \
-				for HDR in $$SRC_DEPS; do \
-					eval export SRC_DEEP_DEPS="\"$$SRC_DEEP_DEPS \$$$${HDR//[-.]/_}_DEPS\""; \
-				done; \
-				export SRC_DEPS="`echo $$SRC_DEPS $$SRC_DEEP_DEPS | sed 's/  */\n/g' | sort -u`"; \
-				test "$$SRC_DEPS" = "$$SRC_DEPS_OLD" && break; \
-			done; \
-			echo $$SRC $$SRC_DEPS >>$(DEPS); \
-		done; \
-	)
+ifeq ($(OS), Darwin)
+$(OSX_HEADERS_PATH)/net/pfvar.h:
+	mkdir -p $(OSX_HEADERS_PATH)/net && curl -o $(OSX_HEADERS_PATH)/net/pfvar.h https://raw.githubusercontent.com/opensource-apple/xnu/$(OSX_VERSION)/bsd/net/pfvar.h
+$(OSX_HEADERS_PATH)/net/radix.h:
+	mkdir -p $(OSX_HEADERS_PATH)/net && curl -o $(OSX_HEADERS_PATH)/net/radix.h https://raw.githubusercontent.com/opensource-apple/xnu/$(OSX_VERSION)/bsd/net/radix.h
+$(OSX_HEADERS_PATH)/libkern/tree.h:
+	mkdir -p $(OSX_HEADERS_PATH)/libkern && curl -o $(OSX_HEADERS_PATH)/libkern/tree.h https://raw.githubusercontent.com/opensource-apple/xnu/$(OSX_VERSION)/libkern/libkern/tree.h
+endif
+
+$(DEPS): $(OSX_HEADERS) $(SRCS)
+	$(CC) -MM $(CFLAGS) $(SRCS) 2>/dev/null >$(DEPS)
 
 -include $(DEPS)
 
@@ -119,3 +120,4 @@ clean:
 distclean: clean
 	$(RM) tags $(DEPS)
 	$(RM) -r gen
+	$(RM) -r $(OSX_ROOT_PATH)

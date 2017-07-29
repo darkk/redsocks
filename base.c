@@ -35,7 +35,16 @@
 
 #if defined USE_PF
 # include <net/if.h>
+#if defined _APPLE_
+#define PRIVATE
+#endif
 # include <net/pfvar.h>
+#if defined _APPLE_
+#define sport sxport.port
+#define dport dxport.port
+#define rdport rdxport.port
+#undef PRIVATE
+#endif
 # include <sys/ioctl.h>
 #endif
 #ifdef __FreeBSD__
@@ -449,7 +458,7 @@ static int base_init()
 			exit(EXIT_SUCCESS);
 		}
 	}
-    
+
 	log_open(); // child has nothing to do with TTY
 
 	if (instance.daemon) {
