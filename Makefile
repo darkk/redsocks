@@ -67,7 +67,7 @@ $(CONF):
 		echo "#define USE_PF" >$(CONF) \
 		;; \
 	Darwin) \
-		echo "#define USE_PF\n#define _APPLE_" >$(CONF) \
+		echo -e "#define USE_PF\n#define _APPLE_" >$(CONF) \
 		;; \
 	*) \
 		echo "Unknown system, only generic firewall code is compiled" 1>&2; \
