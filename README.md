@@ -19,33 +19,52 @@ need of blacklist.
 
 HOW TO BUILD
 ------------
-###Prerequisites
+### Prerequisites
 The following libraries are required.
 
 * libevent2
 * OpenSSL or PolarSSL
 
-###Steps
+### Steps
 On general linux, simply run command below to build with OpenSSL.
 
-	make
+```
+$ make
+```
 
 To compile with PolarSSL
 
-	make USE_CRYPTO_POLARSSL=true
+```
+$ make USE_CRYPTO_POLARSSL=true
+```
 
 To compile static binaries (with Tomatoware)
 
-	make ENABLE_STATIC=true
+```
+$ make ENABLE_STATIC=true
+```
 
 By default, HTTPS proxy support is disabled. To enable this feature, you need to
 compile like (Require libevent2 compiled with OpenSSL support):
-
-	make ENABLE_HTTPS_PROXY=true
+```
+$ make ENABLE_HTTPS_PROXY=true
+```
 
 Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
 to cross compile.
+
+### MacOS
+To build on a MacOS system, you will have to install OpenSSL headers and libevent2
+For this, brew is your best friends
+```
+$ brew install openssl libevent
+```
+Makefile include the folder of openssl headers and lib installed by brew.
+
+To build with PF and run on MacOS, you will need some pf headers that are not included with a standard MacOS installation.
+You can find them on this repository : https://github.com/opensource-apple/xnu
+And the Makefile will going find this file for you
 
 Configurations
 --------------
@@ -53,7 +72,7 @@ Please see 'redsocks.conf.example' for whole picture of configuration file.
 Below are additional sample configuration sections for different usage.
 Operations required to iptables are not listed here.
 
-###Redirect Blocked Traffic via Proxy Automatically
+### Redirect Blocked Traffic via Proxy Automatically
 To use the autoproxy feature, please change the redsocks section in
 configuration file like this:
 
@@ -76,8 +95,8 @@ configuration file like this:
 	 //password = passwd;
 	}
 
-###Redirect Blocked Traffic via VPN Automatically
-Suppose you have VPN connection setup with interface tun0. You want all 
+### Redirect Blocked Traffic via VPN Automatically
+Suppose you have VPN connection setup with interface tun0. You want all
 all blocked traffic pass through via VPN connection while normal traffic
 pass through via default internet connection.
 
@@ -90,7 +109,7 @@ pass through via default internet connection.
 		autoproxy = 1;
 	}
 
-###Redirect Blocked Traffic via shadowsocks proxy
+### Redirect Blocked Traffic via shadowsocks proxy
 Similar like other redsocks section. The encryption method is specified
 by field 'login'.
 
@@ -106,7 +125,7 @@ by field 'login'.
 							   // method of shadowsocks
 		password = "your password"; // Your shadowsocks password
 	}
-	
+
 	redudp {
 		local_ip = 127.0.0.1;
 		local_port = 1053;
@@ -151,7 +170,7 @@ List of supported encryption methods(Compiled with PolarSSL):
 	CAMELLIA-192-CFB128
 	CAMELLIA-256-CFB128
 
-###Work with GoAgent
+### Work with GoAgent
 To make redsocks2 works with GoAgent proxy, you need to set proxy type as
 'http-relay' for HTTP protocol and 'http-connect' for HTTPS protocol  
 respectively.
@@ -163,7 +182,7 @@ The configuration for forwarding connections to GoAgent is like below:
 	 local_port = 1081; //HTTP should be redirect to this port.
 	 ip = 192.168.1.1;
 	 port = 8080;
-	 type = http-relay; // Must be 'htt-relay' for HTTP traffic. 
+	 type = http-relay; // Must be 'htt-relay' for HTTP traffic.
 	 autoproxy = 1; // I want autoproxy feature enabled on this section.
 	 // timeout is meaningful when 'autoproxy' is non-zero.
 	 // It specified timeout value when trying to connect to destination
@@ -176,7 +195,7 @@ The configuration for forwarding connections to GoAgent is like below:
 	 local_port = 1082; // HTTPS should be redirect to this port.
 	 ip = 192.168.1.1;
 	 port = 8080;
-	 type = http-connect; // Must be 'htt-connect' for HTTPS traffic. 
+	 type = http-connect; // Must be 'htt-connect' for HTTPS traffic.
 	 autoproxy = 1; // I want autoproxy feature enabled on this section.
 	 // timeout is meaningful when 'autoproxy' is non-zero.
 	 // It specified timeout value when trying to connect to destination
@@ -185,7 +204,7 @@ The configuration for forwarding connections to GoAgent is like below:
 	 timeout = 13;
 	}
 
-###Redirect UDP based DNS Request via TCP connection
+### Redirect UDP based DNS Request via TCP connection
 Sending DNS request via TCP connection is one way to prevent from DNS
 poisoning. You can redirect all UDP based DNS requests via TCP connection
 with the following config section.
@@ -208,4 +227,3 @@ server as the local IP:port configured above.
 AUTHOR
 ------
 [Zhuofei Wang](mailto:semigodking.com) semigodking@gmail.com
-
