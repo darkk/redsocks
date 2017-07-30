@@ -77,7 +77,7 @@ $(CONF):
 # Dependency on .git is useful to rebuild `version.c' after commit, but it breaks non-git builds.
 gen/version.c: *.c *.h gen/.build
 	$(RM) -f $@.tmp
-	echo '/* this file is -generated during build */' > $@.tmp
+	echo '/* this file is auto-generated during build */' > $@.tmp
 	echo '#include "../version.h"' >> $@.tmp
 	echo 'const char* redsocks_version = ' >> $@.tmp
 	if [ -d .git ]; then \
