@@ -107,7 +107,27 @@ $(OSX_HEADERS_PATH)/libkern/tree.h:
 endif
 
 $(DEPS): $(OSX_HEADERS) $(SRCS)
-	$(CC) -MM $(CFLAGS) $(SRCS) 2>/dev/null >$(DEPS)
+	$(CC) -MM $(CFLAGS) $(SRCS) 2>/dev/null >$(DEPS) || \
+	( \
+		for I in $(wildcard *.h); do \
+			export $${I//[-.]/_}_DEPS="`sed '/^\#[ \t]*include \?"\(.*\)".*/!d;s//\1/' $$I`"; \
+		done; \
+		echo -n >$(DEPS); \
+		for SRC in $(SRCS); do \
+			echo -n "$${SRC%.c}.o: " >>$(DEPS); \
+			export SRC_DEPS="`sed '/\#[ \t]*include \?"\(.*\)".*/!d;s//\1/' $$SRC | sort`"; \
+			while true; do \
+				export SRC_DEPS_OLD="$$SRC_DEPS"; \
+				export SRC_DEEP_DEPS=""; \
+				for HDR in $$SRC_DEPS; do \
+					eval export SRC_DEEP_DEPS="\"$$SRC_DEEP_DEPS \$$$${HDR//[-.]/_}_DEPS\""; \
+				done; \
+				export SRC_DEPS="`echo $$SRC_DEPS $$SRC_DEEP_DEPS | sed 's/  */\n/g' | sort -u`"; \
+				test "$$SRC_DEPS" = "$$SRC_DEPS_OLD" && break; \
+			done; \
+			echo $$SRC $$SRC_DEPS >>$(DEPS); \
+		done; \
+	)
 
 -include $(DEPS)
 
