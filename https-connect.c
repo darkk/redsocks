@@ -35,8 +35,14 @@
 #include "redsocks.h"
 #include "http-auth.h"
 
-#ifndef EVENT__HAVE_OPENSSL
-#error The libevent2 you are compiling with does not have OpenSSL enabled!
+#if LIBEVENT_VERSION_NUMBER >= 0x02010100
+#  ifndef EVENT__HAVE_OPENSSL
+#  error The libevent2 you are compiling with does not have OpenSSL enabled!
+#  endif
+#else
+#  ifndef _EVENT_HAVE_OPENSSL
+#  error The libevent2 you are compiling with does not have OpenSSL enabled!
+#  endif
 #endif
 
 typedef enum httpsc_state_t {
