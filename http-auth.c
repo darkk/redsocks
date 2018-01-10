@@ -269,11 +269,13 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 }
 
 const char *auth_request_header = "Proxy-Authenticate:";
+const char *auth_request_types[2] = { "Basic", "Digest" } ;
 const char *auth_response_header = "Proxy-Authorization:";
 
 char *http_auth_request_header(struct evbuffer *src, struct evbuffer *tee)
 {
 	char *line;
+
 	for (;;) {
 		line = redsocks_evbuffer_readline(src);
 		if (tee && line) {
@@ -290,8 +292,21 @@ char *http_auth_request_header(struct evbuffer *src, struct evbuffer *tee)
 			free(line);
 			return NULL;
 		}
-		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
-			return line;
+
+		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0 ) {
+                  char* ptr = line;
+                  ptr += strlen(auth_request_header);
+                  while (isspace(*ptr))
+                    ptr++;
+
+                  for (int i = 0; i < sizeof(auth_request_types) / sizeof(char*); i++) {
+                    if (strncasecmp(ptr, auth_request_types[i], strlen(auth_request_types[i])) == 0) {
+                      return line;
+                    }
+                  }
+
+
+                }
 		free(line);
 	}
 }
