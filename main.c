@@ -202,17 +202,19 @@ int main(int argc, char **argv)
     if (setup_signals())
         return EXIT_FAILURE;
 
-    // Initialize global event base
-    g_event_base = event_base_new();
-    if (!g_event_base)
-        return EXIT_FAILURE;
-        
     memset(terminators, 0, sizeof(terminators));
 
     FOREACH(ss, subsystems) {
         if ((*ss)->init) {
             error = (*ss)->init();
             if (error)
+                goto shutdown;
+        }
+        // init global event base only after base subsystem init is done.
+        if (!g_event_base) {
+            // Initialize global event base
+            g_event_base = event_base_new();
+            if (!g_event_base)
                 goto shutdown;
         }
     }
