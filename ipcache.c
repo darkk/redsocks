@@ -373,16 +373,18 @@ void cache_add_addr(const struct sockaddr_in * addr)
     /* use 'first' to index item in cache block when count is equal or greater than block size */
     unsigned int first = addr_cache_pointers[block]; 
 
-    if (count < config->block_size)
+    if (count < config->block_size) {
         item = get_cache_data(block, count);
-    else
+        addr_cache_counters[block]++;
+    }
+    else {
         item = get_cache_data(block, first);
-
+        addr_cache_pointers[block]++;
+        addr_cache_pointers[block] %= config->block_size;
+    }
     memcpy((void *)&item->addr, (void *)addr, sizeof(struct sockaddr_in));
     item->present = 1;
     item->access_time = redsocks_time(NULL);
-    addr_cache_pointers[block]++;
-    addr_cache_pointers[block] %= config->block_size;
 
     set_cache_changed(1);
 }
