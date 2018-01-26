@@ -124,26 +124,72 @@ char *redsocks_evbuffer_readline(struct evbuffer *buf)
 #endif
 }
 
+int red_socket_client(int type)
+{
+	int fd = -1;
+	int error;
+
+	fd = socket(AF_INET, type, 0);
+	if (fd == -1) {
+		log_errno(LOG_ERR, "socket");
+		goto fail;
+	}
+
+	error = fcntl_nonblock(fd);
+	if (error) {
+		log_errno(LOG_ERR, "fcntl");
+		goto fail;
+	}
+
+	if (type == SOCK_STREAM) {
+		if (apply_tcp_keepalive(fd))
+			goto fail;
+	}
+
+	return fd;
+
+fail:
+	if (fd != -1)
+		redsocks_close(fd);
+	return -1;
+}
+
+int red_socket_server(int type, struct sockaddr_in *bindaddr)
+{
+	int on = 1;
+	int error;
+	int fd = red_socket_client(type);
+	if (fd == -1)
+		goto fail;
+
+	error = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+	if (error) {
+		log_errno(LOG_ERR, "setsockopt");
+		goto fail;
+	}
+
+	error = bind(fd, (struct sockaddr*)bindaddr, sizeof(*bindaddr));
+	if (error) {
+		log_errno(LOG_ERR, "bind");
+		goto fail;
+	}
+
+	return fd;
+fail:
+	if (fd != -1)
+		redsocks_close(fd);
+	return -1;
+
+}
+
+
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg)
 {
 	struct bufferevent *retval = NULL;
 	int relay_fd = -1;
 	int error;
 
-	relay_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (relay_fd == -1) {
-		log_errno(LOG_ERR, "socket");
-		goto fail;
-	}
-
-	error = fcntl_nonblock(relay_fd);
-	if (error) {
-		log_errno(LOG_ERR, "fcntl");
-		goto fail;
-	}
-
-	if (apply_tcp_keepalive(relay_fd))
-		goto fail;
+	relay_fd = red_socket_client(SOCK_STREAM);
 
 	error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
 	if (error && errno != EINPROGRESS) {

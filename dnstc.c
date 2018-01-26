@@ -47,7 +47,7 @@ typedef struct dns_header_t {
 	uint16_t qdcount;
 	uint16_t ancount;
 	uint16_t nscount;
-	uint16_t arcount;
+	uint16_t arcount; // may be >0 for EDNS queries
 } PACKED dns_header;
 
 #define DNS_QR 0x80
@@ -81,7 +81,7 @@ static void dnstc_pkt_from_client(int fd, short what, void *_arg)
 		&& (buf.h.qr_opcode_aa_tc_rd & DNS_QR) == 0 /* query */
 		&& (buf.h.ra_z_rcode & DNS_Z) == 0 /* Z is Zero */
 		&& buf.h.qdcount /* some questions */
-		&& !buf.h.ancount && !buf.h.nscount && !buf.h.arcount /* no answers */
+		&& !buf.h.ancount && !buf.h.nscount /* no answers */
 	) {
 		buf.h.qr_opcode_aa_tc_rd |= DNS_QR;
 		buf.h.qr_opcode_aa_tc_rd |= DNS_TC;
