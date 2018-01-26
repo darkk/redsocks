@@ -145,10 +145,12 @@ SIGTERM and SIGINT terminates daemon, all active connections are closed</p>
 # See <a href="http://en.wikipedia.org/wiki/Reserved_IP_addresses#Reserved_IPv4_addresses">Wikipedia</a> and <a href="http://tools.ietf.org/html/rfc5735">RFC5735</a> for full list of reserved networks.
 <strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 0.0.0.0/8 -j RETURN</code>
 <strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 10.0.0.0/8 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 100.64.0.0/10 -j RETURN</code>
 <strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 127.0.0.0/8 -j RETURN</code>
 <strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 169.254.0.0/16 -j RETURN</code>
 <strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 172.16.0.0/12 -j RETURN</code>
 <strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 192.168.0.0/16 -j RETURN</code>
+<strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 198.18.0.0/15 -j RETURN</code>
 <strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 224.0.0.0/4 -j RETURN</code>
 <strong>root#</strong> <code>iptables -t nat -A REDSOCKS -d 240.0.0.0/4 -j RETURN</code>
 
