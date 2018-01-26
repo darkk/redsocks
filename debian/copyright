@@ -3,7 +3,7 @@ Upstream-Name: redsocks
 Source: http://darkk.net.ru/redsocks/
 
 Files: *
-Copyright: 2007-2011 Leonid Evdokimov <leon@darkk.net.ru>
+Copyright: 2007-2018 Leonid Evdokimov <leon@darkk.net.ru>
 License: Apache 2.0
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
