@@ -1,0 +1,61 @@
+diff --git a/Makefile b/Makefile
+index c1e064a..ee6a07a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,5 +1,5 @@
+-OBJS := parser.o main.o redsocks.o log.o direct.o ipcache.o autoproxy.o encrypt.o shadowsocks.o http-connect.o \
+-        socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o socks5-udp.o shadowsocks-udp.o \
++OBJS := parser.o main.o redsocks.o log.o direct.o ipcache.o autoproxy.o http-connect.o \
++        socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o socks5-udp.o \
+         tcpdns.o gen/version.o
+ SRCS := $(OBJS:.o=.c)
+ CONF := config.h
+@@ -40,7 +40,7 @@ override LIBS += -levent_openssl
+ override CFLAGS += -DENABLE_HTTPS_PROXY
+ $(info Compile with HTTPS proxy enabled.)
+ endif
+-override LIBS += -lssl -lcrypto
++#override LIBS += -lssl -lcrypto
+ override CFLAGS += -DUSE_CRYPTO_OPENSSL
+ endif
+ ifdef ENABLE_STATIC
+diff --git a/redsocks.c b/redsocks.c
+index 69022b4..66313a0 100644
+--- a/redsocks.c
++++ b/redsocks.c
+@@ -56,7 +56,7 @@ extern relay_subsys https_connect_subsys;
+ extern relay_subsys http_relay_subsys;
+ extern relay_subsys socks4_subsys;
+ extern relay_subsys socks5_subsys;
+-extern relay_subsys shadowsocks_subsys;
++//extern relay_subsys shadowsocks_subsys;
+ static relay_subsys *relay_subsystems[] =
+ {
+     &direct_connect_subsys,
+@@ -64,7 +64,7 @@ static relay_subsys *relay_subsystems[] =
+     &http_relay_subsys,
+     &socks4_subsys,
+     &socks5_subsys,
+-    &shadowsocks_subsys,
++//    &shadowsocks_subsys,
+ #if defined(ENABLE_HTTPS_PROXY)
+     &https_connect_subsys,
+ #endif
+diff --git a/redudp.c b/redudp.c
+index cf014c3..ab7d55b 100644
+--- a/redudp.c
++++ b/redudp.c
+@@ -64,11 +64,11 @@ struct bound_udp4 {
+ };
+
+ extern udprelay_subsys socks5_udp_subsys;
+-extern udprelay_subsys shadowsocks_udp_subsys;
++//extern udprelay_subsys shadowsocks_udp_subsys;
+ static udprelay_subsys *relay_subsystems[] =
+ {
+     &socks5_udp_subsys,
+-    &shadowsocks_udp_subsys,
++//    &shadowsocks_udp_subsys,
+ };
+ /***********************************************************************
+  * Helpers

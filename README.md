@@ -50,6 +50,12 @@ compile like (Require libevent2 compiled with OpenSSL support):
 $ make ENABLE_HTTPS_PROXY=true
 ```
 
+To compile on newer systems with OpenSSL 1.1.0 and newer (disables shadowsocks support):
+```
+$ git apply patches/disable-ss.patch
+$ make
+```
+
 Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
 to cross compile.
