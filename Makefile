@@ -66,7 +66,7 @@ gen/.build:
 base.c: $(CONF)
 
 $(DEPS): $(SRCS)
-	gcc -MM $(SRCS) 2>/dev/null >$(DEPS) || \
+	$(CC) -MM $(SRCS) 2>/dev/null >$(DEPS) || \
 	( \
 		for I in $(wildcard *.h); do \
 			export $${I//[-.]/_}_DEPS="`sed '/^\#[ \t]*include \?"\(.*\)".*/!d;s//\1/' $$I`"; \
