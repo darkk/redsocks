@@ -117,7 +117,7 @@ int redsocks_gettimeofday(struct timeval *tv)
 
 char *redsocks_evbuffer_readline(struct evbuffer *buf)
 {
-#if _EVENT_NUMERIC_VERSION >= 0x02000000
+#if LIBEVENT_VERSION_NUMBER >= 0x02000000
 	return evbuffer_readln(buf, NULL, EVBUFFER_EOL_CRLF);
 #else
 	return evbuffer_readline(buf);
