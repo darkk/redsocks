@@ -147,6 +147,15 @@ static void dnsu2t_pkt_from_client(int srvfd, short what, void *_arg)
 		sent = write(event_get_fd(&self->relay_rd), &in, pktlen);
 	}
 
+	if (sent == -1 && errno == EINPROGRESS) {
+		// Writing with MSG_FASTOPEN fails with EINPROGRESS on a non-blocking
+		// socket. When that happens, client needs to write the data again. We
+		// save the data here and write it in the call back function when the
+		// socket becomes writable.
+		self->pkt = in;
+		self->pkt_size = pktlen;
+	}
+
 	if (sent == pktlen || (sent == -1 && errno == EINPROGRESS)) {
 		self->request_count++;
 		self->inflight_count++;
@@ -227,6 +236,14 @@ static void dnsu2t_close_relay(dnsu2t_instance *self)
 void dnsu2t_relay_writable(int fd, short what, void *_arg)
 {
 	dnsu2t_instance *self = _arg;
+
+	if (self->pkt_size != 0) {
+		// Resend saved packet as the first sendto didn't have an available TFO
+		// cookie.
+		write(event_get_fd(&self->relay_rd), &self->pkt, self->pkt_size);
+		self->pkt_size = 0;
+	}
+
 	assert(event_get_fd(&self->relay_wr) == fd);
 	if ((what & EV_WRITE) && self->inflight_count < self->config.inflight_max && !self->reqstream_broken) {
 		if (event_add(&self->listener, NULL) != 0)
