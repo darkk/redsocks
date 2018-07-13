@@ -340,7 +340,7 @@ static int ss_connect_relay(redsocks_client *client)
         redsocks_drop_client(client);
         return -1;
     }
-    sclient->e_ctx_init = 1;
+    sclient->d_ctx_init = 1;
 
     /* build and send header */
     // TODO: Better implementation and IPv6 Support
