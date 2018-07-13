@@ -323,10 +323,15 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
 fallback:
 #endif
 
-        *len = 0; // Nothing sent, caller needs to write data again when connection is setup.
         error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
         if (error && errno != EINPROGRESS) {
             log_errno(LOG_NOTICE, "connect");
+            goto fail;
+        }
+        // write data to evbuffer so that data can be sent when connection is set up
+        if (bufferevent_write(retval, data, *len) != 0) {
+            log_errno(LOG_NOTICE, "bufferevent_write");
+            *len = 0; // Nothing sent, caller needs to write data again when connection is setup.
             goto fail;
         }
     }

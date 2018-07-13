@@ -38,9 +38,6 @@ typedef struct ss_client_t {
     struct enc_ctx d_ctx;
     short e_ctx_init;
     short d_ctx_init;
-    bool  tfo;
-    size_t tfo_size;
-    char  tfo_buff[512];
 } ss_client;
 
 typedef struct ss_instance_t {
@@ -278,7 +275,6 @@ static void ss_relay_readcb(struct bufferevent *buffev, void *_arg)
 static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
 {
     redsocks_client *client = _arg;
-    ss_client *sclient = (void*)(client + 1);
 
     assert(buffev == client->relay);
     assert(client->state == ss_new);
@@ -309,9 +305,6 @@ static void ss_relay_connected(struct bufferevent *buffev, void *_arg)
                                      ss_relay_writecb,
                                      redsocks_event_error,
                                      client);
-    if(!sclient->tfo) {
-        bufferevent_write(client->relay, &sclient->tfo_buff[0], sclient->tfo_size);
-    }
     // Write any data received from client side to relay.
     if (evbuffer_get_length(bufferevent_get_input(client->client)))
         ss_relay_writecb(client->relay, client);
@@ -328,6 +321,7 @@ static int ss_connect_relay(redsocks_client *client)
     ss_header_ipv4 header;
     struct timeval tv;
     size_t len = 0;
+    char buff[64+sizeof(header)];
 
     if (enc_ctx_init(&ss->info, &sclient->e_ctx, 1)) {
         log_error(LOG_ERR, "Shadowsocks failed to initialize encryption context.");
@@ -348,28 +342,25 @@ static int ss_connect_relay(redsocks_client *client)
     header.addr = client->destaddr.sin_addr.s_addr;
     header.port = client->destaddr.sin_port;
     len += sizeof(header);
-    size_t sz = sizeof(sclient->tfo_buff);
-    if (!ss_encrypt(&sclient->e_ctx, (char *)&header, len, &sclient->tfo_buff[0], &sz)) {
+    size_t sz = sizeof(buff);
+    if (!ss_encrypt(&sclient->e_ctx, (char *)&header, len, &buff[0], &sz)) {
         log_error(LOG_ERR, "Encryption error.");
         redsocks_drop_client(client);
         return -1;
     }
-    sclient->tfo_size = len = sz;
+    len = sz;
 
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
     client->relay = red_connect_relay_tfo(interface, &client->instance->config.relayaddr,
                     NULL, ss_relay_connected, redsocks_event_error, client, 
-                    &tv, &sclient->tfo_buff[0], &sz);
+                    &tv, &buff[0], &sz);
 
     if (!client->relay) {
         redsocks_drop_client(client);
         return -1;
     }
-    if (sz && sz == len) {
-       sclient->tfo = true;
-    }
-    else if (sz) {
+    else if (sz && sz != len) {
         log_error(LOG_ERR, "Unexpected length of data sent.");
         redsocks_drop_client(client);
         return -1;
