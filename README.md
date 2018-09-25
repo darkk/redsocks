@@ -3,7 +3,7 @@
 This tool allows you to redirect any TCP connection to SOCKS or HTTPS
 proxy using your firewall, so redirection may be system-wide or network-wide.
 
-When is resocks useful?
+When is redsocks useful?
 
 * you want to route part of TCP traffic via OpenSSH `DynamicForward` Socks5
   port using firewall policies. That was original redsocks development goal;
