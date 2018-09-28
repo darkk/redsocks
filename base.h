@@ -3,6 +3,7 @@
 
 int getdestaddr(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr);
 int apply_tcp_keepalive(int fd);
+int apply_reuseport(int fd);
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */

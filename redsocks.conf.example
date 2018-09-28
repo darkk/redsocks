@@ -43,6 +43,13 @@ base {
 	//tcp_keepalive_time = 0;
 	//tcp_keepalive_probes = 0;
 	//tcp_keepalive_intvl = 0;
+
+	/* Enable or disable Linux 3.9+ specific socket option SO_REUSEPORT.
+	 * Some older versions of Linux like CentOS 6.5 (Kernel 2.6.32) also
+	 # support this option.
+	 * Default to off.
+	 */
+	reuseport = off;
 }
 
 redsocks {

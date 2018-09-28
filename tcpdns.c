@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <errno.h>
 
+#include "base.h"
 #include "list.h"
 #include "log.h"
 #include "parser.h"
@@ -464,6 +465,8 @@ static int tcpdns_init_instance(tcpdns_instance *instance)
         log_errno(LOG_ERR, "socket");
         goto fail;
     }
+    if (apply_reuseport(fd))
+        log_error(LOG_WARNING, "Continue without SO_REUSEPORT enabled");
 
     error = bind(fd, (struct sockaddr*)&instance->config.bindaddr, sizeof(instance->config.bindaddr));
     if (error) {

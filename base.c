@@ -78,6 +78,9 @@ typedef struct base_instance_t {
 	bool log_debug;
 	bool log_info;
 	bool daemon;
+#ifdef SO_REUSEPORT
+	bool reuseport;
+#endif
 #if defined(TCP_KEEPIDLE) && defined(TCP_KEEPCNT) && defined(TCP_KEEPINTVL)
 	uint16_t tcp_keepalive_time;
 	uint16_t tcp_keepalive_probes;
@@ -284,6 +287,22 @@ int apply_tcp_keepalive(int fd)
 	return 0;
 }
 
+int apply_reuseport(int fd)
+{
+    if (!instance.reuseport)
+        return 0;
+
+#ifdef SO_REUSEPORT
+    int opt = 1;
+    int rc = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
+    if (rc == -1)
+        log_errno(LOG_ERR, "setsockopt");
+    return rc;
+#else
+    return -1;
+#endif
+}
+
 static redirector_subsys redirector_subsystems[] =
 {
 #ifdef __FreeBSD__
@@ -315,6 +334,9 @@ static parser_entry base_entries[] =
 	{ .key = "tcp_keepalive_time",   .type = pt_uint16, .addr = &instance.tcp_keepalive_time },
 	{ .key = "tcp_keepalive_probes", .type = pt_uint16, .addr = &instance.tcp_keepalive_probes },
 	{ .key = "tcp_keepalive_intvl",  .type = pt_uint16, .addr = &instance.tcp_keepalive_intvl },
+#endif
+#ifdef SO_REUSEPORT
+	{ .key = "reuseport",  .type = pt_bool,    .addr = &instance.reuseport},
 #endif
 	{ }
 };

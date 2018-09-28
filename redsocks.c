@@ -985,6 +985,9 @@ static int redsocks_init_instance(redsocks_instance *instance)
     if (make_socket_transparent(fd))
         log_error(LOG_WARNING, "Continue without TPROXY support");
 
+    if (apply_reuseport(fd))
+        log_error(LOG_WARNING, "Continue without SO_REUSEPORT enabled");
+
     error = bind(fd, (struct sockaddr*)&instance->config.bindaddr, sizeof(instance->config.bindaddr));
     if (error) {
         log_errno(LOG_ERR, "bind");

@@ -32,6 +32,7 @@
 #include <arpa/inet.h>
 #include <assert.h>
 
+#include "base.h"
 #include "list.h"
 #include "log.h"
 #include "socks5.h"
@@ -571,6 +572,9 @@ static int redudp_init_instance(redudp_instance *instance)
             red_inet_ntop(&instance->config.bindaddr, buf1, sizeof(buf1)),
             red_inet_ntop(&instance->config.destaddr, buf2, sizeof(buf2)));
     }
+
+    if (apply_reuseport(fd))
+        log_error(LOG_WARNING, "Continue without SO_REUSEPORT enabled");
 
     error = bind(fd, (struct sockaddr*)&instance->config.bindaddr, sizeof(instance->config.bindaddr));
     if (error) {

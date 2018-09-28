@@ -14,6 +14,8 @@ need of blacklist.
 6. UDP transparent proxy via shadowsocks proxy.
 7. Support Ful-cone NAT Traversal when working with shadowsocks or socks5 proxy.
 8. Integrated HTTPS proxy support(HTTP CONNECT over SSL).
+9. Support TCP Fast Open on local server side and shadowsocks client side
+10.Support port reuse ([SO_REUSEPORT](https://lwn.net/Articles/542629/))
 
 [Chinese Reference](https://github.com/semigodking/redsocks/wiki)
 
@@ -26,7 +28,7 @@ The following libraries are required.
 * OpenSSL or PolarSSL
 
 ### Steps
-On general linux, simply run command below to build with OpenSSL.
+On general Linux, simply run command below to build with OpenSSL.
 
 ```
 $ make
