@@ -289,10 +289,10 @@ int apply_tcp_keepalive(int fd)
 
 int apply_reuseport(int fd)
 {
+#ifdef SO_REUSEPORT
     if (!instance.reuseport)
         return 0;
 
-#ifdef SO_REUSEPORT
     int opt = 1;
     int rc = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
     if (rc == -1)
