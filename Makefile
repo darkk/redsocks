@@ -2,11 +2,13 @@ ifdef DISABLE_SHADOWSOCKS
 OBJS := parser.o main.o redsocks.o log.o direct.o ipcache.o autoproxy.o http-connect.o \
         socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o socks5-udp.o \
         tcpdns.o gen/version.o
-override CFLAGS += -DDISABLE_SHADOWSOCKS
+CFLAGS +=-fPIC -O3 -DDISABLE_SHADOWSOCKS
+FEATURES += DISABLE_SHADOWSOCKS
 else
 OBJS := parser.o main.o redsocks.o log.o direct.o ipcache.o autoproxy.o encrypt.o shadowsocks.o http-connect.o \
         socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o socks5-udp.o shadowsocks-udp.o \
         tcpdns.o gen/version.o
+CFLAGS +=-fPIC -O3
 endif
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
@@ -16,7 +18,6 @@ VERSION := 0.67
 OS := $(shell uname)
 
 LIBS := -levent
-CFLAGS +=-fPIC -O3
 override CFLAGS += -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
 ifeq ($(OS), Linux)
 override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600
@@ -45,6 +46,7 @@ ifdef ENABLE_HTTPS_PROXY
 override OBJS += https-connect.o
 override LIBS += -levent_openssl
 override CFLAGS += -DENABLE_HTTPS_PROXY
+override FEATURES += ENABLE_HTTPS_PROXY
 $(info Compile with HTTPS proxy enabled.)
 endif
 override LIBS += -lssl -lcrypto
@@ -53,6 +55,7 @@ endif
 ifdef ENABLE_STATIC
 override LIBS += -ldl -lz
 override LDFLAGS += -Wl,-static -static -static-libgcc -s
+override FEATURES += STATIC_COMPILE
 endif
 
 all: $(OUT)
@@ -92,9 +95,13 @@ gen/version.c: *.c *.h gen/.build
 		echo '"redsocks.git/'`git describe --tags`' $(CRYPTO)"'; \
 		if [ `git status --porcelain | grep -v -c '^??'` != 0 ]; then \
 			echo '"-unclean"'; \
-		fi \
+		fi; \
+		echo '"\n"'; \
+		echo '"Features: $(FEATURES)"'; \
 	else \
 		echo '"redsocks/$(VERSION) $(CRYPTO)"'; \
+		echo '"\n"'; \
+		echo '"Features: $(FEATURES)"'; \
 	fi >> $@.tmp
 	echo ';' >> $@.tmp
 	mv -f $@.tmp $@
