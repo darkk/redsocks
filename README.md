@@ -58,6 +58,11 @@ $ git apply patches/disable-ss.patch
 $ make
 ```
 
+To compile on newer systems with OpenSSL 1.1.1+ (just disable shadowsocks support, no patch need and worked with ENABLE_HTTPS_PROXY. DO NOT APPLY THE PATCH!):
+```
+$ make DISABLE_SHADOWSOCKS=true
+```
+
 Since this variant of redsocks is customized for running with Openwrt, please
 read documents here (http://wiki.openwrt.org/doc/devel/crosscompile) for how
 to cross compile.

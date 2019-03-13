@@ -3,8 +3,8 @@
  *
  * This code is based on redsocks project developed by Leonid Evdokimov.
  * Licensed under the Apache License, Version 2.0 (the "License").
- * 
- * 
+ *
+ *
  * Copyright (C) 2007-2011 Leonid Evdokimov <leon@darkk.net.ru>
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
@@ -56,7 +56,9 @@ extern relay_subsys https_connect_subsys;
 extern relay_subsys http_relay_subsys;
 extern relay_subsys socks4_subsys;
 extern relay_subsys socks5_subsys;
+#if !defined(DISABLE_SHADOWSOCKS)
 extern relay_subsys shadowsocks_subsys;
+#endif
 static relay_subsys *relay_subsystems[] =
 {
     &direct_connect_subsys,
@@ -64,7 +66,9 @@ static relay_subsys *relay_subsystems[] =
     &http_relay_subsys,
     &socks4_subsys,
     &socks5_subsys,
+#if !defined(DISABLE_SHADOWSOCKS)
     &shadowsocks_subsys,
+#endif
 #if defined(ENABLE_HTTPS_PROXY)
     &https_connect_subsys,
 #endif
@@ -179,7 +183,7 @@ static int redsocks_onenter(parser_section *section)
             (strcmp(entry->key, "autoproxy") == 0) ? (void*)&instance->config.autoproxy :
             (strcmp(entry->key, "timeout") == 0) ? (void*)&instance->config.timeout:
             NULL;
-    section->data = instance;   
+    section->data = instance;
     return 0;
 }
 
@@ -387,9 +391,9 @@ int redsocks_start_relay(redsocks_client *client)
                                      event_cb,
                                      client);
 
-    error = bufferevent_enable(client->client, 
-                client->client_evshut == EV_READ ? EV_WRITE : 
-                client->client_evshut == EV_WRITE ? EV_READ : 
+    error = bufferevent_enable(client->client,
+                client->client_evshut == EV_READ ? EV_WRITE :
+                client->client_evshut == EV_WRITE ? EV_READ :
                 client->client_evshut == (EV_READ|EV_WRITE) ? 0 : EV_READ | EV_WRITE);
     if (!error)
         error = bufferevent_enable(client->relay, EV_READ | EV_WRITE);
@@ -506,7 +510,7 @@ void redsocks_event_error(struct bufferevent *buffev, short what, void *_arg)
 
     if (!(what & BEV_EVENT_ERROR))
         errno = redsocks_socket_geterrno(client, buffev);
-    redsocks_log_errno(client, LOG_DEBUG, "%s, what: " event_fmt_str, 
+    redsocks_log_errno(client, LOG_DEBUG, "%s, what: " event_fmt_str,
                             buffev == client->client?"client":"relay",
                             event_fmt(what));
 
@@ -674,7 +678,7 @@ int redsocks_connect_relay(redsocks_client *client)
 
     // Allowing binding relay socket to specified IP for outgoing connections
     client->relay = red_connect_relay(interface, &client->instance->config.relayaddr,
-                                      NULL, 
+                                      NULL,
                                       redsocks_relay_connected,
                                       redsocks_event_error, client, &tv);
     if (!client->relay) {
@@ -782,7 +786,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
     // everything seems to be ok, let's allocate some memory
     if (self->config.autoproxy)
-        client = calloc(1, sizeof(redsocks_client) + 
+        client = calloc(1, sizeof(redsocks_client) +
                             self->relay_ss->payload_len + autoproxy_subsys.payload_len
                             );
     else
@@ -809,9 +813,9 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
     if (!client->client) {
         log_errno(LOG_ERR, "bufferevent_socket_new");
         goto fail;
-    }   
+    }
     bufferevent_setcb(client->client, NULL, NULL, redsocks_event_error, client);
-    
+
     client_fd = -1;
 
     // enable reading to handle EOF from client
@@ -893,7 +897,7 @@ static void redsocks_dump_instance(redsocks_instance *instance)
               red_inet_ntop(&instance->config.bindaddr, addr_str, sizeof(addr_str)));
     list_for_each_entry(client, &instance->clients, list)
         redsocks_dump_client(client, LOG_INFO);
-    
+
     log_error(LOG_INFO, "End of client list.");
 }
 
@@ -905,9 +909,9 @@ static void redsocks_debug_dump()
         redsocks_dump_instance(instance);
 }
 
-/* Audit is required to clean up hung connections. 
+/* Audit is required to clean up hung connections.
  * Not all connections are closed gracefully by both ends. In any case that
- * either far end of client or far end of relay does not close connection 
+ * either far end of client or far end of relay does not close connection
  * gracefully, we got hung connections.
  */
 static void redsocks_audit_instance(redsocks_instance *instance)
@@ -925,7 +929,7 @@ static void redsocks_audit_instance(redsocks_instance *instance)
 
         if (now - client->last_event >= REDSOCKS_AUDIT_INTERVAL){
             /* Only take actions if no touch of the client for at least an audit cycle.*/
-            /* drop this client if either end disconnected */   
+            /* drop this client if either end disconnected */
             if ((client->client_evshut == EV_WRITE && client->relay_evshut == EV_READ)
                 || (client->client_evshut == EV_READ && client->relay_evshut == EV_WRITE)
                 || (client->client_evshut == (EV_READ|EV_WRITE) && client->relay_evshut == EV_WRITE)
@@ -963,11 +967,11 @@ static int redsocks_init_instance(redsocks_instance *instance)
     int error;
     evutil_socket_t fd = -1;
 
-    if (instance->relay_ss->instance_init 
+    if (instance->relay_ss->instance_init
         && instance->relay_ss->instance_init(instance)) {
         log_errno(LOG_ERR, "Failed to init relay subsystem.");
         goto fail;
-    } 
+    }
 
     fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd == -1) {

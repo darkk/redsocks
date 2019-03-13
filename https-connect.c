@@ -106,8 +106,12 @@ static int httpsc_instance_init(struct redsocks_instance_t *instance)
 {
     httpsc_instance * httpsc = (httpsc_instance *)(instance + 1);
     SSL_CTX * ctx = NULL;
-    
-    ctx = SSL_CTX_new(SSLv23_client_method());
+
+    #if (OPENSSL_VERSION_NUMBER < 0x10100000L)
+        ctx = SSL_CTX_new(SSLv23_client_method());
+    #else
+        ctx = SSL_CTX_new(TLS_client_method());
+    #endif
     if (!ctx)
     {
         unsigned long err = ERR_get_error();
@@ -148,7 +152,7 @@ static void httpsc_event_cb(struct bufferevent *buffev, short what, void *_arg)
     else
 #endif
         log_ssl_error(client, client->relay);
-    redsocks_log_errno(client, LOG_DEBUG, "%s, what: " event_fmt_str, 
+    redsocks_log_errno(client, LOG_DEBUG, "%s, what: " event_fmt_str,
                             buffev == client->client?"client":"relay",
                             event_fmt(what));
 
@@ -159,7 +163,7 @@ static void httpsc_event_cb(struct bufferevent *buffev, short what, void *_arg)
         {
             if (!(client->relay_evshut & EV_WRITE) && client->relay_connected)
                 // when we got EOF from client, we need to shutdown relay's write
-                process_shutdown_on_write_(client, client->client, client->relay); 
+                process_shutdown_on_write_(client, client->client, client->relay);
         }
         else
         {
@@ -226,12 +230,12 @@ static int httpsc_connect_relay(redsocks_client *client)
     struct timeval tv = {client->instance->config.timeout, 0};
 
     if (!sclient->ssl)
-        sclient->ssl = SSL_new(httpsc->ctx); 
+        sclient->ssl = SSL_new(httpsc->ctx);
 
     // Allowing binding relay socket to specified IP for outgoing connections
     client->relay = red_connect_relay_ssl(interface, &client->instance->config.relayaddr,
                                       sclient->ssl,
-                                      httpsc_read_cb, 
+                                      httpsc_read_cb,
                                       NULL,
                                       httpsc_event_cb, client, &tv);
     if (!client->relay) {

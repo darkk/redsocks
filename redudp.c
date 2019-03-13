@@ -3,8 +3,8 @@
  *
  * This code is based on redsocks project developed by Leonid Evdokimov.
  * Licensed under the Apache License, Version 2.0 (the "License").
- * 
- * 
+ *
+ *
  * redsocks - transparent TCP-to-proxy redirector
  * Copyright (C) 2007-2011 Leonid Evdokimov <leon@darkk.net.ru>
  *
@@ -65,11 +65,15 @@ struct bound_udp4 {
 };
 
 extern udprelay_subsys socks5_udp_subsys;
+#if !defined(DISABLE_SHADOWSOCKS)
 extern udprelay_subsys shadowsocks_udp_subsys;
+#endif
 static udprelay_subsys *relay_subsystems[] =
 {
     &socks5_udp_subsys,
+    #if !defined(DISABLE_SHADOWSOCKS)
     &shadowsocks_udp_subsys,
+    #endif
 };
 /***********************************************************************
  * Helpers
@@ -263,7 +267,7 @@ void redudp_bump_timeout(redudp_client *client)
     }
 }
 
-void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len, 
+void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len,
                               struct sockaddr_in * srcaddr)
 {
     size_t sent;
@@ -541,11 +545,11 @@ static int redudp_init_instance(redudp_instance *instance)
     char buf1[RED_INET_ADDRSTRLEN], buf2[RED_INET_ADDRSTRLEN];
 
     instance->shared_buff = &shared_buff[0];
-    if (instance->relay_ss->instance_init 
+    if (instance->relay_ss->instance_init
         && instance->relay_ss->instance_init(instance)) {
         log_errno(LOG_ERR, "Failed to init UDP relay subsystem.");
         goto fail;
-    } 
+    }
 
     fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
