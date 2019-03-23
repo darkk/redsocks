@@ -96,12 +96,12 @@ gen/version.c: *.c *.h gen/.build
 		if [ `git status --porcelain | grep -v -c '^??'` != 0 ]; then \
 			echo '"-unclean"'; \
 		fi; \
-		echo '"\n"'; \
-		echo '"Features: $(FEATURES)"'; \
+		echo '"\\n"'; \
+		echo '"Features: $(FEATURES)"' \
 	else \
 		echo '"redsocks/$(VERSION) $(CRYPTO)"'; \
-		echo '"\n"'; \
-		echo '"Features: $(FEATURES)"'; \
+		echo '"\\n"'; \
+		echo '"Features: $(FEATURES)"' \
 	fi >> $@.tmp
 	echo ';' >> $@.tmp
 	mv -f $@.tmp $@
