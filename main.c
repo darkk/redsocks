@@ -26,8 +26,11 @@
 #include "main.h"
 #include "utils.h"
 #include "version.h"
+#include "config.h"
+#include "base.h"
 
 extern app_subsys redsocks_subsys;
+extern app_subsys debug_subsys;
 extern app_subsys base_subsys;
 #ifndef __ANDROID__
 extern app_subsys redudp_subsys;
@@ -36,6 +39,9 @@ extern app_subsys dnstc_subsys;
 
 app_subsys *subsystems[] = {
 	&redsocks_subsys,
+#ifdef DBG_BUILD
+	&debug_subsys,
+#endif
 	&base_subsys,
 #ifndef __ANDROID__
 	&redudp_subsys,
@@ -52,14 +58,6 @@ static void terminate(int sig, short what, void *_arg)
 		log_error(LOG_WARNING, "event_loopbreak");
 }
 
-static void red_srand()
-{
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	// using tv_usec is a bit less predictable than tv_sec
-	srand(tv.tv_sec*1000000+tv.tv_usec);
-}
-
 int main(int argc, char **argv)
 {
 	int error;
@@ -70,7 +68,7 @@ int main(int argc, char **argv)
 	int opt;
 	int i;
 
-	red_srand();
+	evutil_secure_rng_init();
 	while ((opt = getopt(argc, argv, "h?vtc:p:")) != -1) {
 		switch (opt) {
 		case 't':
@@ -84,6 +82,13 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			puts(redsocks_version);
+			printf("Built with libevent-%s\n", LIBEVENT_VERSION);
+			printf("Runs  with libevent-%s\n", event_get_version());
+			if (LIBEVENT_VERSION_NUMBER != event_get_version_number()) {
+				printf("Warning: libevent version number mismatch.\n"
+				       "  Headers: %8x\n"
+				       "  Runtime: %8x\n", LIBEVENT_VERSION_NUMBER, event_get_version_number());
+			}
 			return EXIT_SUCCESS;
 		default:
 			printf(
@@ -97,6 +102,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (event_get_struct_event_size() != sizeof(struct event)) {
+		puts("libevent event_get_struct_event_size() != sizeof(struct event)! Check `redsocks -v` and recompile redsocks");
+		return EXIT_FAILURE;
+	}
 
 	FILE *f = fopen(confname, "r");
 	if (!f) {
@@ -104,7 +113,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	parser_context* parser = parser_start(f, NULL);
+	parser_context* parser = parser_start(f);
 	if (!parser) {
 		perror("Not enough memory for parser");
 		return EXIT_FAILURE;
@@ -123,12 +132,12 @@ int main(int argc, char **argv)
 	if (conftest)
 		return EXIT_SUCCESS;
 
-	event_init();
+	struct event_base* evbase = event_init();
 	memset(terminators, 0, sizeof(terminators));
 
 	FOREACH(ss, subsystems) {
 		if ((*ss)->init) {
-			error = (*ss)->init();
+			error = (*ss)->init(evbase);
 			if (error)
 				goto shutdown;
 		}
@@ -153,7 +162,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-	log_error(LOG_NOTICE, "redsocks started");
+	if (LIBEVENT_VERSION_NUMBER != event_get_version_number()) {
+		log_error(LOG_WARNING, "libevent version mismatch! headers %8x, runtime %8x\n", LIBEVENT_VERSION_NUMBER, event_get_version_number());
+	}
+
+	log_error(LOG_NOTICE, "redsocks started, conn_max=%u", redsocks_conn_max());
 
 	event_dispatch();
 
@@ -172,7 +185,7 @@ shutdown:
 		if ((*ss)->fini)
 			(*ss)->fini();
 
-	event_base_free(NULL);
+	event_base_free(evbase);
 
 	return !error ? EXIT_SUCCESS : EXIT_FAILURE;
 }

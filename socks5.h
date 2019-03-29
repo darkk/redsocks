@@ -87,7 +87,7 @@ static const int socks5_status_Address_type_not_supported = 8;
 
 
 const char* socks5_status_to_str(int socks5_status);
-int socks5_is_valid_cred(const char *login, const char *password);
+bool socks5_is_valid_cred(const char *login, const char *password);
 
 struct evbuffer *socks5_mkmethods_plain(int do_password);
 struct evbuffer *socks5_mkpassword_plain(const char *login, const char *password);

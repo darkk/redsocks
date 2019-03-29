@@ -25,22 +25,22 @@
 
 #include "md5.h"
 #include "base64.h"
-
+#include "log.h"
 #include "http-auth.h"
 
 char* basic_authentication_encode(const char *user, const char *passwd)
 {
 	/* prepare the user:pass key pair */
 	int pair_len = strlen(user) + 1 + strlen(passwd);
-	char *pair_ptr = calloc(pair_len + 1, 1);
+	char pair[pair_len + 1];
 
-	sprintf(pair_ptr, "%s:%s", user, passwd);
+	sprintf(pair, "%s:%s", user, passwd);
 
 	/* calculate the final string length */
 	int basic_len = BASE64_SIZE(pair_len);
 	char *basic_ptr = calloc(basic_len + 1, 1);
 
-	if (!base64_encode(basic_ptr, basic_len, (const uint8_t*)pair_ptr, pair_len))
+	if (!base64_encode(basic_ptr, basic_len, (const uint8_t*)pair, pair_len))
 		return NULL;
 
 	return basic_ptr;
@@ -270,3 +270,28 @@ char* digest_authentication_encode(const char *line, const char *user, const cha
 
 const char *auth_request_header = "Proxy-Authenticate:";
 const char *auth_response_header = "Proxy-Authorization:";
+
+char *http_auth_request_header(struct evbuffer *src, struct evbuffer *tee)
+{
+	char *line;
+	for (;;) {
+		line = redsocks_evbuffer_readline(src);
+		if (tee && line) {
+			if (evbuffer_add(tee, line, strlen(line)) != 0 ||
+			    evbuffer_add(tee, "\r\n", 2) != 0)
+			{
+				log_error(LOG_NOTICE, "evbuffer_add");
+				free(line);
+				return NULL; // I'm going up straight to the 403...
+			}
+		}
+		// FIXME: multi-line headers are not supported
+		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
+			free(line);
+			return NULL;
+		}
+		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
+			return line;
+		free(line);
+	}
+}

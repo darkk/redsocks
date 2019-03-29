@@ -23,9 +23,24 @@
 #include "utils.h"
 #include "log.h"
 
-static const char *lowmem = "<Can't print error, not enough memory>";
+const char *error_lowmem = "<Can't print error, not enough memory>";
 
 typedef void (*log_func)(const char *file, int line, const char *func, int priority, const char *message, const char *appendix);
+
+static const char* getprioname(int priority)
+{
+	switch (priority) {
+		case LOG_EMERG:   return "emerg";
+		case LOG_ALERT:   return "alert";
+		case LOG_CRIT:    return "crit";
+		case LOG_ERR:     return "err";
+		case LOG_WARNING: return "warning";
+		case LOG_NOTICE:  return "notice";
+		case LOG_INFO:    return "info";
+		case LOG_DEBUG:   return "debug";
+		default:          return "?";
+	}
+}
 
 static void fprint_timestamp(
 		FILE* fd,
@@ -36,10 +51,11 @@ static void fprint_timestamp(
 
 	/* XXX: there is no error-checking, IMHO it's better to lose messages
 	 *      then to die and stop service */
+	const char* sprio = getprioname(priority);
 	if (appendix)
-		fprintf(fd, "%lu.%6.6lu %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message, appendix);
+		fprintf(fd, "%lu.%6.6lu %s %s:%u %s(...) %s: %s\n", tv.tv_sec, tv.tv_usec, sprio, file, line, func, message, appendix);
 	else
-		fprintf(fd, "%lu.%6.6lu %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, file, line, func, message);
+		fprintf(fd, "%lu.%6.6lu %s %s:%u %s(...) %s\n", tv.tv_sec, tv.tv_usec, sprio, file, line, func, message);
 }
 
 static void stderr_msg(const char *file, int line, const char *func, int priority, const char *message, const char *appendix)
@@ -67,12 +83,22 @@ static void syslog_msg(const char *file, int line, const char *func, int priorit
 
 static log_func log_msg = stderr_msg;
 static log_func log_msg_next = NULL;
+static bool should_log_info = true;
+static bool should_log_debug = false;
 
+bool should_log(int priority)
+{
+	return (priority != LOG_DEBUG && priority != LOG_INFO)
+	    || (priority == LOG_DEBUG && should_log_debug)
+	    || (priority == LOG_INFO && should_log_info);
+}
 
 int log_preopen(const char *dst, bool log_debug, bool log_info)
 {
 	const char *syslog_prefix = "syslog:";
 	const char *file_prefix = "file:";
+	should_log_debug = log_debug;
+	should_log_info = log_info;
 	if (strcmp(dst, "stderr") == 0) {
 		log_msg_next = stderr_msg;
 	}
@@ -139,16 +165,19 @@ void log_open()
 
 void _log_vwrite(const char *file, int line, const char *func, int do_errno, int priority, const char *fmt, va_list ap)
 {
+	if (!should_log(priority))
+		return;
+
 	int saved_errno = errno;
 	struct evbuffer *buff = evbuffer_new();
 	const char *message;
 
 	if (buff) {
 		evbuffer_add_vprintf(buff, fmt, ap);
-		message = (const char*)EVBUFFER_DATA(buff);
+		message = (const char*)evbuffer_pullup(buff, -1);
 	}
 	else
-		message = lowmem;
+		message = error_lowmem;
 
 	log_msg(file, line, func, priority, message, do_errno ? strerror(saved_errno) : NULL);
 
@@ -158,6 +187,9 @@ void _log_vwrite(const char *file, int line, const char *func, int do_errno, int
 
 void _log_write(const char *file, int line, const char *func, int do_errno, int priority, const char *fmt, ...)
 {
+	if (!should_log(priority))
+		return;
+
 	va_list ap;
 
 	va_start(ap, fmt);

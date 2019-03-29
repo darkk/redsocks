@@ -3,8 +3,10 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <assert.h>
 #include <event.h>
 #include "list.h"
+#include "parser.h"
 
 
 struct redsocks_client_t;
@@ -18,6 +20,7 @@ typedef struct relay_subsys_t {
 	evbuffercb writecb;
 	void       (*init)(struct redsocks_client_t *client);
 	void       (*fini)(struct redsocks_client_t *client);
+	void       (*instance_init)(struct redsocks_instance_t *instance);
 	void       (*instance_fini)(struct redsocks_instance_t *instance);
 	// connect_relay (if any) is called instead of redsocks_connect_relay after client connection acceptance
 	void       (*connect_relay)(struct redsocks_client_t *client);
@@ -29,25 +32,21 @@ typedef struct redsocks_config_t {
 	char *type;
 	char *login;
 	char *password;
-	uint16_t min_backoff_ms;
-	uint16_t max_backoff_ms; // backoff capped by 65 seconds is enough :)
 	uint16_t listenq;
+	bool use_splice;
+	enum disclose_src_e disclose_src;
+	enum on_proxy_fail_e on_proxy_fail;
 } redsocks_config;
-
-struct tracked_event {
-	struct event ev;
-	struct timeval inserted;
-};
 
 typedef struct redsocks_instance_t {
 	list_head       list;
 	redsocks_config config;
-	struct tracked_event listener;
-	struct tracked_event accept_backoff;
-	uint16_t        accept_backoff_ms;
+	struct event    listener;
 	list_head       clients;
 	relay_subsys   *relay_ss;
 } redsocks_instance;
+
+typedef unsigned short evshut_t; // EV_READ | EV_WRITE
 
 typedef struct redsocks_client_t {
 	list_head           list;
@@ -57,17 +56,54 @@ typedef struct redsocks_client_t {
 	struct sockaddr_in  clientaddr;
 	struct sockaddr_in  destaddr;
 	int                 state;         // it's used by bottom layer
-	unsigned short      client_evshut;
-	unsigned short      relay_evshut;
-	time_t              first_event;
-	time_t              last_event;
+	evshut_t            client_evshut;
+	evshut_t            relay_evshut;
+	struct timeval      first_event;
+	struct timeval      last_event;
 } redsocks_client;
 
+typedef struct splice_pipe_t {
+	int read;
+	int write;
+	size_t size;
+} splice_pipe;
 
+typedef struct redsocks_pump_t {
+	/* Quick-n-dirty test show, that some Linux 4.4.0 build uses ~1.5 kb of
+	 * slab_unreclaimable RAM per every pipe pair. Most of connections are
+	 * usually idle and it's possble to save some measurable amount of RAM
+	 * using shared pipe pool. */
+	redsocks_client c;
+	splice_pipe request;
+	splice_pipe reply;
+	struct event client_read;
+	struct event client_write;
+	struct event relay_read;
+	struct event relay_write;
+} redsocks_pump;
+
+static inline size_t sizeof_client(redsocks_instance *i)
+{
+	return ((i->config.use_splice) ? sizeof(redsocks_pump) : sizeof(redsocks_client)) + i->relay_ss->payload_len;
+}
+
+static inline void* red_payload(redsocks_client *c)
+{
+	return (c->instance->config.use_splice) ? (void*)(((redsocks_pump*)c) + 1) : (void*)(c + 1);
+}
+
+static inline redsocks_pump* red_pump(redsocks_client *c)
+{
+	assert(c->instance->config.use_splice);
+	return (redsocks_pump*)c;
+}
+
+void redsocks_shutdown(redsocks_client *client, struct bufferevent *buffev, int how);
 void redsocks_drop_client(redsocks_client *client);
 void redsocks_touch_client(redsocks_client *client);
 void redsocks_connect_relay(redsocks_client *client);
 void redsocks_start_relay(redsocks_client *client);
+bool redsocks_has_splice_instance();
 
 typedef int (*size_comparator)(size_t a, size_t b);
 int sizes_equal(size_t a, size_t b);
@@ -93,6 +129,18 @@ int redsocks_write_helper(
 
 #define redsocks_close(fd) redsocks_close_internal((fd), __FILE__, __LINE__, __func__)
 void redsocks_close_internal(int fd, const char* file, int line, const char *func);
+
+#define redsocks_event_add(client, ev) redsocks_event_add_internal((client), (ev), __FILE__, __LINE__, __func__)
+void redsocks_event_add_internal(redsocks_client *client, struct event *ev, const char *file, int line, const char *func);
+
+#define redsocks_event_del(client, ev) redsocks_event_del_internal((client), (ev), __FILE__, __LINE__, __func__)
+void redsocks_event_del_internal(redsocks_client *client, struct event *ev, const char *file, int line, const char *func);
+
+#define redsocks_bufferevent_dropfd(client, ev) redsocks_bufferevent_dropfd_internal((client), (ev), __FILE__, __LINE__, __func__)
+void redsocks_bufferevent_dropfd_internal(redsocks_client *client, struct bufferevent *ev, const char *file, int line, const char *func);
+
+// I have to account descriptiors for accept-backoff, that's why BEV_OPT_CLOSE_ON_FREE is not used.
+void redsocks_bufferevent_free(struct bufferevent *buffev);
 
 #define redsocks_log_error(client, prio, msg...) \
 	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 0, &(client)->clientaddr, &(client)->destaddr, prio, ## msg)

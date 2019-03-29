@@ -67,7 +67,7 @@ static void dnstc_pkt_from_client(int fd, short what, void *_arg)
 	} buf;
 	ssize_t pktlen, outgoing;
 
-	assert(fd == EVENT_FD(&self->listener));
+	assert(fd == event_get_fd(&self->listener));
 	pktlen = red_recv_udp_pkt(fd, buf.raw, sizeof(buf), &clientaddr, NULL);
 	if (pktlen == -1)
 		return;
@@ -201,7 +201,7 @@ static void dnstc_fini_instance(dnstc_instance *instance)
 	if (event_initialized(&instance->listener)) {
 		if (event_del(&instance->listener) != 0)
 			log_errno(LOG_WARNING, "event_del");
-		if (close(EVENT_FD(&instance->listener)) != 0)
+		if (close(event_get_fd(&instance->listener)) != 0)
 			log_errno(LOG_WARNING, "close");
 		memset(&instance->listener, 0, sizeof(instance->listener));
 	}

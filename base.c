@@ -17,8 +17,10 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
+#include <sys/resource.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -61,13 +63,18 @@ typedef struct base_instance_t {
 	bool log_debug;
 	bool log_info;
 	bool daemon;
+#if defined(TCP_KEEPIDLE) && defined(TCP_KEEPCNT) && defined(TCP_KEEPINTVL)
+	uint16_t tcp_keepalive_time;
+	uint16_t tcp_keepalive_probes;
+	uint16_t tcp_keepalive_intvl;
+#endif
+	uint32_t rlimit_nofile;
+	uint32_t redsocks_conn_max;
+	uint32_t connpres_idle_timeout;
+	uint32_t max_accept_backoff_ms;
 } base_instance;
 
-static base_instance instance = {
-	.configured = 0,
-	.log_debug = false,
-	.log_info = false,
-};
+static base_instance instance;
 
 #if defined __FreeBSD__ || defined USE_PF
 static int redir_open_private(const char *fname, int flags)
@@ -240,6 +247,41 @@ int getdestaddr(int fd, const struct sockaddr_in *client, const struct sockaddr_
 	return instance.redirector->getdestaddr(fd, client, bindaddr, destaddr);
 }
 
+int apply_tcp_keepalive(int fd)
+{
+	struct { int level, option, value; } opt[] = {
+		{ SOL_SOCKET, SO_KEEPALIVE, 1 },
+		{ IPPROTO_TCP, TCP_KEEPIDLE, instance.tcp_keepalive_time },
+		{ IPPROTO_TCP, TCP_KEEPCNT, instance.tcp_keepalive_probes },
+		{ IPPROTO_TCP, TCP_KEEPINTVL, instance.tcp_keepalive_intvl },
+	};
+	for (int i = 0; i < SIZEOF_ARRAY(opt); ++i) {
+		if (opt[i].value) {
+			int error = setsockopt(fd, opt[i].level, opt[i].option, &opt[i].value, sizeof(opt[i].value));
+			if (error) {
+				log_errno(LOG_WARNING, "setsockopt(%d, %d, %d, &%d, %zu)", fd, opt[i].level, opt[i].option, opt[i].value, sizeof(opt[i].value));
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
+uint32_t max_accept_backoff_ms()
+{
+	return instance.max_accept_backoff_ms;
+}
+
+uint32_t redsocks_conn_max()
+{
+	return instance.redsocks_conn_max;
+}
+
+uint32_t connpres_idle_timeout()
+{
+	return instance.connpres_idle_timeout;
+}
+
 static redirector_subsys redirector_subsystems[] =
 {
 #ifdef __FreeBSD__
@@ -267,6 +309,15 @@ static parser_entry base_entries[] =
 	{ .key = "log_debug",  .type = pt_bool,    .addr = &instance.log_debug },
 	{ .key = "log_info",   .type = pt_bool,    .addr = &instance.log_info },
 	{ .key = "daemon",     .type = pt_bool,    .addr = &instance.daemon },
+#if defined(TCP_KEEPIDLE) && defined(TCP_KEEPCNT) && defined(TCP_KEEPINTVL)
+	{ .key = "tcp_keepalive_time",   .type = pt_uint16, .addr = &instance.tcp_keepalive_time },
+	{ .key = "tcp_keepalive_probes", .type = pt_uint16, .addr = &instance.tcp_keepalive_probes },
+	{ .key = "tcp_keepalive_intvl",  .type = pt_uint16, .addr = &instance.tcp_keepalive_intvl },
+#endif
+	{ .key = "rlimit_nofile", .type = pt_uint32, .addr = &instance.rlimit_nofile },
+	{ .key = "redsocks_conn_max", .type = pt_uint32, .addr = &instance.redsocks_conn_max },
+	{ .key = "connpres_idle_timeout", .type = pt_uint32, .addr = &instance.connpres_idle_timeout },
+	{ .key = "max_accept_backoff", .type = pt_uint32, .addr = &instance.max_accept_backoff_ms },
 	{ }
 };
 
@@ -277,12 +328,18 @@ static int base_onenter(parser_section *section)
 		return -1;
 	}
 	memset(&instance, 0, sizeof(instance));
+	instance.configured = 1;
+	instance.max_accept_backoff_ms = 60000;
+	instance.connpres_idle_timeout = 7440;
 	return 0;
 }
 
 static int base_onexit(parser_section *section)
 {
-	const char *err = NULL;
+	if (!instance.max_accept_backoff_ms) {
+		parser_error(section->context, "`max_accept_backoff` must be positive, 0 ms is too low");
+		return -1;
+	}
 
 	if (instance.redirector_name) {
 		redirector_subsys *ss;
@@ -293,20 +350,17 @@ static int base_onexit(parser_section *section)
 				break;
 			}
 		}
-		if (!instance.redirector)
-			err = "invalid `redirector` set";
+		if (!instance.redirector) {
+			parser_error(section->context, "invalid `redirector` set <%s>", instance.redirector_name);
+			return -1;
+		}
 	}
 	else {
-		err = "no `redirector` set";
+		parser_error(section->context, "no `redirector` set");
+		return -1;
 	}
 
-	if (err)
-		parser_error(section->context, err);
-
-	if (!err)
-		instance.configured = 1;
-
-	return err ? -1 : 0;
+	return 0;
 }
 
 static parser_section base_conf_section =
@@ -360,6 +414,28 @@ static int base_init()
 			instance.log_info
 	) < 0 ) {
 		goto fail;
+	}
+
+	if (instance.rlimit_nofile) {
+		struct rlimit rlmt;
+		rlmt.rlim_cur = instance.rlimit_nofile;
+		rlmt.rlim_max = instance.rlimit_nofile;
+		if (setrlimit(RLIMIT_NOFILE, &rlmt) != 0) {
+			log_errno(LOG_ERR, "setrlimit(RLIMIT_NOFILE, %u)", instance.rlimit_nofile);
+			goto fail;
+		}
+	} else {
+		struct rlimit rlmt;
+		if (getrlimit(RLIMIT_NOFILE, &rlmt) != 0) {
+			log_errno(LOG_ERR, "getrlimit(RLIMIT_NOFILE)");
+			goto fail;
+		}
+		instance.rlimit_nofile = rlmt.rlim_cur;
+	}
+
+	if (!instance.redsocks_conn_max) {
+		instance.redsocks_conn_max = (instance.rlimit_nofile - instance.rlimit_nofile / 4)
+			/ (redsocks_has_splice_instance() ? 6 : 2);
 	}
 
 	if (instance.daemon) {

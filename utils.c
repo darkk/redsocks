@@ -23,6 +23,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "log.h"
+#include "base.h"
 #include "utils.h"
 #include "redsocks.h" // for redsocks_close
 #include "libc-compat.h"
@@ -90,12 +91,27 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
 	return pktlen;
 }
 
+uint32_t red_randui32()
+{
+	uint32_t ret;
+	evutil_secure_rng_get_bytes(&ret, sizeof(ret));
+	return ret;
+}
+
 time_t redsocks_time(time_t *t)
 {
 	time_t retval;
 	retval = time(t);
 	if (retval == ((time_t) -1))
 		log_errno(LOG_WARNING, "time");
+	return retval;
+}
+
+int redsocks_gettimeofday(struct timeval *tv)
+{
+	int retval = gettimeofday(tv, NULL);
+	if (retval != 0)
+		log_errno(LOG_WARNING, "gettimeofday");
 	return retval;
 }
 
@@ -111,7 +127,6 @@ char *redsocks_evbuffer_readline(struct evbuffer *buf)
 struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb writecb, everrorcb errorcb, void *cbarg)
 {
 	struct bufferevent *retval = NULL;
-	int on = 1;
 	int relay_fd = -1;
 	int error;
 
@@ -127,11 +142,8 @@ struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb write
 		goto fail;
 	}
 
-	error = setsockopt(relay_fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
-	if (error) {
-		log_errno(LOG_WARNING, "setsockopt");
+	if (apply_tcp_keepalive(relay_fd))
 		goto fail;
-	}
 
 	error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
 	if (error && errno != EINPROGRESS) {
@@ -145,6 +157,8 @@ struct bufferevent* red_connect_relay(struct sockaddr_in *addr, evbuffercb write
 		goto fail;
 	}
 
+	relay_fd = -1;
+
 	error = bufferevent_enable(retval, EV_WRITE); // we wait for connection...
 	if (error) {
 		log_errno(LOG_ERR, "bufferevent_enable");
@@ -157,7 +171,7 @@ fail:
 	if (relay_fd != -1)
 		redsocks_close(relay_fd);
 	if (retval)
-		bufferevent_free(retval);
+		redsocks_bufferevent_free(retval);
 	return NULL;
 }
 
@@ -167,9 +181,9 @@ int red_socket_geterrno(struct bufferevent *buffev)
 	int pseudo_errno;
 	socklen_t optlen = sizeof(pseudo_errno);
 
-	assert(EVENT_FD(&buffev->ev_read) == EVENT_FD(&buffev->ev_write));
+	assert(event_get_fd(&buffev->ev_read) == event_get_fd(&buffev->ev_write));
 
-	error = getsockopt(EVENT_FD(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
+	error = getsockopt(event_get_fd(&buffev->ev_read), SOL_SOCKET, SO_ERROR, &pseudo_errno, &optlen);
 	if (error) {
 		log_errno(LOG_ERR, "getsockopt");
 		return -1;
@@ -221,7 +235,7 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
 	uint16_t port;
 	const char placeholder[] = "???:???";
 
-	assert(buffer_size >= sizeof(placeholder));
+	assert(buffer_size >= RED_INET_ADDRSTRLEN);
 
 	memset(buffer, 0, buffer_size);
 	if (sa->sin_family == AF_INET) {

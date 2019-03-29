@@ -1,17 +1,26 @@
+-include make.conf
 OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o gen/version.o
+ifeq ($(DBG_BUILD),1)
+OBJS += debug.o
+endif
 SRCS := $(OBJS:.o=.c)
 CONF := config.h
 DEPS := .depend
 OUT := redsocks
-VERSION := 0.4
+VERSION := 0.5
 
-LIBS := -levent
+LIBS := -levent_core
+ifeq ($(DBG_BUILD),1)
+# -levent_extra is required only for `http` and `debug`
+LIBS += -levent_extra
+endif
 CFLAGS += -g -O2
-override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
+# _GNU_SOURCE is used to get splice(2), it also implies _BSD_SOURCE
+override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_DEFAULT_SOURCE -D_GNU_SOURCE -Wall
 
 all: $(OUT)
 
-.PHONY: all clean distclean
+.PHONY: all clean distclean test
 
 tags: *.c *.h
 	ctags -R
@@ -29,6 +38,9 @@ $(CONF):
 		echo "/* Unknown system, only generic firewall code is compiled */" >$(CONF) \
 		;; \
 	esac
+ifeq ($(DBG_BUILD),1)
+	echo "#define DBG_BUILD 1" >>$(CONF)
+endif
 
 # Dependency on .git is useful to rebuild `version.c' after commit, but it breaks non-git builds.
 gen/version.c: *.c *.h gen/.build
@@ -39,7 +51,7 @@ gen/version.c: *.c *.h gen/.build
 	if [ -d .git ]; then \
 		echo '"redsocks.git/'`git describe --tags`'"'; \
 		if [ `git status --porcelain | grep -v -c '^??'` != 0 ]; then \
-			echo '"-unclean"'; \
+			echo '"'"-unclean-$$(date --rfc-3339=seconds | tr ' ' 'T')-$${USER}@$$(uname -n)"'"'; \
 		fi \
 	else \
 		echo '"redsocks/$(VERSION)"'; \
@@ -87,3 +99,13 @@ clean:
 distclean: clean
 	$(RM) tags $(DEPS)
 	$(RM) -r gen
+
+tests/__build-tstamp__: $(OUT) tests/[a-z]* tests/[a-z]*/*
+	cd tests && ./build
+	touch $@
+
+tests/prlimit-nofile: tests/prlimit-nofile.c
+	$(CC) $(CFLAGS) -o $@ $^
+
+test: tests/__build-tstamp__ tests/prlimit-nofile
+	cd tests && env $(TEST_ENV) ./run

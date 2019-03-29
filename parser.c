@@ -38,7 +38,6 @@ struct parser_context_t {
 	parser_section *sections;
 	int line;
 	int error;
-	parser_errhandler errhandler;
 	struct {
 		size_t size;
 		size_t filled;
@@ -47,22 +46,33 @@ struct parser_context_t {
 };
 
 
-void parser_error(parser_context *context, const char *msg)
+void parser_error(parser_context *context, const char *fmt, ...)
 {
-	context->error = 1;
-	if (context->errhandler)
-		context->errhandler(msg, context->line);
+	va_list ap;
+	struct evbuffer *buff = evbuffer_new();
+	const char *msg;
+
+	va_start(ap, fmt);
+	if (buff) {
+		evbuffer_add_vprintf(buff, fmt, ap);
+		msg = (const char*)evbuffer_pullup(buff, -1);
+	}
 	else
-		fprintf(stderr, "file parsing error at line %u: %s\n", context->line, msg);
+		msg = error_lowmem;
+	va_end(ap);
+
+	context->error = 1;
+	fprintf(stderr, "file parsing error at line %u: %s\n", context->line, msg);
+	if (buff)
+		evbuffer_free(buff);
 }
 
-parser_context* parser_start(FILE *fd, parser_errhandler errhandler)
+parser_context* parser_start(FILE *fd)
 {
 	parser_context *ret = calloc(1, sizeof(parser_context));
 	if (!ret)
 		return NULL;
 	ret->fd = fd;
-	ret->errhandler = errhandler;
 	ret->buffer.size = 128; // should be big enough to fetch whole ``line``
 	ret->buffer.data = malloc(ret->buffer.size);
 	if (!ret->buffer.data) {
@@ -260,6 +270,44 @@ static int vp_pbool(parser_context *context, void *addr, const char *token)
 	return -1;
 }
 
+static int vp_disclose_src(parser_context *context, void *addr, const char *token)
+{
+	enum disclose_src_e *dst = addr;
+	struct { char *name; enum disclose_src_e value; } opt[] = {
+		{ "off", DISCLOSE_NONE },
+		{ "no", DISCLOSE_NONE },
+		{ "false", DISCLOSE_NONE },
+		{ "X-Forwarded-For", DISCLOSE_X_FORWARDED_FOR },
+		{ "Forwarded_ip", DISCLOSE_FORWARDED_IP },
+		{ "Forwarded_ipport", DISCLOSE_FORWARDED_IPPORT },
+	};
+	for (int i = 0; i < SIZEOF_ARRAY(opt); ++i) {
+		if (strcmp(token, opt[i].name) == 0) {
+			*dst = opt[i].value;
+			return 0;
+		}
+	}
+	parser_error(context, "disclose_src <%s> is not parsed", token);
+	return -1;
+}
+
+static int vp_on_proxy_fail(parser_context *context, void *addr, const char *token)
+{
+	enum on_proxy_fail_e *dst = addr;
+	struct { char *name; enum on_proxy_fail_e value; } opt[] = {
+		{ "close", ONFAIL_CLOSE },
+		{ "forward_http_err", ONFAIL_FORWARD_HTTP_ERR },
+	};
+	for (int i = 0; i < SIZEOF_ARRAY(opt); ++i) {
+		if (strcmp(token, opt[i].name) == 0) {
+			*dst = opt[i].value;
+			return 0;
+		}
+	}
+	parser_error(context, "on_proxy_fail <%s> is not parsed", token);
+	return -1;
+}
+
 static int vp_pchar(parser_context *context, void *addr, const char *token)
 {
 	char *p = strdup(token);
@@ -287,6 +335,18 @@ static int vp_uint16(parser_context *context, void *addr, const char *token)
 	return 0;
 }
 
+static int vp_uint32(parser_context *context, void *addr, const char *token)
+{
+	char *end;
+	uint32_t uli = strtoul(token, &end, 0);
+	if (*end != '\0') {
+		parser_error(context, "integer is not parsed");
+		return -1;
+	}
+	*(uint32_t*)addr = uli;
+	return 0;
+}
+
 static int vp_in_addr(parser_context *context, void *addr, const char *token)
 {
 	struct in_addr ia;
@@ -309,7 +369,7 @@ static int vp_in_addr(parser_context *context, void *addr, const char *token)
 			struct sockaddr_in *resolved_addr;
 			for (iter = ainfo, count = 0; iter; iter = iter->ai_next, ++count)
 				;
-			taken = rand() % count;
+			taken = red_randui32() % count;
 			for (iter = ainfo; taken > 0; iter = iter->ai_next, --taken)
 				;
 			resolved_addr = (struct sockaddr_in*)iter->ai_addr;
@@ -322,9 +382,9 @@ static int vp_in_addr(parser_context *context, void *addr, const char *token)
 		}
 		else {
 			if (err == EAI_SYSTEM)
-				parser_error(context, strerror(errno));
+				parser_error(context, "unable to resolve %s, error %d (%s)", token, errno, strerror(errno));
 			else
-				parser_error(context, gai_strerror(err));
+				parser_error(context, "unable to resolve %s, getaddrinfo error %d (%s)", token, err, gai_strerror(err));
 			return -1;
 		}
 	}
@@ -382,13 +442,30 @@ static int vp_in_addr2(parser_context *context, void *addr, const char *token)
 	return retval;
 }
 
+static int vp_obsolete(parser_context *context, void *addr, const char *token)
+{
+	parser_error(context, "obsolete key, delete it");
+	return -1;
+}
+
+static int vp_redsocks_max_accept_backoff(parser_context *context, void *addr, const char *token)
+{
+	parser_error(context, "max_accept_backoff is not per-port setting anymore, move it from `redsocks` to `base`");
+	return -1;
+}
+
 static value_parser value_parser_by_type[] =
 {
 	[pt_bool] = vp_pbool,
 	[pt_pchar] = vp_pchar,
 	[pt_uint16] = vp_uint16,
+	[pt_uint32] = vp_uint32,
 	[pt_in_addr] = vp_in_addr,
 	[pt_in_addr2] = vp_in_addr2,
+	[pt_disclose_src] = vp_disclose_src,
+	[pt_on_proxy_fail] = vp_on_proxy_fail,
+	[pt_obsolete] = vp_obsolete,
+	[pt_redsocks_max_accept_backoff] = vp_redsocks_max_accept_backoff,
 };
 
 int parser_run(parser_context *context)
@@ -489,7 +566,7 @@ int parser_run(parser_context *context)
 								parser_error(context, "section->onenter failed");
 					}
 					else {
-						parser_error(context, "unknown section");
+						parser_error(context, "unknown section <%s>", section_token);
 					}
 					FREE(section_token);
 				}
@@ -521,19 +598,19 @@ int parser_run(parser_context *context)
 					parser_error(context, "assignment termination outside of any section");
 				}
 				else if (key_token && !value_token) {
-					parser_error(context, "assignment has only key but no value");
+					parser_error(context, "assignment has only key <%s> but no value", key_token);
 				}
 				else if (key_token && value_token) {
 					parser_entry *e;
 					for (e = section->entries; e->key; e++)
 						if (strcmp(e->key, key_token) == 0)
 							break;
-					if (e) {
+					if (e->key) {
 						if ( (value_parser_by_type[e->type])(context, e->addr, value_token) == -1 )
-							parser_error(context, "value can't be parsed");
+							parser_error(context, "value <%s> can't be parsed for key <%s>", value_token, key_token);
 					}
 					else {
-						parser_error(context, "assignment with unknown key");
+						parser_error(context, "assignment with unknown key <%s>", key_token);
 					}
 				}
 				else {
@@ -556,7 +633,8 @@ int parser_run(parser_context *context)
 					token = 0;
 				}
 				else {
-					parser_error(context, "invalid token order");
+					parser_error(context, "invalid token order: key_token=%s, value_token=%s, next token=%s",
+					             key_token, value_token, token);
 				}
 			}
 			free(token);

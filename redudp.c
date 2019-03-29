@@ -214,21 +214,16 @@ static struct evbuffer* socks5_mkassociate(void *p)
  */
 static void redudp_drop_client(redudp_client *client)
 {
-	int fd;
 	redudp_log_error(client, LOG_INFO, "Dropping...");
 	enqueued_packet *q, *tmp;
 	if (event_initialized(&client->timeout)) {
 		if (event_del(&client->timeout) == -1)
 			redudp_log_errno(client, LOG_ERR, "event_del");
 	}
-	if (client->relay) {
-		fd = EVENT_FD(&client->relay->ev_read);
-		bufferevent_free(client->relay);
-		shutdown(fd, SHUT_RDWR);
-		redsocks_close(fd);
-	}
+	if (client->relay)
+		redsocks_bufferevent_free(client->relay);
 	if (event_initialized(&client->udprelay)) {
-		fd = EVENT_FD(&client->udprelay);
+		int fd = event_get_fd(&client->udprelay);
 		if (event_del(&client->udprelay) == -1)
 			redudp_log_errno(client, LOG_ERR, "event_del");
 		redsocks_close(fd);
@@ -275,7 +270,7 @@ static void redudp_forward_pkt(redudp_client *client, char *buf, size_t pktlen)
 	io[1].iov_base = buf;
 	io[1].iov_len = pktlen;
 
-	outgoing = sendmsg(EVENT_FD(&client->udprelay), &msg, 0);
+	outgoing = sendmsg(event_get_fd(&client->udprelay), &msg, 0);
 	if (outgoing == -1) {
 		redudp_log_errno(client, LOG_WARNING, "sendmsg: Can't forward packet, dropping it");
 		return;
@@ -565,7 +560,7 @@ static void redudp_pkt_from_socks(int fd, short what, void *_arg)
 	ssize_t pktlen, fwdlen, outgoing;
 	struct sockaddr_in udprelayaddr;
 
-	assert(fd == EVENT_FD(&client->udprelay));
+	assert(fd == event_get_fd(&client->udprelay));
 
 	pktlen = red_recv_udp_pkt(fd, pkt.buf, sizeof(pkt.buf), &udprelayaddr, NULL);
 	if (pktlen == -1)
@@ -619,7 +614,7 @@ static void redudp_pkt_from_socks(int fd, short what, void *_arg)
 	fwdlen = pktlen - sizeof(pkt.header);
 	outgoing = sendto(do_tproxy(client->instance)
 	                      ? client->sender_fd
-	                      : EVENT_FD(&client->instance->listener),
+	                      : event_get_fd(&client->instance->listener),
 	                  pkt.buf + sizeof(pkt.header), fwdlen, 0,
 	                  (struct sockaddr*)&client->clientaddr, sizeof(client->clientaddr));
 	if (outgoing != fwdlen) {
@@ -639,7 +634,7 @@ static void redudp_pkt_from_client(int fd, short what, void *_arg)
 
 	pdestaddr = do_tproxy(self) ? &destaddr : NULL;
 
-	assert(fd == EVENT_FD(&self->listener));
+	assert(fd == event_get_fd(&self->listener));
 	pktlen = red_recv_udp_pkt(fd, buf, sizeof(buf), &clientaddr, pdestaddr);
 	if (pktlen == -1)
 		return;
@@ -832,7 +827,7 @@ static void redudp_fini_instance(redudp_instance *instance)
 	if (event_initialized(&instance->listener)) {
 		if (event_del(&instance->listener) != 0)
 			log_errno(LOG_WARNING, "event_del");
-		redsocks_close(EVENT_FD(&instance->listener));
+		redsocks_close(event_get_fd(&instance->listener));
 		memset(&instance->listener, 0, sizeof(instance->listener));
 	}
 
