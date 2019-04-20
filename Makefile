@@ -97,11 +97,11 @@ gen/version.c: *.c *.h gen/.build
 			echo '"-unclean"'; \
 		fi; \
 		echo '"\\n"'; \
-		echo '"Features: $(FEATURES)"' \
+		echo '"Features: $(FEATURES)"'; \
 	else \
 		echo '"redsocks/$(VERSION) $(CRYPTO)"'; \
 		echo '"\\n"'; \
-		echo '"Features: $(FEATURES)"' \
+		echo '"Features: $(FEATURES)"'; \
 	fi >> $@.tmp
 	echo ';' >> $@.tmp
 	mv -f $@.tmp $@
