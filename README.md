@@ -53,7 +53,7 @@ hacks. The author has no permanent root access to machines running OpenBSD,
 FreeBSD and MacOSX to test and develop for these platforms.
 
 [Transocks](http://transocks.sourceforge.net/) is alike project but it has
-noticable performance penality.
+noticeable performance penality.
 
 [Transsocks_ev](http://oss.tiggerswelt.net/transocks_ev/)
 is alike project too, but it has no HTTPS-proxy support
