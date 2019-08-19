@@ -221,12 +221,16 @@ luser$ sg socksified -c id
 uid=1000(luser) gid=1001(socksified) groups=1000(luser),1001(socksified)
 luser$ sg socksified -c "firefox"
 
-# If you want to configure socksifying router, you should look at
+# If you want to configure a socksifying router, you should look at
 # doc/iptables-packet-flow.png, doc/iptables-packet-flow-ng.png and
 # https://en.wikipedia.org/wiki/File:Netfilter-packet-flow.svg
-# Note, you should have proper `local_ip' value to get external packets with
-# redsocks, default 127.0.0.1 will not go. See iptables(8) manpage regarding
-# REDIRECT target for details.
+#
+# Note, you should configure redsocks to listen on the primary IP address 
+# of the incoming interface, i.e. properly configure `local_ip' value to get external packets with
+# redsocks, as the default 127.0.0.1 will not get redirected packets. 
+# See iptables-extension(8) manpage regarding REDIRECT target for details
+# or http://ipset.netfilter.org/iptables-extensions.man.html#lbDM
+#
 # Depending on your network configuration iptables conf. may be as easy as:
 root# iptables -t nat -A PREROUTING --in-interface eth_int -p tcp -j REDSOCKS
 ```
