@@ -231,6 +231,42 @@ luser$ sg socksified -c "firefox"
 root# iptables -t nat -A PREROUTING --in-interface eth_int -p tcp -j REDSOCKS
 ```
 
+## nftables example
+
+https://wiki.nftables.org/ - more modern replacemnt for iptables
+
+```
+# required to do redirects
+modprobe nft_redir
+
+nft -f - <<EOF
+table ip nat {
+	chain REDSOCKS {
+		# hook to the output
+		type nat hook output priority 0; policy accept;
+
+		# skip if the user is not uid 1000
+		ip protocol tcp skuid != 1000 return
+
+		# skip for local ip ranges
+		ip daddr 0.0.0.0/8      return
+		ip daddr 10.0.0.0/8     return
+		ip daddr 100.64.0.0/10  return
+		ip daddr 127.0.0.0/8    return
+		ip daddr 169.254.0.0/16 return
+		ip daddr 172.16.0.0/12  return
+		ip daddr 192.168.0.0/16 return
+		ip daddr 198.18.0.0/15  return
+		ip daddr 224.0.0.0/4    return
+		ip daddr 240.0.0.0/4    return
+
+		# everything else tcp = redirect to redsocks
+		ip protocol tcp redirect to 12345
+	}
+}
+EOF
+```
+
 ### Note about GID-based redirection
 
 Keep in mind, that changed GID affects filesystem permissions, so if your
