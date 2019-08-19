@@ -46,12 +46,6 @@ static void dnsu2t_pkt_from_relay(int fd, short what, void *_arg);
 static void dnsu2t_relay_writable(int fd, short what, void *_arg);
 static void dnsu2t_close_relay(dnsu2t_instance *self);
 
-// this DNS query (IN SOA for `.`) acts as in-band DNS ping
-static const uint8_t dnsq_soa_root[] = {
-	0x00, 0x00, 0x01, 0x20,
-	0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x06, 0x00, 0x01};
-
 typedef struct inflight_req_t {
 	uint16_t id; // in network byte order
 	struct sockaddr_in clientaddr;
