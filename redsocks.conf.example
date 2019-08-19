@@ -30,12 +30,12 @@ base {
 	// chroot = "/var/chroot";
 
 	/* possible `redirector' values are:
-	 *   iptables   - for Linux
+	 *   netfilter  - for Linux
 	 *   ipf        - for FreeBSD
 	 *   pf         - for OpenBSD
 	 *   generic    - some generic redirector that MAY work
 	 */
-	redirector = iptables;
+	redirector = netfilter;
 
 	/* Override per-socket values for TCP_KEEPIDLE, TCP_KEEPCNT,
 	 * and TCP_KEEPINTVL. see man 7 tcp for details.

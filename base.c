@@ -28,7 +28,7 @@
 #include <grp.h>
 #include <stdlib.h>
 #include "config.h"
-#if defined USE_IPTABLES
+#if defined USE_NETFILTER
 # include <limits.h>
 # include <linux/netfilter_ipv4.h>
 #endif
@@ -214,8 +214,8 @@ fail:
 }
 #endif
 
-#ifdef USE_IPTABLES
-static int getdestaddr_iptables(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
+#ifdef USE_NETFILTER
+static int getdestaddr_netfilter(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
 {
 	socklen_t socklen = sizeof(*destaddr);
 	int error;
@@ -290,8 +290,9 @@ static redirector_subsys redirector_subsystems[] =
 #ifdef USE_PF
 	{ .name = "pf",  .init = redir_init_pf,  .fini = redir_close_private, .getdestaddr = getdestaddr_pf },
 #endif
-#ifdef USE_IPTABLES
-	{ .name = "iptables", .getdestaddr = getdestaddr_iptables },
+#ifdef USE_NETFILTER
+	{ .name = "netfilter", .getdestaddr = getdestaddr_netfilter },
+	{ .name = "iptables", .getdestaddr = getdestaddr_netfilter },
 #endif
 	{ .name = "generic",  .getdestaddr = getdestaddr_generic  },
 };

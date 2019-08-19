@@ -28,7 +28,7 @@ tags: *.c *.h
 $(CONF):
 	@case `uname` in \
 	Linux*) \
-		echo "#define USE_IPTABLES" >$(CONF) \
+		echo "#define USE_NETFILTER" >$(CONF) \
 		;; \
 	OpenBSD) \
 		echo "#define USE_PF" >$(CONF) \
