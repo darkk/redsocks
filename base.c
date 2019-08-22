@@ -251,9 +251,11 @@ int apply_tcp_keepalive(int fd)
 {
 	struct { int level, option, value; } opt[] = {
 		{ SOL_SOCKET, SO_KEEPALIVE, 1 },
+#if defined(TCP_KEEPIDLE) && defined(TCP_KEEPCNT) && defined(TCP_KEEPINTVL)
 		{ IPPROTO_TCP, TCP_KEEPIDLE, instance.tcp_keepalive_time },
 		{ IPPROTO_TCP, TCP_KEEPCNT, instance.tcp_keepalive_probes },
 		{ IPPROTO_TCP, TCP_KEEPINTVL, instance.tcp_keepalive_intvl },
+#endif
 	};
 	for (int i = 0; i < SIZEOF_ARRAY(opt); ++i) {
 		if (opt[i].value) {
