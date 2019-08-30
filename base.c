@@ -468,6 +468,11 @@ static int base_init()
 	}
 
 	if (instance.user) {
+		 /* This executable is calling setuid and setgid without setgroups or initgroups.
+		 *  There is a high probability this mean it didn't relinquish all groups, and
+		 *  this would be a potential security issue to be fixed. Seek POS36-C on the web
+		 *  for details about the problem. */
+		setgroups(0, NULL);
 		if (setuid(uid) < 0) {
 			log_errno(LOG_ERR, "setuid(%i)", uid);
 			goto fail;
