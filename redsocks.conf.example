@@ -106,6 +106,10 @@ redsocks {
 	//  X-Forwarded-For  -- X-Forwarded-For: IP
 	//  Forwarded_ip     -- Forwarded: for=IP # see RFC7239
 	//  Forwarded_ipport -- Forwarded: for="IP:port" # see RFC7239
+	// socks4 supports:
+	//  username_append_ip     -- login@IP
+	//  username_append_ipport -- login@IP:port
+	//
 	// disclose_src = false;
 
 	// various ways to handle proxy failure
