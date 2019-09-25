@@ -65,8 +65,14 @@ static int direct_connect_relay(redsocks_client *client)
     struct timeval tv = {client->instance->config.timeout, 0};
 
     // Allowing binding relay socket to specified IP for outgoing connections
-    client->relay = red_connect_relay(interface, &client->destaddr, NULL,
-                         redsocks_relay_connected, redsocks_event_error, client, &tv);
+    client->relay = red_connect_relay(
+            interface,
+            (struct sockaddr *)&client->destaddr,
+            NULL,
+            redsocks_relay_connected,
+            redsocks_event_error,
+            client,
+            &tv);
     if (!client->relay)
     {
         redsocks_log_errno(client, LOG_ERR, "red_connect_relay");

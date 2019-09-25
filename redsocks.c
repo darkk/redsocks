@@ -82,8 +82,7 @@ static parser_entry redsocks_entries[] =
     { .key = "local_ip",   .type = pt_in_addr },
     { .key = "local_port", .type = pt_uint16 },
     { .key = "interface",  .type = pt_pchar },
-    { .key = "ip",         .type = pt_in_addr },
-    { .key = "port",       .type = pt_uint16 },
+    { .key = "relay",      .type = pt_pchar },
     { .key = "type",       .type = pt_pchar },
     { .key = "login",      .type = pt_pchar },
     { .key = "password",   .type = pt_pchar },
@@ -156,8 +155,6 @@ static int redsocks_onenter(parser_section *section)
     INIT_LIST_HEAD(&instance->clients);
     instance->config.bindaddr.sin_family = AF_INET;
     instance->config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    instance->config.relayaddr.sin_family = AF_INET;
-    instance->config.relayaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     /* Default value can be checked in run-time, but I doubt anyone needs that.
      * Linux:   sysctl net.core.somaxconn
      * FreeBSD: sysctl kern.ipc.somaxconn */
@@ -172,8 +169,7 @@ static int redsocks_onenter(parser_section *section)
             (strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
             (strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
             (strcmp(entry->key, "interface") == 0)  ? (void*)&instance->config.interface :
-            (strcmp(entry->key, "ip") == 0)         ? (void*)&instance->config.relayaddr.sin_addr :
-            (strcmp(entry->key, "port") == 0)       ? (void*)&instance->config.relayaddr.sin_port :
+            (strcmp(entry->key, "relay") == 0)      ? (void*)&instance->config.relay :
             (strcmp(entry->key, "type") == 0)       ? (void*)&instance->config.type :
             (strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
             (strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
@@ -200,10 +196,17 @@ static int redsocks_onexit(parser_section *section)
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
         entry->addr = NULL;
 
-    instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);
-    instance->config.relayaddr.sin_port = htons(instance->config.relayaddr.sin_port);
+    // Parse and update relay address
+    struct sockaddr * addr = (struct sockaddr *)&instance->config.relayaddr;
+    int addr_size = sizeof(instance->config.relayaddr);
+    if (instance->config.relay) {
+        if (evutil_parse_sockaddr_port(instance->config.relay, addr, &addr_size))
+             err = "invalid relay address";
+    }
 
-    if (instance->config.type) {
+    instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);
+
+    if (!err && instance->config.type) {
         relay_subsys **ss;
         FOREACH(ss, relay_subsystems) {
             if (!strcmp((*ss)->name, instance->config.type)) {
@@ -278,8 +281,8 @@ void redsocks_touch_client(redsocks_client *client)
 
 static inline const char* bufname(redsocks_client *client, struct bufferevent *buf)
 {
-	assert(buf == client->client || buf == client->relay);
-	return buf == client->client ? "client" : "relay";
+    assert(buf == client->client || buf == client->relay);
+    return buf == client->client ? "client" : "relay";
 }
 
 static void redsocks_relay_readcb(redsocks_client *client, struct bufferevent *from, struct bufferevent *to)
@@ -677,7 +680,8 @@ int redsocks_connect_relay(redsocks_client *client)
     tv.tv_usec = 0;
 
     // Allowing binding relay socket to specified IP for outgoing connections
-    client->relay = red_connect_relay(interface, &client->instance->config.relayaddr,
+    client->relay = red_connect_relay(interface,
+                                      (struct sockaddr *)&client->instance->config.relayaddr,
                                       NULL,
                                       redsocks_relay_connected,
                                       redsocks_event_error, client, &tv);

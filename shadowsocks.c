@@ -352,9 +352,16 @@ static int ss_connect_relay(redsocks_client *client)
 
     tv.tv_sec = client->instance->config.timeout;
     tv.tv_usec = 0;
-    client->relay = red_connect_relay_tfo(interface, &client->instance->config.relayaddr,
-                    NULL, ss_relay_connected, redsocks_event_error, client, 
-                    &tv, &buff[0], &sz);
+    client->relay = red_connect_relay_tfo(
+            interface,
+            (struct sockaddr *)&client->instance->config.relayaddr,
+            NULL,
+            ss_relay_connected,
+            redsocks_event_error,
+            client,
+            &tv,
+            &buff[0],
+            &sz);
 
     if (!client->relay) {
         redsocks_drop_client(client);

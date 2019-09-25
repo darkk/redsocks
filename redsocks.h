@@ -30,7 +30,8 @@ typedef struct relay_subsys_t {
 
 typedef struct redsocks_config_t {
 	struct sockaddr_in bindaddr;
-	struct sockaddr_in relayaddr;
+	struct sockaddr_storage relayaddr;
+	char *relay;
 	char *type;
 	char *login;
 	char *password;

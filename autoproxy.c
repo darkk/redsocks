@@ -708,9 +708,14 @@ static int auto_connect_relay(redsocks_client *client)
             aclient->quick_check = 1;
         }
         /* connect to target directly without going through proxy */    
-        client->relay = red_connect_relay(config->interface, &client->destaddr,
-                        NULL, auto_relay_connected, auto_event_error, client, 
-                        &tv);
+        client->relay = red_connect_relay(
+                config->interface,
+                (struct sockaddr *)&client->destaddr,
+                NULL,
+                auto_relay_connected,
+                auto_event_error,
+                client,
+                &tv);
         if (!client->relay) {
             // Failed to connect to destination directly, try again via proxy.
             return auto_retry(client, 0);

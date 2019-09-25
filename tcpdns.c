@@ -319,7 +319,7 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
             return;
         }
         /* connect to target directly without going through proxy */
-        req->resolver = red_connect_relay(NULL, destaddr,
+        req->resolver = red_connect_relay(NULL, (struct sockaddr *)destaddr,
                         tcpdns_readcb, tcpdns_connected, tcpdns_event_error, req, 
                         &tv);
         if (req->resolver) 

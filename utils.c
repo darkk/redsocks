@@ -110,6 +110,7 @@ time_t redsocks_time(time_t *t)
 }
 
 struct bufferevent* red_prepare_relay(const char *ifname,
+                                int sa_family, 
                                 bufferevent_data_cb readcb,
                                 bufferevent_data_cb writecb,
                                 bufferevent_event_cb errorcb,
@@ -119,7 +120,7 @@ struct bufferevent* red_prepare_relay(const char *ifname,
     int relay_fd = -1;
     int error;
 
-    relay_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    relay_fd = socket(sa_family, SOCK_STREAM, IPPROTO_TCP);
     if (relay_fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;
@@ -172,7 +173,7 @@ fail:
 }
 
 struct bufferevent* red_connect_relay(const char *ifname,
-                                    struct sockaddr_in *addr,
+                                    struct sockaddr *addr,
                                     bufferevent_data_cb readcb,
                                     bufferevent_data_cb writecb,
                                     bufferevent_event_cb errorcb,
@@ -183,15 +184,15 @@ struct bufferevent* red_connect_relay(const char *ifname,
     int relay_fd = -1;
     int error;
 
-    retval = red_prepare_relay(ifname, readcb, writecb, errorcb, cbarg);
+    retval = red_prepare_relay(ifname, addr->sa_family, readcb, writecb, errorcb, cbarg);
     if (retval) {
         relay_fd = bufferevent_getfd(retval);
         if (timeout_write)
             bufferevent_set_timeouts(retval, NULL, timeout_write);
 
-        //  error = bufferevent_socket_connect(retval, (struct sockaddr*)addr, sizeof(*addr));
+        //  error = bufferevent_socket_connect(retval, addr, sizeof(*addr));
         //  if (error) {
-        error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+        error = connect(relay_fd, addr, sizeof(struct sockaddr_storage));
         if (error && errno != EINPROGRESS) {
             log_errno(LOG_NOTICE, "connect");
             goto fail;
@@ -211,7 +212,7 @@ fail:
 
 #if defined(ENABLE_HTTPS_PROXY)
 struct bufferevent* red_connect_relay_ssl(const char *ifname,
-                                    struct sockaddr_in *addr,
+                                    struct sockaddr *addr,
                                     SSL * ssl,
                                     bufferevent_data_cb readcb,
                                     bufferevent_data_cb writecb,
@@ -224,14 +225,14 @@ struct bufferevent* red_connect_relay_ssl(const char *ifname,
     int relay_fd = -1;
     int error;
 
-    underlying = red_prepare_relay(ifname, NULL, NULL, NULL, NULL);
+    underlying = red_prepare_relay(ifname, addr->sa_family, NULL, NULL, NULL, NULL);
     if (!underlying)
         goto fail;
     relay_fd = bufferevent_getfd(underlying);
     if (timeout_write)
         bufferevent_set_timeouts(underlying, NULL, timeout_write);
 
-    error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+    error = connect(relay_fd, addr, sizeof(struct sockaddr_storage));
     if (error && errno != EINPROGRESS) {
         log_errno(LOG_NOTICE, "connect");
         goto fail;
@@ -274,7 +275,7 @@ fail:
 #endif
 
 struct bufferevent* red_connect_relay_tfo(const char *ifname,
-                                    struct sockaddr_in *addr,
+                                    struct sockaddr *addr,
                                     bufferevent_data_cb readcb,
                                     bufferevent_data_cb writecb,
                                     bufferevent_event_cb errorcb,
@@ -287,7 +288,7 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
     int relay_fd = -1;
     int error;
 
-    retval = red_prepare_relay(ifname, readcb, writecb, errorcb, cbarg);
+    retval = red_prepare_relay(ifname, addr->sa_family, readcb, writecb, errorcb, cbarg);
     if (retval) {
         relay_fd = bufferevent_getfd(retval);
         if (timeout_write)
@@ -295,7 +296,7 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
 
 #ifdef MSG_FASTOPEN
         size_t s = sendto(relay_fd, data, * len, MSG_FASTOPEN,
-                (struct sockaddr *)addr, sizeof(*addr)
+                addr, sizeof(struct sockaddr_storage)
                 );
         *len = 0; // Assume nothing sent, caller needs to write data again when connection is setup.
         if (s == -1) {
@@ -323,7 +324,7 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
 fallback:
 #endif
 
-        error = connect(relay_fd, (struct sockaddr*)addr, sizeof(*addr));
+        error = connect(relay_fd, addr, sizeof(struct sockaddr_storage));
         if (error && errno != EINPROGRESS) {
             log_errno(LOG_NOTICE, "connect");
             goto fail;

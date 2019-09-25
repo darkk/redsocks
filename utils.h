@@ -58,12 +58,13 @@ uint32_t red_randui32();
 time_t redsocks_time(time_t *t);
 char *redsocks_evbuffer_readline(struct evbuffer *buf);
 struct bufferevent* red_prepare_relay(const char *ifname,
+                                int sa_family,
                                 bufferevent_data_cb readcb,
                                 bufferevent_data_cb writecb,
                                 bufferevent_event_cb errorcb,
                                 void *cbarg);
 struct bufferevent* red_connect_relay(const char *ifname,
-                                struct sockaddr_in *addr,
+                                struct sockaddr *addr,
                                 bufferevent_data_cb readcb,
                                 bufferevent_data_cb writecb,
                                 bufferevent_event_cb errorcb,
@@ -71,7 +72,7 @@ struct bufferevent* red_connect_relay(const char *ifname,
                                 const struct timeval *timeout_write);
 #if defined(ENABLE_HTTPS_PROXY)
 struct bufferevent* red_connect_relay_ssl(const char *ifname,
-                                struct sockaddr_in *addr,
+                                struct sockaddr *addr,
                                 SSL * ssl,
                                 bufferevent_data_cb readcb,
                                 bufferevent_data_cb writecb,
@@ -80,7 +81,7 @@ struct bufferevent* red_connect_relay_ssl(const char *ifname,
                                 const struct timeval *timeout_write);
 #endif
 struct bufferevent* red_connect_relay_tfo(const char *ifname,
-                                struct sockaddr_in *addr,
+                                struct sockaddr *addr,
                                 bufferevent_data_cb readcb,
                                 bufferevent_data_cb writecb,
                                 bufferevent_event_cb errorcb,
