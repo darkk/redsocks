@@ -32,7 +32,12 @@
 #include "redsocks.h" // for redsocks_close
 #include "libc-compat.h"
 
-int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inaddr, struct sockaddr_in *toaddr)
+int red_recv_udp_pkt(
+    int fd,
+    char *buf,
+    size_t buflen,
+    struct sockaddr_storage *inaddr,
+    struct sockaddr_storage *toaddr)
 {
     socklen_t addrlen = sizeof(*inaddr);
     ssize_t pktlen;
@@ -64,7 +69,7 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
                 cmsg->cmsg_type == IP_ORIGDSTADDR &&
                 cmsg->cmsg_len >= CMSG_LEN(sizeof(*toaddr))
             ) {
-                struct sockaddr_in* cmsgaddr = (struct sockaddr_in*)CMSG_DATA(cmsg);
+                struct sockaddr_storage* cmsgaddr = (struct sockaddr_storage*)CMSG_DATA(cmsg);
                 memcpy(toaddr, cmsgaddr, sizeof(*toaddr));
             }
             else {
@@ -72,7 +77,7 @@ int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *inadd
                     cmsg->cmsg_level, cmsg->cmsg_type);
             }
         }
-        if (toaddr->sin_family != AF_INET) {
+        if (toaddr->ss_family != AF_INET && toaddr->ss_family != AF_INET6) {
             log_error(LOG_WARNING, "(SOL_IP, IP_ORIGDSTADDR) not found");
             return -1;
         }
@@ -173,7 +178,7 @@ fail:
 }
 
 struct bufferevent* red_connect_relay(const char *ifname,
-                                    struct sockaddr *addr,
+                                    struct sockaddr_storage *addr,
                                     bufferevent_data_cb readcb,
                                     bufferevent_data_cb writecb,
                                     bufferevent_event_cb errorcb,
@@ -184,7 +189,7 @@ struct bufferevent* red_connect_relay(const char *ifname,
     int relay_fd = -1;
     int error;
 
-    retval = red_prepare_relay(ifname, addr->sa_family, readcb, writecb, errorcb, cbarg);
+    retval = red_prepare_relay(ifname, addr->ss_family, readcb, writecb, errorcb, cbarg);
     if (retval) {
         relay_fd = bufferevent_getfd(retval);
         if (timeout_write)
@@ -192,7 +197,7 @@ struct bufferevent* red_connect_relay(const char *ifname,
 
         //  error = bufferevent_socket_connect(retval, addr, sizeof(*addr));
         //  if (error) {
-        error = connect(relay_fd, addr, sizeof(struct sockaddr_storage));
+        error = connect(relay_fd, (struct sockaddr *)addr, sizeof(struct sockaddr_storage));
         if (error && errno != EINPROGRESS) {
             log_errno(LOG_NOTICE, "connect");
             goto fail;
@@ -212,7 +217,7 @@ fail:
 
 #if defined(ENABLE_HTTPS_PROXY)
 struct bufferevent* red_connect_relay_ssl(const char *ifname,
-                                    struct sockaddr *addr,
+                                    struct sockaddr_storage *addr,
                                     SSL * ssl,
                                     bufferevent_data_cb readcb,
                                     bufferevent_data_cb writecb,
@@ -225,7 +230,7 @@ struct bufferevent* red_connect_relay_ssl(const char *ifname,
     int relay_fd = -1;
     int error;
 
-    underlying = red_prepare_relay(ifname, addr->sa_family, NULL, NULL, NULL, NULL);
+    underlying = red_prepare_relay(ifname, addr->ss_family, NULL, NULL, NULL, NULL);
     if (!underlying)
         goto fail;
     relay_fd = bufferevent_getfd(underlying);
@@ -275,7 +280,7 @@ fail:
 #endif
 
 struct bufferevent* red_connect_relay_tfo(const char *ifname,
-                                    struct sockaddr *addr,
+                                    struct sockaddr_storage *addr,
                                     bufferevent_data_cb readcb,
                                     bufferevent_data_cb writecb,
                                     bufferevent_event_cb errorcb,
@@ -288,7 +293,7 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
     int relay_fd = -1;
     int error;
 
-    retval = red_prepare_relay(ifname, addr->sa_family, readcb, writecb, errorcb, cbarg);
+    retval = red_prepare_relay(ifname, addr->ss_family, readcb, writecb, errorcb, cbarg);
     if (retval) {
         relay_fd = bufferevent_getfd(retval);
         if (timeout_write)
@@ -296,7 +301,7 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
 
 #ifdef MSG_FASTOPEN
         size_t s = sendto(relay_fd, data, * len, MSG_FASTOPEN,
-                addr, sizeof(struct sockaddr_storage)
+                (struct sockaddr *)addr, sizeof(struct sockaddr_storage)
                 );
         *len = 0; // Assume nothing sent, caller needs to write data again when connection is setup.
         if (s == -1) {
@@ -324,7 +329,7 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
 fallback:
 #endif
 
-        error = connect(relay_fd, addr, sizeof(struct sockaddr_storage));
+        error = connect(relay_fd, (struct sockaddr *)addr, sizeof(struct sockaddr_storage));
         if (error && errno != EINPROGRESS) {
             log_errno(LOG_NOTICE, "connect");
             goto fail;
@@ -381,7 +386,7 @@ int red_is_socket_connected_ok(struct bufferevent *buffev)
     }
 }
 
-char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_size)
+char *red_inet_ntop(const struct sockaddr_storage* sa, char* buffer, size_t buffer_size)
 {
     const char *retval = 0;
     size_t len = 0;
@@ -391,11 +396,11 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
     assert(buffer_size >= RED_INET_ADDRSTRLEN);
 
     memset(buffer, 0, buffer_size);
-    if (sa->sin_family == AF_INET) {
-        retval = inet_ntop(AF_INET, &sa->sin_addr, buffer, buffer_size);
+    if (sa->ss_family == AF_INET) {
+        retval = inet_ntop(AF_INET, &((const struct sockaddr_in *)sa)->sin_addr, buffer, buffer_size);
         port = ((struct sockaddr_in*)sa)->sin_port;
     }
-    else if (sa->sin_family == AF_INET6) {
+    else if (sa->ss_family == AF_INET6) {
         buffer[0] = '[';
         retval = inet_ntop(AF_INET6, &((const struct sockaddr_in6*)sa)->sin6_addr, buffer+1, buffer_size-1);
         port = ((struct sockaddr_in6*)sa)->sin6_port;
@@ -403,7 +408,7 @@ char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_si
     if (retval) {
         assert(retval == buffer);
         len = strlen(retval);
-        if (sa->sin_family == AF_INET6)
+        if (sa->ss_family == AF_INET6)
             snprintf(buffer + len, buffer_size - len, "]:%d", ntohs(port));
         else
             snprintf(buffer + len, buffer_size - len, ":%d", ntohs(port));

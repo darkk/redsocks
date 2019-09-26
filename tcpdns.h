@@ -2,11 +2,12 @@
 #define TCPDNS_H
 
 typedef struct tcpdns_config_t {
-	struct sockaddr_in bindaddr;
-	struct sockaddr_in udpdns1_addr;
-	struct sockaddr_in udpdns2_addr;
-	struct sockaddr_in tcpdns1_addr;
-	struct sockaddr_in tcpdns2_addr;
+	struct sockaddr_storage bindaddr;
+	struct sockaddr_storage tcpdns1_addr;
+	struct sockaddr_storage tcpdns2_addr;
+	char *bind;
+	char *tcpdns1;
+	char *tcpdns2;
 	uint16_t timeout; /* timeout value for DNS response*/
 } tcpdns_config;
 
@@ -40,7 +41,7 @@ typedef struct dns_request_t {
     short               state;
     int                 flags;
     struct bufferevent* resolver;
-    struct sockaddr_in  client_addr;
+    struct sockaddr_storage  client_addr;
     struct timeval      req_time; 
     int *               delay;
     size_t              data_len;

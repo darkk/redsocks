@@ -90,10 +90,8 @@ To use the autoproxy feature, please change the redsocks section in
 configuration file like this:
 
 	redsocks {
-	 local_ip = 192.168.1.1;
-	 local_port = 1081;
-	 ip = 192.168.1.1;
-	 port = 9050;
+	 bind = "192.168.1.1:1081";
+	 relay = "192.168.1.1:9050";
 	 type = socks5; // I use socks5 proxy for GFW'ed IP
 	 autoproxy = 1; // I want autoproxy feature enabled on this section.
 	 // timeout is meaningful when 'autoproxy' is non-zero.
@@ -114,8 +112,7 @@ all blocked traffic pass through via VPN connection while normal traffic
 pass through via default internet connection.
 
 	redsocks {
-		local_ip = 192.168.1.1;
-		local_port = 1080;
+		bind = "192.168.1.1:1081";
 		interface = tun0; // Outgoing interface for blocked traffic
 		type = direct;
 		timeout = 13;
@@ -127,11 +124,9 @@ Similar like other redsocks section. The encryption method is specified
 by field 'login'.
 
 	redsocks {
-		local_ip = 192.168.1.1;
-		local_port = 1080;
+		bind = "192.168.1.1:1080";
 		type = shadowsocks;
-	 	ip = 192.168.1.1;
-		port = 8388;
+		relay = "192.168.1.1:8388";
 		timeout = 13;
 		autoproxy = 1;
 		login = "aes-128-cfb"; // field 'login' is reused as encryption
@@ -140,15 +135,12 @@ by field 'login'.
 	}
 
 	redudp {
-		local_ip = 127.0.0.1;
-		local_port = 1053;
-		ip = your.ss-server.com;
-		port = 443;
+		bind = "127.0.0.1:1053";
+		relay = "123.123.123.123:1082";
 		type = shadowsocks;
 		login = rc4-md5;
 		password = "ss server password";
-		dest_ip = 8.8.8.8;
-		dest_port = 53;
+		dest = "8.8.8.8:53";
 		udp_timeout = 3;
 	}
 
@@ -191,10 +183,8 @@ Suppose your goagent local proxy is running at the same server as redsocks2,
 The configuration for forwarding connections to GoAgent is like below:
 
 	redsocks {
-	 local_ip = 192.168.1.1;
-	 local_port = 1081; //HTTP should be redirect to this port.
-	 ip = 192.168.1.1;
-	 port = 8080;
+	 bind = "192.168.1.1:1081"; //HTTP should be redirect to this port.
+	 relay = "192.168.1.1:8080";
 	 type = http-relay; // Must be 'htt-relay' for HTTP traffic.
 	 autoproxy = 1; // I want autoproxy feature enabled on this section.
 	 // timeout is meaningful when 'autoproxy' is non-zero.
@@ -204,10 +194,8 @@ The configuration for forwarding connections to GoAgent is like below:
 	 timeout = 13;
 	}
 	redsocks {
-	 local_ip = 192.168.1.1;
-	 local_port = 1082; // HTTPS should be redirect to this port.
-	 ip = 192.168.1.1;
-	 port = 8080;
+	 bind = "192.168.1.1:1082"; //HTTPS should be redirect to this port.
+	 relay = "192.168.1.1:8080";
 	 type = http-connect; // Must be 'htt-connect' for HTTPS traffic.
 	 autoproxy = 1; // I want autoproxy feature enabled on this section.
 	 // timeout is meaningful when 'autoproxy' is non-zero.
@@ -226,9 +214,8 @@ with the following config section.
     	// Transform UDP DNS requests into TCP DNS requests.
     	// You can also redirect connections to external TCP DNS server to
     	// REDSOCKS transparent proxy via iptables.
-    	local_ip = 192.168.1.1; // Local server to act as DNS server
-    	local_port = 1053;      // UDP port to receive UDP DNS requests
-    	tcpdns1 = 8.8.4.4;      // DNS server that supports TCP DNS requests
+	bind = "192.168.1.1:1053"; // Local server to act as DNS server
+	tcpdns1 = "8.8.4.4:53";    // DNS server that supports TCP DNS requests
     	tcpdns2 = 8.8.8.8;      // DNS server that supports TCP DNS requests
     	timeout = 4;            // Timeout value for TCP DNS requests
     }

@@ -64,7 +64,7 @@ struct bufferevent* red_prepare_relay(const char *ifname,
                                 bufferevent_event_cb errorcb,
                                 void *cbarg);
 struct bufferevent* red_connect_relay(const char *ifname,
-                                struct sockaddr *addr,
+                                struct sockaddr_storage *addr,
                                 bufferevent_data_cb readcb,
                                 bufferevent_data_cb writecb,
                                 bufferevent_event_cb errorcb,
@@ -72,7 +72,7 @@ struct bufferevent* red_connect_relay(const char *ifname,
                                 const struct timeval *timeout_write);
 #if defined(ENABLE_HTTPS_PROXY)
 struct bufferevent* red_connect_relay_ssl(const char *ifname,
-                                struct sockaddr *addr,
+                                struct sockaddr_storage *addr,
                                 SSL * ssl,
                                 bufferevent_data_cb readcb,
                                 bufferevent_data_cb writecb,
@@ -81,7 +81,7 @@ struct bufferevent* red_connect_relay_ssl(const char *ifname,
                                 const struct timeval *timeout_write);
 #endif
 struct bufferevent* red_connect_relay_tfo(const char *ifname,
-                                struct sockaddr *addr,
+                                struct sockaddr_storage *addr,
                                 bufferevent_data_cb readcb,
                                 bufferevent_data_cb writecb,
                                 bufferevent_event_cb errorcb,
@@ -92,7 +92,7 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
 
 int red_socket_geterrno(struct bufferevent *buffev);
 int red_is_socket_connected_ok(struct bufferevent *buffev);
-int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_in *fromaddr, struct sockaddr_in *toaddr);
+int red_recv_udp_pkt(int fd, char *buf, size_t buflen, struct sockaddr_storage *fromaddr, struct sockaddr_storage *toaddr);
 
 size_t copy_evbuffer(struct bufferevent * dst, struct bufferevent * src, size_t skip);
 size_t get_write_hwm(struct bufferevent *bufev);
@@ -117,7 +117,7 @@ void replace_eventcb(struct bufferevent * buffev, bufferevent_event_cb eventcb);
 #else
 #	define RED_INET_ADDRSTRLEN (1 + INET6_ADDRSTRLEN + 1 + 1 + 5 + 1) // [ + addr + ] + : + port + \0
 #endif
-char *red_inet_ntop(const struct sockaddr_in* sa, char* buffer, size_t buffer_size);
+char *red_inet_ntop(const struct sockaddr_storage * sa, char* buffer, size_t buffer_size);
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */

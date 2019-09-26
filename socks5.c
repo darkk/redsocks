@@ -137,6 +137,7 @@ struct evbuffer *socks5_mkcommand_plain(int socks5_cmd, const struct sockaddr_in
 
 	assert(destaddr->sin_family == AF_INET);
 
+	// FIXME: Support IPv6
 	req.head.ver = socks5_ver;
 	req.head.cmd = socks5_cmd;
 	req.head.reserved = 0;

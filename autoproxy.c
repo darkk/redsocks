@@ -194,7 +194,8 @@ static void on_connection_confirmed(redsocks_client *client)
 {
     redsocks_log_error(client, LOG_DEBUG, "IP Confirmed"); 
 
-    cache_del_addr(&client->destaddr);
+    if (client->destaddr.ss_family == AF_INET)
+        cache_del_addr((struct sockaddr_in *)&client->destaddr);
 }
 
 static void on_connection_blocked(redsocks_client *client)
@@ -494,11 +495,13 @@ static int auto_retry(redsocks_client * client, int updcache)
     if (updcache)
     {
         /* only add IP to cache when the IP is not in cache */
-        if (cache_get_addr_time(&client->destaddr) == NULL)
+        if (client->destaddr.ss_family == AF_INET
+            && cache_get_addr_time((struct sockaddr_in *)&client->destaddr) == NULL)
         {
-            cache_add_addr(&client->destaddr);
+            char destaddr_str[RED_INET_ADDRSTRLEN];
+            cache_add_addr((struct sockaddr_in *)&client->destaddr);
             redsocks_log_error(client, LOG_DEBUG, "ADD IP to cache: %s", 
-                            inet_ntoa(client->destaddr.sin_addr));
+                red_inet_ntop(&client->destaddr, destaddr_str, sizeof(destaddr_str)));
         }
     }
 
@@ -616,8 +619,8 @@ static void auto_event_error(struct bufferevent *buffev, short what, void *_arg)
         && what == (BEV_EVENT_WRITING | BEV_EVENT_TIMEOUT))
         {
             // Update access time for IP fails again.
-            if (aclient->quick_check)
-                cache_touch_addr(&client->destaddr);
+            if (aclient->quick_check && client->destaddr.ss_family == AF_INET)
+                cache_touch_addr((struct sockaddr_in*)&client->destaddr);
 
             on_connection_blocked(client);  
             /* In case timeout occurs while connecting relay, we try to connect
@@ -685,7 +688,8 @@ static int auto_connect_relay(redsocks_client *client)
 
     if (aclient->state == AUTOPROXY_NEW)
     {
-        acc_time = cache_get_addr_time(&client->destaddr);
+        if (client->destaddr.ss_family == AF_INET)
+            acc_time = cache_get_addr_time((struct sockaddr_in *)&client->destaddr);
         if (acc_time)
         {
             redsocks_log_error(client, LOG_DEBUG, "Found dest IP in cache");
@@ -710,7 +714,7 @@ static int auto_connect_relay(redsocks_client *client)
         /* connect to target directly without going through proxy */    
         client->relay = red_connect_relay(
                 config->interface,
-                (struct sockaddr *)&client->destaddr,
+                &client->destaddr,
                 NULL,
                 auto_relay_connected,
                 auto_event_error,

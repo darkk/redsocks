@@ -153,8 +153,9 @@ static int redsocks_onenter(parser_section *section)
 
     INIT_LIST_HEAD(&instance->list);
     INIT_LIST_HEAD(&instance->clients);
-    instance->config.bindaddr.sin_family = AF_INET;
-    instance->config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    struct sockaddr_in * addr = (struct sockaddr_in *)&instance->config.bindaddr;
+    addr->sin_family = AF_INET;
+    addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     /* Default value can be checked in run-time, but I doubt anyone needs that.
      * Linux:   sysctl net.core.somaxconn
      * FreeBSD: sysctl kern.ipc.somaxconn */
@@ -166,9 +167,8 @@ static int redsocks_onenter(parser_section *section)
 
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
         entry->addr =
-            (strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
-            (strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
             (strcmp(entry->key, "interface") == 0)  ? (void*)&instance->config.interface :
+            (strcmp(entry->key, "bind") == 0)       ? (void*)&instance->config.bind :
             (strcmp(entry->key, "relay") == 0)      ? (void*)&instance->config.relay :
             (strcmp(entry->key, "type") == 0)       ? (void*)&instance->config.type :
             (strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
@@ -196,15 +196,19 @@ static int redsocks_onexit(parser_section *section)
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
         entry->addr = NULL;
 
-    // Parse and update relay address
-    struct sockaddr * addr = (struct sockaddr *)&instance->config.relayaddr;
-    int addr_size = sizeof(instance->config.relayaddr);
-    if (instance->config.relay) {
-        if (evutil_parse_sockaddr_port(instance->config.relay, addr, &addr_size))
-             err = "invalid relay address";
+    // Parse and update bind address and relay address
+    if (instance->config.bind) {
+        struct sockaddr * addr = (struct sockaddr *)&instance->config.bindaddr;
+        int addr_size = sizeof(instance->config.bindaddr);
+        if (evutil_parse_sockaddr_port(instance->config.bind, addr, &addr_size))
+            err = "invalid bind address";
     }
-
-    instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);
+    if (!err && instance->config.relay) {
+        struct sockaddr * addr = (struct sockaddr *)&instance->config.relayaddr;
+        int addr_size = sizeof(instance->config.relayaddr);
+        if (evutil_parse_sockaddr_port(instance->config.relay, addr, &addr_size))
+            err = "invalid relay address";
+    }
 
     if (!err && instance->config.type) {
         relay_subsys **ss;
@@ -252,7 +256,8 @@ static parser_section redsocks_conf_section =
 
 void redsocks_log_write_plain(
         const char *file, int line, const char *func, int do_errno,
-        const struct sockaddr_in *clientaddr, const struct sockaddr_in *destaddr,
+        const struct sockaddr_storage *clientaddr,
+        const struct sockaddr_storage *destaddr,
         int priority, const char *orig_fmt, ...
 ) {
     int saved_errno = errno;
@@ -681,7 +686,7 @@ int redsocks_connect_relay(redsocks_client *client)
 
     // Allowing binding relay socket to specified IP for outgoing connections
     client->relay = red_connect_relay(interface,
-                                      (struct sockaddr *)&client->instance->config.relayaddr,
+                                      &client->instance->config.relayaddr,
                                       NULL,
                                       redsocks_relay_connected,
                                       redsocks_event_error, client, &tv);
@@ -736,10 +741,10 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 {
     redsocks_instance *self = _arg;
     redsocks_client   *client = NULL;
-    struct sockaddr_in clientaddr;
-    struct sockaddr_in myaddr;
-    struct sockaddr_in destaddr;
-    socklen_t          addrlen = sizeof(clientaddr);
+    struct sockaddr_storage clientaddr;
+    struct sockaddr_storage myaddr;
+    struct sockaddr_storage destaddr;
+    socklen_t addrlen = sizeof(clientaddr);
     int client_fd = -1;
     int error;
 

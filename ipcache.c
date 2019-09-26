@@ -207,7 +207,7 @@ static int save_cache(const char * path)
             item = get_cache_data(blk, idx);
             if (item && item->present)
             {
-                red_inet_ntop(&item->addr, addr_str, sizeof(addr_str));
+                red_inet_ntop((struct sockaddr_storage *)&item->addr, addr_str, sizeof(addr_str));
                 fprintf(f, "%s\n", addr_str);
             }
         }
@@ -419,7 +419,7 @@ static void cache_dumper()
             if (item && item->present)
             {
                 count++;  
-                red_inet_ntop(&item->addr, addr_str[p], sizeof(addr_str[0]));
+                red_inet_ntop((struct sockaddr_storage *)&item->addr, addr_str[p], sizeof(addr_str[0]));
                 p++;
                 if (p == ADDR_COUNT_PER_LINE)
                 {

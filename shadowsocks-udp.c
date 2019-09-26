@@ -72,31 +72,46 @@ static void ss_client_fini(redudp_client *client)
     }
 }
 
-static void ss_forward_pkt(redudp_client *client, struct sockaddr * destaddr, void *data, size_t pktlen)
+static void ss_forward_pkt(redudp_client *client, struct sockaddr* destaddr, void *data, size_t pktlen)
 {
     ss_client *ssclient = (void*)(client + 1);
     ss_instance * ss = (ss_instance *)(client->instance+1);
-    struct sockaddr_in * relayaddr = &client->instance->config.relayaddr;
+    struct sockaddr_storage * relayaddr = &client->instance->config.relayaddr;
     struct msghdr msg;
     struct iovec io[1];
     ssize_t outgoing;
     int rc;
-    ss_header_ipv4 header;
+    ss_header header;
     size_t len = 0;
+    size_t header_len = 0;
     size_t fwdlen = 0;
     void * buff = client->instance->shared_buff;
 
     /* build and send header */
-    // TODO: Better implementation and IPv6 Support
-    header.addr_type = ss_addrtype_ipv4;
-    header.addr = ((struct sockaddr_in *)destaddr)->sin_addr.s_addr;
-    header.port = ((struct sockaddr_in *)destaddr)->sin_port;
+    if (client->destaddr.ss_family == AF_INET) {
+        struct sockaddr_in * addr = (struct sockaddr_in *)&client->destaddr;
+        header.v4.addr_type = ss_addrtype_ipv4;
+        header.v4.addr = addr->sin_addr.s_addr;
+        header.v4.port = addr->sin_port;
+        header_len = sizeof(ss_header_ipv4);
+    }
+    else if (client->destaddr.ss_family == AF_INET6) {
+        struct sockaddr_in6 * addr = (struct sockaddr_in6 *)&client->destaddr;
+        header.v6.addr_type = ss_addrtype_ipv6;
+        header.v6.addr = addr->sin6_addr;
+        header.v6.port = addr->sin6_port;
+        header_len = sizeof(ss_header_ipv6);
+    }
+    else {
+        redudp_log_error(client, LOG_ERR, "Unsupported address family: %d", client->destaddr.ss_family);
+        return ;
+    }
 
     if (enc_ctx_init(&ss->info, &ss->e_ctx, 1)) {
         redudp_log_error(client, LOG_ERR, "Shadowsocks UDP failed to initialize encryption context.");
         return;
     }
-    rc = ss_encrypt(&ss->e_ctx, (char *)&header, sizeof(header), buff, &len);
+    rc = ss_encrypt(&ss->e_ctx, (char *)&header, header_len, buff, &len);
     if (rc)
     {
         if (len + pktlen < MAX_UDP_PACKET_SIZE)
@@ -137,10 +152,10 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
     redudp_client *client = _arg;
     ss_client *ssclient = (void*)(client + 1);
     ss_instance * ss = (ss_instance *)(client->instance+1);
-    ss_header_ipv4  * header;
+    ss_header  * header;
     ssize_t pktlen;
     size_t  fwdlen;
-    struct sockaddr_in udprelayaddr;
+    struct sockaddr_storage udprelayaddr;
     int rc;
     void * buff = client->instance->shared_buff;
     void * buff2 = ss->buff;
@@ -161,26 +176,49 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
         redudp_log_error(client, LOG_DEBUG, "Can't decrypt packet, dropping it");
         return;
     }
-    header = (ss_header_ipv4 *)buff2;
+    header = (ss_header*)buff2;
     // We do not verify src address, but at least, we need to ensure address type is correct.
-    if (header->addr_type != ss_addrtype_ipv4) {
-        redudp_log_error(client, LOG_DEBUG, "Got address type #%u instead of expected #%u (IPv4).",
-                        header->addr_type, ss_addrtype_ipv4);
+    if (header->addr_type == ss_addrtype_ipv4) {
+        struct sockaddr_in pktaddr = {
+            .sin_family = AF_INET,
+            .sin_addr   = { header->v4.addr },
+            .sin_port   = header->v4.port,
+        };
+
+        if (fwdlen < sizeof(header->v4)) {
+            redudp_log_error(client, LOG_DEBUG, "Packet too short.");
+            return;
+        }
+        fwdlen -= sizeof(*header);
+        redudp_fwd_pkt_to_sender(
+                client,
+                buff2 + sizeof(*header),
+                fwdlen,
+                (struct sockaddr_storage*)&pktaddr);
+    }
+    else if (header->addr_type == ss_addrtype_ipv6) {
+        struct sockaddr_in6 pktaddr = {
+            .sin6_family = AF_INET,
+            .sin6_port   = header->v6.port,
+        };
+        memcpy(&pktaddr.sin6_addr, &header->v6.addr, sizeof(header->v6.addr));
+
+        if (fwdlen < sizeof(header->v6)) {
+            redudp_log_error(client, LOG_DEBUG, "Packet too short.");
+            return;
+        }
+        fwdlen -= sizeof(*header);
+        redudp_fwd_pkt_to_sender(
+                client,
+                buff2 + sizeof(*header),
+                fwdlen,
+                (struct sockaddr_storage*)&pktaddr);
+    }
+    else {
+        redudp_log_error(client, LOG_DEBUG, "Got address type #%u instead of expected #%u (IPv4/IPv6).",
+                header->addr_type, ss_addrtype_ipv4);
         return;
     }
-
-    struct sockaddr_in pktaddr = {
-        .sin_family = AF_INET,
-        .sin_addr   = { header->addr },
-        .sin_port   = header->port,
-    };
-
-    if (fwdlen < sizeof(*header)) {
-        redudp_log_error(client, LOG_DEBUG, "Packet too short.");
-        return;
-    }
-    fwdlen -= sizeof(*header);
-    redudp_fwd_pkt_to_sender(client, buff2 + sizeof(*header), fwdlen, &pktaddr);
 }
 
 static int ss_ready_to_fwd(struct redudp_client_t *client)
@@ -191,7 +229,7 @@ static int ss_ready_to_fwd(struct redudp_client_t *client)
 static void ss_connect_relay(redudp_client *client)
 {
     ss_client *ssclient = (void*)(client + 1);
-    struct sockaddr_in * addr = &client->instance->config.relayaddr;
+    struct sockaddr_storage * addr = &client->instance->config.relayaddr;
     int fd = -1;
     int error;
 

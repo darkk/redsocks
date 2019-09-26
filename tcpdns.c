@@ -218,13 +218,11 @@ static void tcpdns_event_error(struct bufferevent *buffev, short what, void *_ar
     tcpdns_drop_request(req);
 }
 
-static struct sockaddr_in * choose_tcpdns(tcpdns_instance * instance, int **delay)
+static struct sockaddr_storage * choose_tcpdns(tcpdns_instance * instance, int **delay)
 {
     static int n = 0;
     log_error(LOG_DEBUG, "Dealy of TCP DNS resolvers: %d, %d", instance->tcp1_delay_ms, instance->tcp2_delay_ms);
-    if (instance->config.tcpdns1_addr.sin_addr.s_addr != htonl(INADDR_ANY)
-    && (instance->config.tcpdns2_addr.sin_addr.s_addr != htonl(INADDR_ANY))
-    )
+    if (instance->config.tcpdns1 && instance->config.tcpdns2)
     {
         if (instance->tcp1_delay_ms <= 0 
            && instance->tcp2_delay_ms <= 0)
@@ -251,9 +249,9 @@ static struct sockaddr_in * choose_tcpdns(tcpdns_instance * instance, int **dela
                 goto return_tcp1;
         }
     }
-    if (instance->config.tcpdns1_addr.sin_addr.s_addr != htonl(INADDR_ANY))
+    if (instance->config.tcpdns1)
         goto return_tcp1;
-    if (instance->config.tcpdns2_addr.sin_addr.s_addr != htonl(INADDR_ANY))
+    if (instance->config.tcpdns2)
         goto return_tcp2;
 
     * delay = NULL;
@@ -274,7 +272,7 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
     tcpdns_instance *self = _arg;
     dns_request * req = NULL;
     struct timeval tv;
-    struct sockaddr_in * destaddr;
+    struct sockaddr_storage * destaddr;
     ssize_t pktlen;
 
     assert(fd == event_get_fd(self->listener));
@@ -319,7 +317,7 @@ static void tcpdns_pkt_from_client(int fd, short what, void *_arg)
             return;
         }
         /* connect to target directly without going through proxy */
-        req->resolver = red_connect_relay(NULL, (struct sockaddr *)destaddr,
+        req->resolver = red_connect_relay(NULL, destaddr,
                         tcpdns_readcb, tcpdns_connected, tcpdns_event_error, req, 
                         &tv);
         if (req->resolver) 
@@ -382,31 +380,16 @@ static int tcpdns_onenter(parser_section *section)
 
     INIT_LIST_HEAD(&instance->list);
     INIT_LIST_HEAD(&instance->requests);
-    instance->config.bindaddr.sin_family = AF_INET;
-    instance->config.bindaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    instance->config.udpdns1_addr.sin_family = AF_INET;
-    instance->config.udpdns1_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    instance->config.udpdns1_addr.sin_port = htons(53);
-    instance->config.udpdns2_addr.sin_family = AF_INET;
-    instance->config.udpdns2_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    instance->config.udpdns2_addr.sin_port = htons(53);
-    instance->config.tcpdns1_addr.sin_family = AF_INET;
-    instance->config.tcpdns1_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    instance->config.tcpdns1_addr.sin_port = 53;
-    instance->config.tcpdns2_addr.sin_family = AF_INET;
-    instance->config.tcpdns2_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    instance->config.tcpdns2_addr.sin_port = 53;
+    struct sockaddr_in * addr = (struct sockaddr_in *)&instance->config.bindaddr;
+    addr->sin_family = AF_INET;
+    addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr->sin_port = htons(53);
 
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
         entry->addr =
-            (strcmp(entry->key, "local_ip") == 0)   ? (void*)&instance->config.bindaddr.sin_addr :
-            (strcmp(entry->key, "local_port") == 0) ? (void*)&instance->config.bindaddr.sin_port :
-            (strcmp(entry->key, "udpdns1") == 0)   ? (void*)&instance->config.udpdns1_addr.sin_addr :
-            (strcmp(entry->key, "udpdns2") == 0)   ? (void*)&instance->config.udpdns2_addr.sin_addr :
-            (strcmp(entry->key, "tcpdns1") == 0)   ? (void*)&instance->config.tcpdns1_addr.sin_addr :
-            (strcmp(entry->key, "tcpdns1_port") == 0) ? (void*)&instance->config.tcpdns1_addr.sin_port :
-            (strcmp(entry->key, "tcpdns2") == 0)   ? (void*)&instance->config.tcpdns2_addr.sin_addr :
-            (strcmp(entry->key, "tcpdns2_port") == 0) ? (void*)&instance->config.tcpdns2_addr.sin_port :
+            (strcmp(entry->key, "bin") == 0)   ? (void*)&instance->config.bind:
+            (strcmp(entry->key, "tcpdns1") == 0)   ? (void*)&instance->config.tcpdns1 :
+            (strcmp(entry->key, "tcpdns2") == 0)   ? (void*)&instance->config.tcpdns2 :
             (strcmp(entry->key, "timeout") == 0) ? (void*)&instance->config.timeout :
             NULL;
     section->data = instance;
@@ -422,23 +405,37 @@ static int tcpdns_onexit(parser_section *section)
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
         entry->addr = NULL;
 
-    if (instance->config.bindaddr.sin_port == 0)
-        err = "Local port must be configured";
-    else
-        instance->config.bindaddr.sin_port = htons(instance->config.bindaddr.sin_port);
+    // Parse and update bind address and relay address
+    if (instance->config.bind) {
+        struct sockaddr * addr = (struct sockaddr *)&instance->config.bindaddr;
+        int addr_size = sizeof(instance->config.bindaddr);
+        if (evutil_parse_sockaddr_port(instance->config.bind, addr, &addr_size))
+            err = "invalid bind address";
+    }
+    if (!err && instance->config.tcpdns1) {
+        struct sockaddr * addr = (struct sockaddr *)&instance->config.tcpdns1_addr;
+        int addr_size = sizeof(instance->config.tcpdns1_addr);
+        if (evutil_parse_sockaddr_port(instance->config.tcpdns1, addr, &addr_size))
+            err = "invalid tcpdns1 address";
+        else if (addr->sa_family == AF_INET && ((struct sockaddr_in *)addr)->sin_port == 0)
+            ((struct sockaddr_in *)addr)->sin_port = htons(53);
+        else if (addr->sa_family == AF_INET6 && ((struct sockaddr_in6 *)addr)->sin6_port == 0)
+            ((struct sockaddr_in6 *)addr)->sin6_port = htons(53);
+    }
+    if (!err && instance->config.tcpdns2) {
+        struct sockaddr * addr = (struct sockaddr *)&instance->config.tcpdns2_addr;
+        int addr_size = sizeof(instance->config.tcpdns2_addr);
+        if (evutil_parse_sockaddr_port(instance->config.tcpdns2, addr, &addr_size))
+            err = "invalid tcpdns2 address";
+        else if (addr->sa_family == AF_INET && ((struct sockaddr_in *)addr)->sin_port == 0)
+            ((struct sockaddr_in *)addr)->sin_port = htons(53);
+        else if (addr->sa_family == AF_INET6 && ((struct sockaddr_in6 *)addr)->sin6_port == 0)
+            ((struct sockaddr_in6 *)addr)->sin6_port = htons(53);
+    }
 
-    if (instance->config.tcpdns1_addr.sin_addr.s_addr == htonl(INADDR_ANY)
-        && instance->config.tcpdns2_addr.sin_addr.s_addr == htonl(INADDR_ANY))
+
+    if (instance->config.tcpdns1 == NULL && instance->config.tcpdns2 == NULL)
         err = "At least one TCP DNS resolver must be configured.";
-
-    if (instance->config.tcpdns1_addr.sin_port == 0)
-        err = "Incorrect port number for TCP DNS1";
-    else
-        instance->config.tcpdns1_addr.sin_port = htons(instance->config.tcpdns1_addr.sin_port);
-    if (instance->config.tcpdns2_addr.sin_port == 0)
-        err = "Incorrect port number for TCP DNS2";
-    else
-        instance->config.tcpdns2_addr.sin_port = htons(instance->config.tcpdns2_addr.sin_port);
 
     if (err)
         parser_error(section->context, "%s", err);

@@ -149,7 +149,7 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
         socks5_udp_preabmle header;
     } * pkt = client->instance->shared_buff;
     ssize_t pktlen, fwdlen;
-    struct sockaddr_in udprelayaddr;
+    struct sockaddr_storage udprelayaddr;
 
     assert(fd == event_get_fd(&socks5client->udprelay));
 
@@ -177,6 +177,7 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
         return;
     }
 
+    // FIXME: Support IPv6
     struct sockaddr_in pktaddr = {
         .sin_family = AF_INET,
         .sin_addr   = { pkt->header.ip.addr },
@@ -184,7 +185,8 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
     };
 
     fwdlen = pktlen - sizeof(pkt->header);
-    redudp_fwd_pkt_to_sender(client, pkt->buf + sizeof(pkt->header), fwdlen, &pktaddr);
+    redudp_fwd_pkt_to_sender(client, pkt->buf + sizeof(pkt->header), fwdlen,
+        (struct sockaddr_storage *)&pktaddr);
 }
 
 
@@ -388,7 +390,7 @@ static void socks5_connect_relay(redudp_client *client)
     socks5_client *socks5client = (void*)(client + 1);
     socks5client->relay = red_connect_relay(
            NULL,
-           (struct sockaddr *)&client->instance->config.relayaddr,
+           &client->instance->config.relayaddr,
            NULL,
            socks5_relay_connected,
            socks5_relay_error,

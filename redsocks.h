@@ -29,8 +29,9 @@ typedef struct relay_subsys_t {
 } relay_subsys;
 
 typedef struct redsocks_config_t {
-	struct sockaddr_in bindaddr;
+	struct sockaddr_storage bindaddr;
 	struct sockaddr_storage relayaddr;
+	char *bind;
 	char *relay;
 	char *type;
 	char *login;
@@ -63,8 +64,8 @@ typedef struct redsocks_client_t {
 	redsocks_instance  *instance;
 	struct bufferevent *client;
 	struct bufferevent *relay;
-	struct sockaddr_in  clientaddr;
-	struct sockaddr_in  destaddr;
+	struct sockaddr_storage  clientaddr;
+	struct sockaddr_storage  destaddr;
 	int                 state;         // it's used by bottom layer
 	short               relay_connected;
 	unsigned short      client_evshut;
@@ -107,12 +108,12 @@ int redsocks_write_helper(
 void redsocks_close_internal(int fd, const char* file, int line, const char *func);
 
 #define redsocks_log_error(client, prio, msg...) \
-	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 0, &(client)->clientaddr, &(client)->destaddr, prio, ## msg)
+	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 0, (struct sockaddr_storage *)&(client)->clientaddr, (struct sockaddr_storage *)&(client)->destaddr, prio, ## msg)
 #define redsocks_log_errno(client, prio, msg...) \
-	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 1, &(client)->clientaddr, &(client)->destaddr, prio, ## msg)
+	redsocks_log_write_plain(__FILE__, __LINE__, __func__, 1, (struct sockaddr_storage *)&(client)->clientaddr, (struct sockaddr_storage *)&(client)->destaddr, prio, ## msg)
 void redsocks_log_write_plain(
 		const char *file, int line, const char *func, int do_errno,
-		const struct sockaddr_in *clientaddr, const struct sockaddr_in *destaddr,
+		const struct sockaddr_storage *clientaddr, const struct sockaddr_storage *destaddr,
 		int priority, const char *fmt, ...)
 #if defined(__GNUC__)
 	__attribute__ (( format (printf, 8, 9) ))

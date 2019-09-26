@@ -318,9 +318,10 @@ static int ss_connect_relay(redsocks_client *client)
     char * interface = client->instance->config.interface;
     ss_client *sclient = (void*)(client + 1);
     ss_instance * ss = (ss_instance *)(client->instance+1);
-    ss_header_ipv4 header;
+    ss_header header;
     struct timeval tv;
     size_t len = 0;
+    size_t header_len = 0;
     char buff[64+sizeof(header)];
 
     if (enc_ctx_init(&ss->info, &sclient->e_ctx, 1)) {
@@ -337,11 +338,26 @@ static int ss_connect_relay(redsocks_client *client)
     sclient->d_ctx_init = 1;
 
     /* build and send header */
-    // TODO: Better implementation and IPv6 Support
-    header.addr_type = ss_addrtype_ipv4;
-    header.addr = client->destaddr.sin_addr.s_addr;
-    header.port = client->destaddr.sin_port;
-    len += sizeof(header);
+    if (client->destaddr.ss_family == AF_INET) {
+        struct sockaddr_in * addr = (struct sockaddr_in *)&client->destaddr;
+        header.v4.addr_type = ss_addrtype_ipv4;
+        header.v4.addr = addr->sin_addr.s_addr;
+        header.v4.port = addr->sin_port;
+        header_len = sizeof(ss_header_ipv4);
+    }
+    else if (client->destaddr.ss_family == AF_INET6) {
+        struct sockaddr_in6 * addr = (struct sockaddr_in6 *)&client->destaddr;
+        header.v6.addr_type = ss_addrtype_ipv6;
+        header.v6.addr = addr->sin6_addr;
+        header.v6.port = addr->sin6_port;
+        header_len = sizeof(ss_header_ipv6);
+    }
+    else {
+        log_error(LOG_ERR, "Unsupported address family: %d", client->destaddr.ss_family);
+        redsocks_drop_client(client);
+        return -1;
+    }
+    len += header_len;
     size_t sz = sizeof(buff);
     if (!ss_encrypt(&sclient->e_ctx, (char *)&header, len, &buff[0], &sz)) {
         log_error(LOG_ERR, "Encryption error.");
@@ -354,7 +370,7 @@ static int ss_connect_relay(redsocks_client *client)
     tv.tv_usec = 0;
     client->relay = red_connect_relay_tfo(
             interface,
-            (struct sockaddr *)&client->instance->config.relayaddr,
+            &client->instance->config.relayaddr,
             NULL,
             ss_relay_connected,
             redsocks_event_error,

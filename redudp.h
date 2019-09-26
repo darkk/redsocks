@@ -26,10 +26,13 @@ typedef struct udprelay_subsys_t {
 
 
 typedef struct redudp_config_t {
-	struct sockaddr_in bindaddr;
-	struct sockaddr_in relayaddr;
+	struct sockaddr_storage bindaddr;
+	struct sockaddr_storage relayaddr;
 	// TODO:           outgoingaddr;
-	struct sockaddr_in destaddr;
+	struct sockaddr_storage destaddr;
+	char *bind;
+	char *relay;
+	char *dest;
 	char *type;
 	char *login;
 	char *password;
@@ -50,8 +53,8 @@ typedef struct redudp_instance_t {
 typedef struct redudp_client_t {
 	list_head           list;
 	redudp_instance *   instance;
-	struct sockaddr_in  clientaddr;
-	struct sockaddr_in  destaddr;
+	struct sockaddr_storage  clientaddr;
+	struct sockaddr_storage  destaddr;
 	struct event *      timeoutev;
 	int                 state;         // it's used by bottom layer
 	time_t              first_event;
@@ -63,15 +66,15 @@ typedef struct redudp_client_t {
 
 typedef struct enqueued_packet_t {
 	list_head  list;
-	struct sockaddr_in destaddr;
+	struct sockaddr_storage destaddr;
 	size_t     len;
 	char       data[1];
 } enqueued_packet;
 
-struct sockaddr_in* get_destaddr(redudp_client *client);
+struct sockaddr_storage* get_destaddr(redudp_client *client);
 void redudp_drop_client(redudp_client *client);
 void redudp_flush_queue(redudp_client *client);
-void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len, struct sockaddr_in * srcaddr);
+void redudp_fwd_pkt_to_sender(redudp_client *client, void *buf, size_t len, struct sockaddr_storage * srcaddr);
 void redudp_bump_timeout(redudp_client *client);
 
 #define redudp_log_error(client, prio, msg...) \

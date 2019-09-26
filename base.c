@@ -61,7 +61,7 @@
 typedef struct redirector_subsys_t {
 	int (*init)();
 	void (*fini)();
-	int (*getdestaddr)(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr);
+	int (*getdestaddr)(int fd, const struct sockaddr_storage *client, const struct sockaddr_storage *bindaddr, struct sockaddr_storage *destaddr);
 	const char *name;
 	// some subsystems may store data here:
 	int private;
@@ -124,7 +124,10 @@ static int redir_init_ipf()
 	return redir_open_private(fname, O_RDONLY);
 }
 
-static int getdestaddr_ipf(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
+static int getdestaddr_ipf(int fd,
+	const struct sockaddr_storage *client,
+	const struct sockaddr_storage *bindaddr,
+	struct sockaddr_storage *destaddr)
 {
 	int natfd = instance.redirector->private;
 	struct natlookup natLookup;
@@ -184,6 +187,7 @@ static int redir_init_pf()
 	return redir_open_private("/dev/pf", O_RDWR);
 }
 
+// FIXME: Support IPv6
 static int getdestaddr_pf(
 		int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr,
 		struct sockaddr_in *destaddr)
@@ -233,7 +237,11 @@ fail:
 #endif
 
 #ifdef USE_IPTABLES
-static int getdestaddr_iptables(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
+static int getdestaddr_iptables(
+	int fd,
+	const struct sockaddr_storage *client,
+	const struct sockaddr_storage *bindaddr,
+	struct sockaddr_storage *destaddr)
 {
 	socklen_t socklen = sizeof(*destaddr);
 	int error;
@@ -247,7 +255,11 @@ static int getdestaddr_iptables(int fd, const struct sockaddr_in *client, const 
 }
 #endif
 
-static int getdestaddr_generic(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
+static int getdestaddr_generic(
+	int fd,
+	const struct sockaddr_storage *client,
+	const struct sockaddr_storage *bindaddr,
+	struct sockaddr_storage *destaddr)
 {
 	socklen_t socklen = sizeof(*destaddr);
 	int error;
@@ -260,7 +272,11 @@ static int getdestaddr_generic(int fd, const struct sockaddr_in *client, const s
 	return 0;
 }
 
-int getdestaddr(int fd, const struct sockaddr_in *client, const struct sockaddr_in *bindaddr, struct sockaddr_in *destaddr)
+int getdestaddr(
+	int fd,
+	const struct sockaddr_storage *client,
+	const struct sockaddr_storage *bindaddr,
+	struct sockaddr_storage *destaddr)
 {
 	return instance.redirector->getdestaddr(fd, client, bindaddr, destaddr);
 }

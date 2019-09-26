@@ -187,6 +187,10 @@ struct evbuffer *httpc_mkconnect(redsocks_client *client)
 	const char *auth_scheme = NULL;
 	char *auth_string = NULL;
 
+	/* calculate uri */
+	char uri[RED_INET_ADDRSTRLEN];
+	red_inet_ntop(&client->destaddr, uri, sizeof(uri));
+
 	if (auth->last_auth_query != NULL) {
 		/* find previous auth challange */
 
@@ -194,10 +198,6 @@ struct evbuffer *httpc_mkconnect(redsocks_client *client)
 			auth_string = basic_authentication_encode(client->instance->config.login, client->instance->config.password);
 			auth_scheme = "Basic";
 		} else if (strncasecmp(auth->last_auth_query, "Digest", 6) == 0) {
-			/* calculate uri */
-			char uri[128];
-			snprintf(uri, 128, "%s:%u", inet_ntoa(client->destaddr.sin_addr), ntohs(client->destaddr.sin_port));
-
 			/* prepare an random string for cnounce */
 			char cnounce[17];
 			snprintf(cnounce, sizeof(cnounce), "%08x%08x", red_randui32(), red_randui32());
@@ -210,16 +210,11 @@ struct evbuffer *httpc_mkconnect(redsocks_client *client)
 	}
 
 	if (auth_string == NULL) {
-		len = evbuffer_add_printf(buff,
-			"CONNECT %s:%u HTTP/1.0\r\n\r\n",
-			inet_ntoa(client->destaddr.sin_addr),
-			ntohs(client->destaddr.sin_port)
-		);
+		len = evbuffer_add_printf(buff, "CONNECT %s HTTP/1.0\r\n\r\n", uri);
 	} else {
 		len = evbuffer_add_printf(buff,
-			"CONNECT %s:%u HTTP/1.0\r\n%s %s %s\r\n\r\n",
-			inet_ntoa(client->destaddr.sin_addr),
-			ntohs(client->destaddr.sin_port),
+			"CONNECT %s HTTP/1.0\r\n%s %s %s\r\n\r\n",
+			uri,
 			auth_response_header,
 			auth_scheme,
 			auth_string

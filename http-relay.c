@@ -382,17 +382,17 @@ static int httpr_append_header(redsocks_client *client, char *line)
 }
 
 // This function is not reenterable
-static char *fmt_http_host(struct sockaddr_in addr)
+static const char *fmt_http_host(struct sockaddr_storage * addr)
 {
-	static char host[] = "123.123.123.123:12345";
-	if (ntohs(addr.sin_port) == 80)
-		return inet_ntoa(addr.sin_addr);
+	static char host[RED_INET_ADDRSTRLEN];
+
+	if (
+		(addr->ss_family == AF_INET && ntohs(((struct sockaddr_in *)addr)->sin_port) == 80)
+		|| (addr->ss_family == AF_INET6 && ntohs(((struct sockaddr_in6 *)addr)->sin6_port) == 80)
+	   )
+		return inet_ntop(addr->ss_family, addr, &host[0], sizeof(host));
 	else {
-		snprintf(host, sizeof(host),
-				"%s:%u",
-				inet_ntoa(addr.sin_addr),
-				ntohs(addr.sin_port)
-				);
+		red_inet_ntop(addr, host, sizeof(host));
 		return host;
 	}
 }
@@ -401,7 +401,7 @@ static int httpr_toss_http_firstline(redsocks_client *client)
 {
 	httpr_client *httpr = (void*)(client + 1);
 	char *uri = NULL;
-	char *host = httpr->has_host ? httpr->host : fmt_http_host(client->destaddr);
+	const char *host = httpr->has_host ? httpr->host : fmt_http_host(&client->destaddr);
 	static char nbuff[MAX_HTTP_REQUEST_LINE_LENGTH + 1];
 	size_t len = 0;
 
@@ -525,7 +525,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 			if (!httpr->has_host) {
 				char host[32]; // "Host: 123.456.789.012:34567"
 				int written_wo_null = snprintf(host, sizeof(host), "Host: %s",
-				                               fmt_http_host(client->destaddr));
+				                               fmt_http_host(&client->destaddr));
 				UNUSED(written_wo_null);
 				assert(0 < written_wo_null && written_wo_null < sizeof(host));
 				if (httpr_append_header(client, host) < 0)
