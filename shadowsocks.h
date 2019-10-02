@@ -19,6 +19,13 @@ typedef struct ss_header_ipv6_t {
     uint16_t port;
 } PACKED ss_header_ipv6;
 
+typedef struct ss_header_domain_t {
+    unsigned char addr_type;
+    uint8_t length;
+    char domain[255];
+    uint16_t port;
+} PACKED ss_header_domain;
+
 typedef union {
     unsigned char addr_type;
     ss_header_ipv4 v4;

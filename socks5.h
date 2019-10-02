@@ -36,6 +36,11 @@ typedef struct socks5_addr_ipv4_t {
 	uint16_t port;
 } PACKED socks5_addr_ipv4;
 
+typedef struct socks5_addr_ipv6_t {
+    struct in6_addr addr;
+	uint16_t port;
+} PACKED socks5_addr_ipv6;
+
 typedef struct socks5_addr_domain_t {
 	uint8_t size;
 	uint8_t more[1];
@@ -68,7 +73,10 @@ typedef struct socks5_udp_preabmle_t {
 	uint8_t  frag_no;
 	uint8_t  addrtype;   /* 0x01 for IPv4 */
 	/* socks5_addr_* */
-	socks5_addr_ipv4 ip; /* I support only IPv4 at the moment */
+	union {
+	   socks5_addr_ipv4 v4;
+	   socks5_addr_ipv6 v6;
+	} addr;
 } PACKED socks5_udp_preabmle;
 
 static const int socks5_reply_maxlen = 512; // as domain name can't be longer than 256 bytes

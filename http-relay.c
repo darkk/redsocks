@@ -523,7 +523,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 				do_drop = 1;
 
 			if (!httpr->has_host) {
-				char host[32]; // "Host: 123.456.789.012:34567"
+				char host[266]; // "Host: 123.456.789.012:34567"
 				int written_wo_null = snprintf(host, sizeof(host), "Host: %s",
 				                               fmt_http_host(&client->destaddr));
 				UNUSED(written_wo_null);

@@ -55,13 +55,27 @@ static struct evbuffer* socks5_mkassociate(void *p)
     return socks5_mkcommand_plain(socks5_cmd_udp_associate, &sa);
 }
 
-static void socks5_fill_preamble(socks5_udp_preabmle *preamble, struct sockaddr_in * addr)
+static void socks5_fill_preamble(
+    socks5_udp_preabmle *preamble,
+       struct sockaddr * addr,
+       size_t *preamble_len)
 {
     preamble->reserved = 0;
     preamble->frag_no = 0; /* fragmentation is not supported */
-    preamble->addrtype = socks5_addrtype_ipv4;
-    preamble->ip.addr = addr->sin_addr.s_addr;
-    preamble->ip.port = addr->sin_port;
+    if (addr->sa_family == AF_INET) {
+        struct sockaddr_in * in_addr = (struct sockaddr_in *) addr;
+        preamble->addrtype = socks5_addrtype_ipv4;
+        preamble->addr.v4.addr = in_addr->sin_addr.s_addr;
+        preamble->addr.v4.port = in_addr->sin_port;
+        *preamble_len = 4 + sizeof(preamble->addr.v4);
+    }
+    else if (addr->sa_family == AF_INET6) {
+        struct sockaddr_in6 * in6_addr = (struct sockaddr_in6 *) addr;
+        preamble->addrtype = socks5_addrtype_ipv6;
+        memcpy(&preamble->addr.v6, &in6_addr->sin6_addr, sizeof(in6_addr->sin6_addr));
+        preamble->addr.v6.port = in6_addr->sin6_port;
+        *preamble_len = 4 + sizeof(preamble->addr.v6);
+    }
 }
 
 
@@ -114,10 +128,11 @@ static void socks5_forward_pkt(redudp_client *client, struct sockaddr *destaddr,
     socks5_udp_preabmle req;
     struct msghdr msg;
     struct iovec io[2];
-    ssize_t outgoing, fwdlen = pktlen + sizeof(req);
+    size_t preamble_len;
 
-    socks5_fill_preamble(&req, (struct sockaddr_in *)destaddr);
+    socks5_fill_preamble(&req, destaddr, &preamble_len);
 
+    ssize_t outgoing, fwdlen = pktlen + preamble_len;
     memset(&msg, 0, sizeof(msg));
     msg.msg_name = &socks5client->udprelayaddr;
     msg.msg_namelen = sizeof(socks5client->udprelayaddr);
@@ -125,7 +140,7 @@ static void socks5_forward_pkt(redudp_client *client, struct sockaddr *destaddr,
     msg.msg_iovlen = SIZEOF_ARRAY(io);
 
     io[0].iov_base = &req;
-    io[0].iov_len = sizeof(req);
+    io[0].iov_len = preamble_len;
     io[1].iov_base = buf;
     io[1].iov_len = pktlen;
 
@@ -177,16 +192,27 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
         return;
     }
 
-    // FIXME: Support IPv6
-    struct sockaddr_in pktaddr = {
-        .sin_family = AF_INET,
-        .sin_addr   = { pkt->header.ip.addr },
-        .sin_port   = pkt->header.ip.port,
-    };
+    // Support IPv6
+    struct sockaddr_storage src_addr;
+    size_t header_size = 4;
+    if (pkt->header.addrtype == socks5_addrtype_ipv4) {
+        struct sockaddr_in * src = (struct sockaddr_in *)&src_addr;
+        src->sin_family = AF_INET;
+        src->sin_addr.s_addr = pkt->header.addr.v4.addr;
+        src->sin_port = pkt->header.addr.v4.port;
+        header_size += sizeof(socks5_addr_ipv4);
+    }
+    else if (pkt->header.addrtype == socks5_addrtype_ipv6) {
+        struct sockaddr_in6 * src = (struct sockaddr_in6 *)&src_addr;
+        src->sin6_family = AF_INET6;
+        memcpy(&src->sin6_addr, &pkt->header.addr.v6.addr, sizeof(src->sin6_addr));
+        src->sin6_port = pkt->header.addr.v6.port;
+        header_size += sizeof(socks5_addr_ipv6);
+    }
+    // TODO: Support domain addr
 
     fwdlen = pktlen - sizeof(pkt->header);
-    redudp_fwd_pkt_to_sender(client, pkt->buf + sizeof(pkt->header), fwdlen,
-        (struct sockaddr_storage *)&pktaddr);
+    redudp_fwd_pkt_to_sender(client, pkt->buf + header_size, fwdlen, &src_addr);
 }
 
 

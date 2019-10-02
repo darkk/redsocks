@@ -189,10 +189,10 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
             redudp_log_error(client, LOG_DEBUG, "Packet too short.");
             return;
         }
-        fwdlen -= sizeof(*header);
+        fwdlen -= sizeof(header->v4);
         redudp_fwd_pkt_to_sender(
                 client,
-                buff2 + sizeof(*header),
+                buff2 + sizeof(header->v4),
                 fwdlen,
                 (struct sockaddr_storage*)&pktaddr);
     }
@@ -207,10 +207,10 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
             redudp_log_error(client, LOG_DEBUG, "Packet too short.");
             return;
         }
-        fwdlen -= sizeof(*header);
+        fwdlen -= sizeof(header->v6);
         redudp_fwd_pkt_to_sender(
                 client,
-                buff2 + sizeof(*header),
+                buff2 + sizeof(header->v6),
                 fwdlen,
                 (struct sockaddr_storage*)&pktaddr);
     }
