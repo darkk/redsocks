@@ -47,11 +47,6 @@ typedef struct socks5_addr_domain_t {
 	/* uint16_t port; */
 } PACKED socks5_addr_domain;
 
-typedef struct socks5_addr_ipv6_t {
-	uint8_t addr[16];
-	uint16_t port;
-} PACKED socks5_addr_ipv6;
-
 typedef struct socks5_req_t {
 	uint8_t ver;
 	uint8_t cmd;
