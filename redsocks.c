@@ -79,8 +79,7 @@ static list_head instances = LIST_HEAD_INIT(instances);
 
 static parser_entry redsocks_entries[] =
 {
-    { .key = "local_ip",   .type = pt_in_addr },
-    { .key = "local_port", .type = pt_uint16 },
+    { .key = "bind",       .type = pt_pchar },
     { .key = "interface",  .type = pt_pchar },
     { .key = "relay",      .type = pt_pchar },
     { .key = "type",       .type = pt_pchar },
