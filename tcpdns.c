@@ -358,12 +358,9 @@ static void check_dns_delay()
  */
 static parser_entry tcpdns_entries[] =
 {
-    { .key = "local_ip",   .type = pt_in_addr },
-    { .key = "local_port", .type = pt_uint16 },
-    { .key = "tcpdns1",    .type = pt_in_addr },
-    { .key = "tcpdns1_port", .type = pt_uint16 },
-    { .key = "tcpdns2",    .type = pt_in_addr },
-    { .key = "tcpdns2_port", .type = pt_uint16 },
+    { .key = "bind",       .type = pt_pchar },
+    { .key = "tcpdns1",    .type = pt_pchar },
+    { .key = "tcpdns2",    .type = pt_pchar },
     { .key = "timeout",    .type = pt_uint16 },
     { }
 };
@@ -387,7 +384,7 @@ static int tcpdns_onenter(parser_section *section)
 
     for (parser_entry *entry = &section->entries[0]; entry->key; entry++)
         entry->addr =
-            (strcmp(entry->key, "bin") == 0)   ? (void*)&instance->config.bind:
+            (strcmp(entry->key, "bind") == 0)   ? (void*)&instance->config.bind:
             (strcmp(entry->key, "tcpdns1") == 0)   ? (void*)&instance->config.tcpdns1 :
             (strcmp(entry->key, "tcpdns2") == 0)   ? (void*)&instance->config.tcpdns2 :
             (strcmp(entry->key, "timeout") == 0) ? (void*)&instance->config.timeout :
