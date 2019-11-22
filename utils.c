@@ -34,7 +34,7 @@
 
 
 #define addr_size(addr) (((struct sockaddr *)addr)->sa_family == AF_INET ? sizeof(struct sockaddr_in): \
-		                 ((struct sockaddr *)addr)->sa_family == AF_INET6 ? sizeof(struct sockaddr_in6): sizeof(struct sockaddr_storage))
+                         ((struct sockaddr *)addr)->sa_family == AF_INET6 ? sizeof(struct sockaddr_in6): sizeof(struct sockaddr_storage))
 
 int red_recv_udp_pkt(
     int fd,
@@ -77,7 +77,9 @@ int red_recv_udp_pkt(
             if (
                 cmsg->cmsg_level == SOL_IP &&
                 cmsg->cmsg_type == IP_ORIGDSTADDR &&
-                cmsg->cmsg_len >= CMSG_LEN(sizeof(*toaddr))
+                (cmsg->cmsg_len == CMSG_LEN(sizeof(struct sockaddr_in))
+                 || cmsg->cmsg_len == CMSG_LEN(sizeof(struct sockaddr_in6))) &&
+                cmsg->cmsg_len <= CMSG_LEN(sizeof(*toaddr))
             ) {
                 struct sockaddr* cmsgaddr = (struct sockaddr*)CMSG_DATA(cmsg);
                 if (cmsgaddr->sa_family == AF_INET) {
