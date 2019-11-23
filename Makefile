@@ -49,11 +49,11 @@ override CFLAGS += -DENABLE_HTTPS_PROXY
 override FEATURES += ENABLE_HTTPS_PROXY
 $(info Compile with HTTPS proxy enabled.)
 endif
-override LIBS += -lssl -lcrypto
+override LIBS += -lssl -lcrypto -ldl
 override CFLAGS += -DUSE_CRYPTO_OPENSSL
 endif
 ifdef ENABLE_STATIC
-override LIBS += -ldl -lz
+override LIBS += -lz
 override LDFLAGS += -Wl,-static -static -static-libgcc -s
 override FEATURES += STATIC_COMPILE
 endif
