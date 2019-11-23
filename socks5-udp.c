@@ -56,7 +56,7 @@ static struct evbuffer* socks5_mkassociate(void *p)
 }
 
 static void socks5_fill_preamble(
-    socks5_udp_preabmle *preamble,
+       socks5_udp_preamble *preamble,
        struct sockaddr * addr,
        size_t *preamble_len)
 {
@@ -125,10 +125,24 @@ static int socks5_ready_to_fwd(struct redudp_client_t *client)
 static void socks5_forward_pkt(redudp_client *client, struct sockaddr *destaddr, void *buf, size_t pktlen)
 {
     socks5_client *socks5client = (void*)(client + 1);
-    socks5_udp_preabmle req;
+    socks5_udp_preamble req;
     struct msghdr msg;
     struct iovec io[2];
     size_t preamble_len;
+
+    if (socks5client->udprelayaddr.sin_family == AF_INET) {
+        preamble_len = SOCKS5_UDP_PREAMBLE_SIZE_V4;
+    }
+    /*
+    else if (socks5client->udprelayaddr.ss_family == AF_INET6) {
+        preamble_len = SOCKS5_UDP_PREAMBLE_SIZE_V6;
+    }
+    */
+    else {
+        redudp_log_errno(client, LOG_WARNING, "Unknown address type %d",
+                         socks5client->udprelayaddr.sin_family);
+        return;
+    }
 
     socks5_fill_preamble(&req, destaddr, &preamble_len);
 
@@ -161,7 +175,7 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
     socks5_client *socks5client = (void*)(client + 1);
     union {
         char buf[MAX_UDP_PACKET_SIZE];
-        socks5_udp_preabmle header;
+        socks5_udp_preamble header;
     } * pkt = client->instance->shared_buff;
     ssize_t pktlen, fwdlen;
     struct sockaddr_storage udprelayaddr;
@@ -172,7 +186,9 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
     if (pktlen == -1)
         return;
 
-    if (memcmp(&udprelayaddr, &socks5client->udprelayaddr, sizeof(udprelayaddr)) != 0) {
+    if (evutil_sockaddr_cmp((struct sockaddr *)&udprelayaddr,
+                            (struct sockaddr *)&socks5client->udprelayaddr,
+                            1) != 0) {
         char buf[RED_INET_ADDRSTRLEN];
         redudp_log_error(client, LOG_NOTICE, "Got packet from unexpected address %s.",
                          red_inet_ntop(&udprelayaddr, buf, sizeof(buf)));
@@ -211,7 +227,7 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
     }
     // TODO: Support domain addr
 
-    fwdlen = pktlen - sizeof(pkt->header);
+    fwdlen = pktlen - header_size;
     redudp_fwd_pkt_to_sender(client, pkt->buf + header_size, fwdlen, &src_addr);
 }
 
