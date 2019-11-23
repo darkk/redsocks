@@ -30,6 +30,6 @@ typedef union {
     unsigned char addr_type;
     ss_header_ipv4 v4;
     ss_header_ipv6 v6;
-} ss_header;
+} PACKED ss_header;
 
 #endif
