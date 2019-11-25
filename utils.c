@@ -306,13 +306,6 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
 
     retval = red_prepare_relay(ifname, addr->ss_family, readcb, writecb, errorcb, cbarg);
     if (retval) {
-        // write data to evbuffer so that data can be sent when connection is set up
-        if (bufferevent_write(retval, data, *len) != 0) {
-            log_errno(LOG_NOTICE, "bufferevent_write");
-            *len = 0; // Nothing sent, caller needs to write data again when connection is setup.
-            goto fail;
-        }
-
         relay_fd = bufferevent_getfd(retval);
         if (timeout_write)
             bufferevent_set_timeouts(retval, NULL, timeout_write);
@@ -321,13 +314,17 @@ struct bufferevent* red_connect_relay_tfo(const char *ifname,
         size_t s = sendto(relay_fd, data, * len, MSG_FASTOPEN,
                 (struct sockaddr *)addr, addr_size(addr)
                 );
-        *len = 0; // Assume nothing sent, caller needs to write data again when connection is setup.
         if (s == -1) {
             if (errno == EINPROGRESS || errno == EAGAIN
                     || errno == EWOULDBLOCK) {
                 // Remote server doesn't support tfo or it's the first connection to the server.
                 // Connection will automatically fall back to conventional TCP.
                 log_error(LOG_DEBUG, "TFO: no cookie");
+                // write data to evbuffer so that data can be sent when connection is set up
+                if (bufferevent_write(retval, data, *len) != 0) {
+                    log_errno(LOG_NOTICE, "bufferevent_write");
+                    goto fail;
+                }
                 return retval;
             } else if (errno == EOPNOTSUPP || errno == EPROTONOSUPPORT ||
                     errno == ENOPROTOOPT) {
@@ -350,6 +347,11 @@ fallback:
         error = connect(relay_fd, (struct sockaddr *)addr, addr_size(addr));
         if (error && errno != EINPROGRESS) {
             log_errno(LOG_NOTICE, "connect");
+            goto fail;
+        }
+        // write data to evbuffer so that data can be sent when connection is set up
+        if (bufferevent_write(retval, data, *len) != 0) {
+            log_errno(LOG_NOTICE, "bufferevent_write");
             goto fail;
         }
     }
