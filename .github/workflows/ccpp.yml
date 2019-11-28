@@ -10,6 +10,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: install depends
-      run: apt install -y libevent-dev
-    - name: make
-      run: make DISABLE_SHADOWSOCKS=1
+      run: |
+        sudo apt update
+        sudo apt install -y libssl1.0-dev libevent-dev
+    - name: Build
+      run: make
