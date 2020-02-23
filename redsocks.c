@@ -981,7 +981,7 @@ static int redsocks_init_instance(redsocks_instance *instance)
         goto fail;
     }
 
-    fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    fd = socket(instance->config.bindaddr.ss_family, SOCK_STREAM, IPPROTO_TCP);
     if (fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;

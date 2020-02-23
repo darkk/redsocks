@@ -454,7 +454,7 @@ static int tcpdns_init_instance(tcpdns_instance *instance)
     int fd = -1;
     char buf1[RED_INET_ADDRSTRLEN];
 
-    fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    fd = socket(instance->config.bindaddr.ss_family, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;
