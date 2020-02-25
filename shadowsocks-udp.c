@@ -198,7 +198,7 @@ static void ss_pkt_from_server(int fd, short what, void *_arg)
     }
     else if (header->addr_type == ss_addrtype_ipv6) {
         struct sockaddr_in6 pktaddr = {
-            .sin6_family = AF_INET,
+            .sin6_family = AF_INET6,
             .sin6_port   = header->v6.port,
         };
         memcpy(&pktaddr.sin6_addr, &header->v6.addr, sizeof(header->v6.addr));
