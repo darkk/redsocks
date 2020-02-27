@@ -246,7 +246,12 @@ static int getdestaddr_iptables(
 	socklen_t socklen = sizeof(*destaddr);
 	int error;
 
-	error = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, destaddr, &socklen);
+#ifdef SOL_IPV6
+	int sol = (client->ss_family == AF_INET6) ? SOL_IPV6 : SOL_IP;
+#else
+	int sol = SOL_IP;
+#endif
+	error = getsockopt(fd, sol, SO_ORIGINAL_DST, destaddr, &socklen);
 	if (error) {
 		log_errno(LOG_WARNING, "getsockopt");
 		return -1;
