@@ -418,6 +418,8 @@ char *red_inet_ntop(const struct sockaddr_storage* sa, char* buffer, size_t buff
         buffer[0] = '[';
         retval = inet_ntop(AF_INET6, &((const struct sockaddr_in6*)sa)->sin6_addr, buffer+1, buffer_size-1);
         port = ((struct sockaddr_in6*)sa)->sin6_port;
+        if (retval)
+            retval = buffer;
     }
     if (retval) {
         assert(retval == buffer);
