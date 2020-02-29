@@ -128,23 +128,38 @@ struct evbuffer *socks5_mkpassword_plain(const char *login, const char *password
 	return mkevbuffer(req, length);
 }
 
-struct evbuffer *socks5_mkcommand_plain(int socks5_cmd, const struct sockaddr_in *destaddr)
+struct evbuffer *socks5_mkcommand_plain(int socks5_cmd, const struct sockaddr_storage *destaddr)
 {
-	struct {
-		socks5_req head;
-		socks5_addr_ipv4 ip;
-	} PACKED req;
+	if (destaddr->ss_family == AF_INET) {
+		struct {
+			socks5_req head;
+			socks5_addr_ipv4 ip;
+		} PACKED req;
+		const struct sockaddr_in * addr = (const struct sockaddr_in *)destaddr;
 
-	assert(destaddr->sin_family == AF_INET);
+		req.head.ver = socks5_ver;
+		req.head.cmd = socks5_cmd;
+		req.head.reserved = 0;
+		req.head.addrtype = socks5_addrtype_ipv4;
+		req.ip.addr = addr->sin_addr.s_addr;
+		req.ip.port = addr->sin_port;
+		return mkevbuffer(&req, sizeof(req));
+	}
+	else {
+		struct {
+			socks5_req head;
+			socks5_addr_ipv6 ip;
+		} PACKED req;
+		const struct sockaddr_in6 * addr = (const struct sockaddr_in6 *)destaddr;
 
-	// FIXME: Support IPv6
-	req.head.ver = socks5_ver;
-	req.head.cmd = socks5_cmd;
-	req.head.reserved = 0;
-	req.head.addrtype = socks5_addrtype_ipv4;
-	req.ip.addr = destaddr->sin_addr.s_addr;
-	req.ip.port = destaddr->sin_port;
-	return mkevbuffer(&req, sizeof(req));
+		req.head.ver = socks5_ver;
+		req.head.cmd = socks5_cmd;
+		req.head.reserved = 0;
+		req.head.addrtype = socks5_addrtype_ipv6;
+		req.ip.addr = addr->sin6_addr;
+		req.ip.port = addr->sin6_port;
+		return mkevbuffer(&req, sizeof(req));
+	}
 }
 
 static struct evbuffer *socks5_mkconnect(redsocks_client *client)

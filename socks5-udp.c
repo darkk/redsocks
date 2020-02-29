@@ -48,10 +48,9 @@ static struct evbuffer* socks5_mkpassword_plain_wrapper(void *p)
 
 static struct evbuffer* socks5_mkassociate(void *p)
 {
-    struct sockaddr_in sa;
-    //p = p; /* Make compiler happy */
+    struct sockaddr_storage sa;
     memset(&sa, 0, sizeof(sa));
-    sa.sin_family = AF_INET;
+    sa.ss_family = ((const struct sockaddr_storage *)p)->ss_family;
     return socks5_mkcommand_plain(socks5_cmd_udp_associate, &sa);
 }
 
@@ -128,24 +127,15 @@ static void socks5_forward_pkt(redudp_client *client, struct sockaddr *destaddr,
     socks5_udp_preamble req;
     struct msghdr msg;
     struct iovec io[2];
-    size_t preamble_len;
+    size_t preamble_len = 0;
 
-    if (socks5client->udprelayaddr.sin_family == AF_INET) {
-        preamble_len = SOCKS5_UDP_PREAMBLE_SIZE_V4;
-    }
-    /*
-    else if (socks5client->udprelayaddr.ss_family == AF_INET6) {
-        preamble_len = SOCKS5_UDP_PREAMBLE_SIZE_V6;
-    }
-    */
-    else {
+    if (socks5client->udprelayaddr.sin_family != AF_INET && socks5client->udprelayaddr.sin_family != AF_INET6) {
         redudp_log_errno(client, LOG_WARNING, "Unknown address type %d",
                          socks5client->udprelayaddr.sin_family);
         return;
     }
 
     socks5_fill_preamble(&req, destaddr, &preamble_len);
-
     ssize_t outgoing, fwdlen = pktlen + preamble_len;
     memset(&msg, 0, sizeof(msg));
     msg.msg_name = &socks5client->udprelayaddr;
@@ -221,7 +211,7 @@ static void socks5_pkt_from_socks(int fd, short what, void *_arg)
     else if (pkt->header.addrtype == socks5_addrtype_ipv6) {
         struct sockaddr_in6 * src = (struct sockaddr_in6 *)&src_addr;
         src->sin6_family = AF_INET6;
-        memcpy(&src->sin6_addr, &pkt->header.addr.v6.addr, sizeof(src->sin6_addr));
+        src->sin6_addr = pkt->header.addr.v6.addr;
         src->sin6_port = pkt->header.addr.v6.port;
         header_size += sizeof(socks5_addr_ipv6);
     }
@@ -329,7 +319,7 @@ static void socks5_read_auth_reply(struct bufferevent *buffev, void *_arg)
     }
 
     error = redsocks_write_helper_ex_plain(
-            socks5client->relay, NULL, socks5_mkassociate, NULL, 0, /* last two are ignored */
+            socks5client->relay, NULL, socks5_mkassociate, &client->destaddr, 0,
             sizeof(socks5_expected_assoc_reply), sizeof(socks5_expected_assoc_reply));
     if (error)
         goto fail;
@@ -366,7 +356,7 @@ static void socks5_read_auth_methods(struct bufferevent *buffev, void *_arg)
     }
     else if (reply.method == socks5_auth_none) {
         ierror = redsocks_write_helper_ex_plain(
-                socks5client->relay, NULL, socks5_mkassociate, NULL, 0, /* last two are ignored */
+                socks5client->relay, NULL, socks5_mkassociate, &client->destaddr, 0,
                 sizeof(socks5_expected_assoc_reply), sizeof(socks5_expected_assoc_reply));
         if (ierror)
             goto fail;

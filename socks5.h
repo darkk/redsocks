@@ -37,7 +37,7 @@ typedef struct socks5_addr_ipv4_t {
 } PACKED socks5_addr_ipv4;
 
 typedef struct socks5_addr_ipv6_t {
-    struct in6_addr addr;
+	struct in6_addr addr;
 	uint16_t port;
 } PACKED socks5_addr_ipv6;
 
@@ -102,7 +102,7 @@ const char* socks5_is_known_auth_method(socks5_method_reply *reply, int do_passw
 static const int socks5_cmd_connect = 1;
 static const int socks5_cmd_bind = 2;
 static const int socks5_cmd_udp_associate = 3;
-struct evbuffer *socks5_mkcommand_plain(int socks5_cmd, const struct sockaddr_in *destaddr);
+struct evbuffer *socks5_mkcommand_plain(int socks5_cmd, const struct sockaddr_storage *destaddr);
 
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
