@@ -220,7 +220,8 @@ static void bound_udp4_action(const void *nodep, const VISIT which, const int de
 
 static int do_tproxy(redudp_instance* instance)
 {
-    return instance->config.dest == NULL;
+    // When listner is bound to IPv6 address, TPORXY must be used.
+    return instance->config.bindaddr.ss_family == AF_INET6 || instance->config.dest == NULL;
 }
 
 struct sockaddr_storage* get_destaddr(redudp_client *client)
@@ -575,7 +576,7 @@ static int redudp_init_instance(redudp_instance *instance)
         goto fail;
     }
 
-    fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    fd = socket(instance->config.bindaddr.ss_family, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
         log_errno(LOG_ERR, "socket");
         goto fail;
@@ -586,13 +587,25 @@ static int redudp_init_instance(redudp_instance *instance)
         // iptables TPROXY target does not send packets to non-transparent sockets
         if (0 != make_socket_transparent(fd))
             goto fail;
-
-        error = setsockopt(fd, SOL_IP, IP_RECVORIGDSTADDR, &on, sizeof(on));
-        if (error) {
-            log_errno(LOG_ERR, "setsockopt(listener, SOL_IP, IP_RECVORIGDSTADDR)");
-            goto fail;
+ 
+#ifdef SOL_IPV6
+        if (instance->config.bindaddr.ss_family == AF_INET) {
+#endif
+            error = setsockopt(fd, SOL_IP, IP_RECVORIGDSTADDR, &on, sizeof(on));
+            if (error) {
+                log_errno(LOG_ERR, "setsockopt(listener, SOL_IP, IP_RECVORIGDSTADDR)");
+                goto fail;
+            }
+#ifdef SOL_IPV6
         }
-
+        else {
+            error = setsockopt(fd, SOL_IPV6, IPV6_RECVORIGDSTADDR, &on, sizeof(on));
+            if (error) {
+                log_errno(LOG_ERR, "setsockopt(listener, SOL_IPV6, IPV6_RECVORIGDSTADDR)");
+                goto fail;
+            }
+        }
+#endif
         log_error(LOG_INFO, "redudp @ %s: TPROXY", red_inet_ntop(&instance->config.bindaddr, buf1, sizeof(buf1)));
     }
     else {

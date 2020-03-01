@@ -75,8 +75,11 @@ int red_recv_udp_pkt(
         memset(toaddr, 0, sizeof(*toaddr));
         for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
             if (
-                cmsg->cmsg_level == SOL_IP &&
-                cmsg->cmsg_type == IP_ORIGDSTADDR &&
+                ((cmsg->cmsg_level == SOL_IP && cmsg->cmsg_type == IP_ORIGDSTADDR)
+#ifdef SOL_IPV6
+		 || (cmsg->cmsg_level == SOL_IPV6 && cmsg->cmsg_type == IPV6_ORIGDSTADDR)
+#endif
+		 ) &&
                 (cmsg->cmsg_len == CMSG_LEN(sizeof(struct sockaddr_in))
                  || cmsg->cmsg_len == CMSG_LEN(sizeof(struct sockaddr_in6))) &&
                 cmsg->cmsg_len <= CMSG_LEN(sizeof(*toaddr))
