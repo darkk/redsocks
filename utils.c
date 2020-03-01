@@ -77,9 +77,9 @@ int red_recv_udp_pkt(
             if (
                 ((cmsg->cmsg_level == SOL_IP && cmsg->cmsg_type == IP_ORIGDSTADDR)
 #ifdef SOL_IPV6
-		 || (cmsg->cmsg_level == SOL_IPV6 && cmsg->cmsg_type == IPV6_ORIGDSTADDR)
+                 || (cmsg->cmsg_level == SOL_IPV6 && cmsg->cmsg_type == IPV6_ORIGDSTADDR)
 #endif
-		 ) &&
+                 ) &&
                 (cmsg->cmsg_len == CMSG_LEN(sizeof(struct sockaddr_in))
                  || cmsg->cmsg_len == CMSG_LEN(sizeof(struct sockaddr_in6))) &&
                 cmsg->cmsg_len <= CMSG_LEN(sizeof(*toaddr))
@@ -497,7 +497,14 @@ size_t get_write_hwm(struct bufferevent *bufev)
 int make_socket_transparent(int fd)
 {
     int on = 1;
-    int error = setsockopt(fd, SOL_IP, IP_TRANSPARENT, &on, sizeof(on));
+    int error = 0;
+#ifdef SOL_IPV6
+    // Try IPv6 first
+    error = setsockopt(fd, SOL_IPV6, IPV6_TRANSPARENT, &on, sizeof(on));
+    if (!error)
+        return error;
+#endif
+    error = setsockopt(fd, SOL_IP, IP_TRANSPARENT, &on, sizeof(on));
     if (error)
         log_errno(LOG_ERR, "setsockopt(..., SOL_IP, IP_TRANSPARENT)");
     return error;

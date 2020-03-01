@@ -220,8 +220,7 @@ static void bound_udp4_action(const void *nodep, const VISIT which, const int de
 
 static int do_tproxy(redudp_instance* instance)
 {
-    // When listner is bound to IPv6 address, TPORXY must be used.
-    return instance->config.bindaddr.ss_family == AF_INET6 || instance->config.dest == NULL;
+    return instance->config.dest == NULL;
 }
 
 struct sockaddr_storage* get_destaddr(redudp_client *client)

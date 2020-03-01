@@ -32,6 +32,11 @@
 #   define IP_TRANSPARENT 19
 #endif
 
+#ifndef IPV6_TRANSPARENT
+#   warning Using hardcoded value for IPV6_TRANSPARENT as libc headers do not define it.
+#   define IPV6_TRANSPARENT 75
+#endif
+
 #ifndef SOL_IP
 #   warning Using hardcoded value for SOL_IP as libc headers do not define it.
 #   define SOL_IP IPPROTO_IP
