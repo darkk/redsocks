@@ -198,9 +198,9 @@ static int getdestaddr_pf(
 	char clientaddr_str[INET6_ADDRSTRLEN], bindaddr_str[INET6_ADDRSTRLEN];
 
 	memset(&nl, 0, sizeof(struct pfioc_natlook));
-	nl.saddr.v4.s_addr = client->sin_addr.s_addr;
+	nl.saddr.v4addr.s_addr = client->sin_addr.s_addr;
 	nl.sport = client->sin_port;
-	nl.daddr.v4.s_addr = bindaddr->sin_addr.s_addr;
+	nl.daddr.v4addr.s_addr = bindaddr->sin_addr.s_addr;
 	nl.dport = bindaddr->sin_port;
 	nl.af = AF_INET;
 	nl.proto = IPPROTO_TCP;
@@ -219,7 +219,7 @@ static int getdestaddr_pf(
 	}
 	destaddr->sin_family = AF_INET;
 	destaddr->sin_port = nl.rdport;
-	destaddr->sin_addr = nl.rdaddr.v4;
+	destaddr->sin_addr = nl.rdaddr.v4addr;
 	return 0;
 
 fail:

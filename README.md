@@ -76,7 +76,7 @@ $ brew install openssl libevent
 Makefile include the folder of openssl headers and lib installed by brew.
 
 To build with PF and run on MacOS, you will need some pf headers that are not included with a standard MacOS installation.
-You can find them on this repository : https://github.com/opensource-apple/xnu
+You can find them on this repository : https://github.com/apple/darwin-xnu
 And the Makefile will going find this file for you
 
 Configurations

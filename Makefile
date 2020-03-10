@@ -114,11 +114,11 @@ base.c: $(CONF)
 
 ifeq ($(OS), Darwin)
 $(OSX_HEADERS_PATH)/net/pfvar.h:
-	mkdir -p $(OSX_HEADERS_PATH)/net && curl -o $(OSX_HEADERS_PATH)/net/pfvar.h https://raw.githubusercontent.com/opensource-apple/xnu/$(OSX_VERSION)/bsd/net/pfvar.h
+	mkdir -p $(OSX_HEADERS_PATH)/net && curl -o $(OSX_HEADERS_PATH)/net/pfvar.h https://raw.githubusercontent.com/apple/darwin-xnu/master/bsd/net/pfvar.h
 $(OSX_HEADERS_PATH)/net/radix.h:
-	mkdir -p $(OSX_HEADERS_PATH)/net && curl -o $(OSX_HEADERS_PATH)/net/radix.h https://raw.githubusercontent.com/opensource-apple/xnu/$(OSX_VERSION)/bsd/net/radix.h
+	mkdir -p $(OSX_HEADERS_PATH)/net && curl -o $(OSX_HEADERS_PATH)/net/radix.h https://raw.githubusercontent.com/apple/darwin-xnu/master/bsd/net/radix.h
 $(OSX_HEADERS_PATH)/libkern/tree.h:
-	mkdir -p $(OSX_HEADERS_PATH)/libkern && curl -o $(OSX_HEADERS_PATH)/libkern/tree.h https://raw.githubusercontent.com/opensource-apple/xnu/$(OSX_VERSION)/libkern/libkern/tree.h
+	mkdir -p $(OSX_HEADERS_PATH)/libkern && curl -o $(OSX_HEADERS_PATH)/libkern/tree.h https://raw.githubusercontent.com/apple/darwin-xnu/master/libkern/libkern/tree.h
 endif
 
 $(DEPS): $(OSX_HEADERS) $(SRCS)
