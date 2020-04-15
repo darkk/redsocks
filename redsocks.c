@@ -1,5 +1,5 @@
 /* redsocks - transparent TCP-to-proxy redirector
- * Copyright (C) 2007-2011 Leonid Evdokimov <leon@darkk.net.ru>
+ * Copyright (C) 2007-2018 Leonid Evdokimov <leon@darkk.net.ru>
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License.  You may obtain a copy
@@ -1369,30 +1369,10 @@ static int redsocks_init_instance(redsocks_instance *instance)
 	 *        looks ugly.
 	 */
 	int error;
-	int on = 1;
 	int fd = -1;
 
-	fd = socket(AF_INET, SOCK_STREAM, 0);
+	fd = red_socket_server(SOCK_STREAM, &instance->config.bindaddr);
 	if (fd == -1) {
-		log_errno(LOG_ERR, "socket");
-		goto fail;
-	}
-
-	error = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-	if (error) {
-		log_errno(LOG_ERR, "setsockopt");
-		goto fail;
-	}
-
-	error = bind(fd, (struct sockaddr*)&instance->config.bindaddr, sizeof(instance->config.bindaddr));
-	if (error) {
-		log_errno(LOG_ERR, "bind");
-		goto fail;
-	}
-
-	error = fcntl_nonblock(fd);
-	if (error) {
-		log_errno(LOG_ERR, "fcntl");
 		goto fail;
 	}
 

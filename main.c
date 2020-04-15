@@ -1,5 +1,5 @@
 /* redsocks - transparent TCP-to-proxy redirector
- * Copyright (C) 2007-2011 Leonid Evdokimov <leon@darkk.net.ru>
+ * Copyright (C) 2007-2018 Leonid Evdokimov <leon@darkk.net.ru>
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License.  You may obtain a copy
@@ -34,6 +34,7 @@ extern app_subsys debug_subsys;
 extern app_subsys base_subsys;
 extern app_subsys redudp_subsys;
 extern app_subsys dnstc_subsys;
+extern app_subsys dnsu2t_subsys;
 
 app_subsys *subsystems[] = {
 	&redsocks_subsys,
@@ -43,6 +44,7 @@ app_subsys *subsystems[] = {
 	&base_subsys,
 	&redudp_subsys,
 	&dnstc_subsys,
+	&dnsu2t_subsys,
 };
 
 static const char *confname = "redsocks.conf";

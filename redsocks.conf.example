@@ -150,4 +150,28 @@ dnstc {
 	local_port = 5300;
 }
 
+dnsu2t {
+	// fake and a bit less dumb DNS server that converts several UDP
+	// queries into single pipelined TCP stream of DNS queries.
+	local_ip = 127.0.0.1;
+	local_port = 5313;
+
+	// See https://en.wikipedia.org/wiki/Public_recursive_name_server
+	// NB: TCP connection to this ${ip}:${port} is not passed through
+	// proxy, configure your firewall rules if you want that.
+	remote_ip = 8.8.8.8;
+	remote_port = 53;
+
+	// Maximum amount of concurrent in-flight DNS queries sent to remote server.
+	// Some public DNS servers seem to limit it and terminate connections
+	// with high count of in-flight requests, so it's trade-off between
+	// request latency and availability. In-flight requests are not cached,
+	// so they're lost in case of DNS/TCP connection termination.
+	// inflight_max = 16;
+
+	// I/O timeout of remote endpoint. Default value is quite conservative and
+	// corresponds to the highest timeout among public servers from Wikipedia.
+	// remote_timeout = 30;
+}
+
 // you can add more `redsocks' and `redudp' sections if you need.
