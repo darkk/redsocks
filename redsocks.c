@@ -1078,10 +1078,12 @@ static void conn_pressure_lowered()
 
 static void redsocks_accept_backoff(int fd, short what, void *_null)
 {
-	accept_enable(); // `accept_backoff_ev` is not pending now
-
-	if (conn_pressure_ongoing())
+	if (conn_pressure_ongoing()) {
 		conn_pressure(); // rearm timeout
+	}
+	if (!conn_pressure_ongoing()) {
+		accept_enable();
+	}
 }
 
 void redsocks_close_internal(int fd, const char* file, int line, const char *func)
