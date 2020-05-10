@@ -500,19 +500,21 @@ int make_socket_transparent(int fd)
     int error = 0;
 #ifdef SOL_IPV6
     int error_6 = 0;
-    // Try IPv6 first
-    error_6 = setsockopt(fd, SOL_IPV6, IPV6_TRANSPARENT, &on, sizeof(on));
-    if (error_6)
-        log_errno(LOG_DEBUG, "setsockopt(fd, SOL_IPV6, IPV6_TRANSPARENT)");
 #endif
+
     error = setsockopt(fd, SOL_IP, IP_TRANSPARENT, &on, sizeof(on));
     if (error)
         log_errno(LOG_DEBUG, "setsockopt(fd, SOL_IP, IP_TRANSPARENT)");
-    if (error && error_6) {
+
+#ifdef SOL_IPV6
+    error_6 = setsockopt(fd, SOL_IPV6, IPV6_TRANSPARENT, &on, sizeof(on));
+    if (error_6)
+        log_errno(LOG_DEBUG, "setsockopt(fd, SOL_IPV6, IPV6_TRANSPARENT)");
+
+    if (error && error_6)
         log_error(LOG_ERR, "Can not make socket transparent. See debug log for details.");
-        return error;
-    }
-    return 0;
+#endif
+    return error;
 }
 
 int apply_tcp_fastopen(int fd)

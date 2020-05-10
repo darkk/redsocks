@@ -452,6 +452,7 @@ static int tcpdns_init_instance(tcpdns_instance *instance)
      */
     int error;
     int fd = -1;
+    int bindaddr_len = 0;
     char buf1[RED_INET_ADDRSTRLEN];
 
     fd = socket(instance->config.bindaddr.ss_family, SOCK_DGRAM, IPPROTO_UDP);
@@ -462,7 +463,12 @@ static int tcpdns_init_instance(tcpdns_instance *instance)
     if (apply_reuseport(fd))
         log_error(LOG_WARNING, "Continue without SO_REUSEPORT enabled");
 
-    error = bind(fd, (struct sockaddr*)&instance->config.bindaddr, sizeof(instance->config.bindaddr));
+#ifdef __APPLE__
+    bindaddr_len = instance->config.bindaddr.ss_len > 0 ? instance->config.bindaddr.ss_len : sizeof(instance->config.bindaddr);
+#else
+    bindaddr_len = sizeof(instance->config.bindaddr);
+#endif
+    error = bind(fd, (struct sockaddr*)&instance->config.bindaddr, bindaddr_len);
     if (error) {
         log_errno(LOG_ERR, "bind");
         goto fail;
