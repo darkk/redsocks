@@ -285,13 +285,14 @@ char *http_auth_request_header(struct evbuffer *src, struct evbuffer *tee)
 				return NULL; // I'm going up straight to the 403...
 			}
 		}
-		// FIXME: multi-line headers are not supported
 		if (line == NULL || *line == '\0' || strchr(line, ':') == NULL) {
 			free(line);
 			return NULL;
 		}
-		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0)
-			return line;
+		if (strncasecmp(line, auth_request_header, strlen(auth_request_header)) == 0) 
+			if (strcasestr(line, "Basic") != NULL ||
+			     strcasestr (line, "Digest") != NULL)
+				return line;
 		free(line);
 	}
 }
