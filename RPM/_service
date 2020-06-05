@@ -1,0 +1,21 @@
+<services>
+  <service name="obs_scm">
+    <param name="url">https://github.com/snorre-k/redsocks.git</param>
+    <param name="scm">git</param>
+    <param name="extract">RPM/redsocks.spec</param>
+    <param name="versionformat">@PARENT_TAG@+git@TAG_OFFSET@+%cd.%h</param>
+  </service>
+
+<!--
+Warning: the following mode="buildtime" options require the additional
+openSUSE:Tools repository path added to each repository
+-->
+
+  <service name="tar" mode="buildtime"/>
+  <service name="recompress" mode="buildtime">
+    <param name="file">*.tar</param>
+    <param name="compression">gz</param>
+  </service>
+
+  <service name="set_version" mode="buildtime"/>
+</services>
