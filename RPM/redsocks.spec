@@ -27,8 +27,7 @@ License:	Apache-2.0
 Summary:	Redirect any TCP connection to a SOCKS or HTTPS proxy server
 Url:		http://darkk.net.ru/redsocks/
 Group:		Productivity/Networking/Other
-#Source:		%{name}-%{version}.tar.gz
-Source:		_service
+Source:		%{name}-%{version}.tar.gz
 BuildRequires:	libevent-devel
 PreReq:		%fillup_prereq
 PreReq:		/usr/bin/getent
@@ -51,7 +50,7 @@ Also included is a small DNS server returning answers with the "truncated" flag
 set for any UDP query, forcing the resolver to use TCP.
 
 %prep
-%setup -n %_sourcedir/%name-%version -T -D
+%setup 
 
 %build
 CFLAGS="$RPM_OPT_FLAGS" make %{?_smp_mflags}
