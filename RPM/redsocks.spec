@@ -28,7 +28,6 @@ Summary:	Redirect any TCP connection to a SOCKS or HTTPS proxy server
 Url:		http://darkk.net.ru/redsocks/
 Group:		Productivity/Networking/Other
 Source:		%{name}-%{version}.tar.gz
-Source2:	%{name}.sysconfig
 BuildRequires:	libevent-devel
 PreReq:		%fillup_prereq
 PreReq:		/usr/bin/getent
@@ -65,7 +64,7 @@ ln -s -f %{_sbindir}/service %{buildroot}%{_sbindir}/rc%{name}
 %{__install} -D debian/%{name}.conf %buildroot/%_sysconfdir/%{name}/%{name}.conf
 %{__install} -D debian/%{name}.8 %buildroot/%_mandir/man8/%{name}.8
 gzip %buildroot/%_mandir/man8/%{name}.8
-%{__install} -D -m644 %{SOURCE2} %{buildroot}%{_fillupdir}/sysconfig.%{name}
+%{__install} -D -m644 SuSE/%{name}.sysconfig %{buildroot}%{_fillupdir}/sysconfig.%{name}
 %{__install} -d -m 0755 %{buildroot}%{_tmpfilesdir}
 echo "d /var/run/%name  755 %name %name" >%{buildroot}%{_tmpfilesdir}/%{name}.conf
 
