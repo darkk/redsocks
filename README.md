@@ -1,5 +1,10 @@
 # redsocks – transparent TCP-to-proxy redirector
 
+Adapted by Snorre to have some bugfixes
+
+* Works with proxies sending multiple authentication requests
+* Added RPM spec file
+
 This tool allows you to redirect any TCP connection to SOCKS or HTTPS
 proxy using your firewall, so redirection may be system-wide or network-wide.
 
