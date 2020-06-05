@@ -1,6 +1,6 @@
 # redsocks – transparent TCP-to-proxy redirector
 
-Adapted by Snorre to have some bugfixes
+Adapted by Snorre to have some bugfixes:
 
 * Works with proxies sending multiple authentication requests
 * Added RPM spec file
