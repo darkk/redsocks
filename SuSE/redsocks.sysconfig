@@ -1,0 +1,9 @@
+## Path:        Network/Others
+## Description: socks redirector
+
+## Type:        string
+## Default:     "/etc/redsocks/redsocks.conf"
+#
+# The config file.
+#
+REDSOCKS_CONF="/etc/redsocks/redsocks.conf"

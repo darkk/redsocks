@@ -1,5 +1,11 @@
 # redsocks – transparent TCP-to-proxy redirector
 
+Adapted by Snorre to have some bugfixes:
+
+* Works with proxies sending multiple authentication requests
+* Added RPM spec file
+* Added _service for building on OSB 
+
 This tool allows you to redirect any TCP connection to SOCKS or HTTPS
 proxy using your firewall, so redirection may be system-wide or network-wide.
 
@@ -251,3 +257,4 @@ Mailing list also has [archives](http://librelist.com/browser/redsocks/).
 ## Author
 
 This program was written by Leonid Evdokimov <leon@darkk.net.ru>
+Changed by Snorre

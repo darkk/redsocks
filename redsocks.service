@@ -1,5 +1,6 @@
 [Unit]
 Description=Transparent redirector of any TCP connection to proxy using your firewall
+After=network.target
 
 [Service]
 Type=forking
