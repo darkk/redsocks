@@ -21,7 +21,7 @@
 %endif
 
 Name:		redsocks
-Version:	0.5.1
+Version:	_service
 Release:	0
 License:	Apache-2.0
 Summary:	Redirect any TCP connection to a SOCKS or HTTPS proxy server
