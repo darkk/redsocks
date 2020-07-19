@@ -52,7 +52,7 @@ typedef struct dns_header_t {
 
 #define DNS_QR 0x80
 #define DNS_TC 0x02
-#define DNS_Z  0x70
+#define DNS_Z  0x50 /* Z take 1 bit now, see: https://www.freesoft.org/CIE/RFC/2065/40.htm */
 
 /***********************************************************************
  * Logic
