@@ -22,6 +22,9 @@ override CFLAGS += -D_BSD_SOURCE -D_DEFAULT_SOURCE -Wall
 ifeq ($(OS), Linux)
 override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600
 endif
+ifeq ($(OS), FreeBSD)
+override CFLAGS +=-I/usr/local/include -L/usr/local//lib
+endif
 ifeq ($(OS), Darwin)
 override CFLAGS +=-I/usr/local/opt/openssl/include -L/usr/local/opt/openssl/lib
 SHELL := /bin/bash

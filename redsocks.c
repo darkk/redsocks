@@ -998,10 +998,10 @@ static int redsocks_init_instance(redsocks_instance *instance)
     if (make_socket_transparent(fd))
         log_error(LOG_WARNING, "Continue without TPROXY support");
 
-    if (apply_reuseport(fd))
-        log_error(LOG_WARNING, "Continue without SO_REUSEPORT enabled");
+//    if (apply_reuseport(fd))
+//        log_error(LOG_WARNING, "Continue without SO_REUSEPORT enabled");
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
     bindaddr_len = instance->config.bindaddr.ss_len > 0 ? instance->config.bindaddr.ss_len : sizeof(instance->config.bindaddr);
 #else
     bindaddr_len = sizeof(instance->config.bindaddr);
