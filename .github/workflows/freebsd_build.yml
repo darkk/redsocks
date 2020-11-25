@@ -1,20 +1,9 @@
-name: C/C++ CI
+name: freebsd_build
 
 on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-    - name: install depends
-      run: |
-        sudo apt update
-        sudo apt install -y libssl1.0-dev libevent-dev
-    - name: Build
-      run: make
-
-  build_freebsd:
     runs-on: macos-latest
     name: A job to run test FreeBSD
     # env:

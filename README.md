@@ -1,5 +1,8 @@
 REDSOCKS2
 =========
+[![Linux Build Status](https://github.com/semigodking/redsocks/workflows/linux_build/badge.svg)](https://github.com/semigodking/redsocks/actions)
+[![FreeBSD Build Status](https://github.com/semigodking/redsocks/workflows/freebsd_build/badge.svg)](https://github.com/semigodking/redsocks/actions)
+
 This is a modified version of original redsocks.
 The name is changed to REDSOCKS2 to distinguish with original redsocks.
 REDSOCKS2 contains several new features besides many bug fixes to original
@@ -15,7 +18,7 @@ need of blacklist.
 7. Support Ful-cone NAT Traversal when working with shadowsocks or socks5 proxy.
 8. Integrated HTTPS proxy support(HTTP CONNECT over SSL).
 9. Support TCP Fast Open on local server side and shadowsocks client side
-10.Support port reuse ([SO_REUSEPORT](https://lwn.net/Articles/542629/))
+10. Support port reuse ([SO_REUSEPORT](https://lwn.net/Articles/542629/))
 
 [Chinese Reference](https://github.com/semigodking/redsocks/wiki)
 
