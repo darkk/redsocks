@@ -4,9 +4,7 @@ on: [push]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v1
     - name: install depends
@@ -15,3 +13,21 @@ jobs:
         sudo apt install -y libssl1.0-dev libevent-dev
     - name: Build
       run: make
+
+  build_freebsd:
+    runs-on: macos-latest
+    name: A job to run test FreeBSD
+    # env:
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build in FreeBSD
+      id: test
+      uses: vmactions/freebsd-vm@v0.0.9
+      with:
+        # envs: 'MYTOKEN MYTOKEN2'
+        usesh: true
+        prepare: pkg install -y curl libevent gmake 
+        run: |
+          pwd
+          freebsd-version
+          gmake DISABLE_SHADOWSOCKS=1
