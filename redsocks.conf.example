@@ -71,7 +71,7 @@ redsocks {
 	// min_accept_backoff = 100;
 	// max_accept_backoff = 60000;
 
-	// `relay' is IP address and port of proxy-server. Domain name is not
+	// `relay` is IP address and port of proxy-server. Domain name is not
 	// supported yet.
 	// Can be:
 	//     [IPv6Address]:port
@@ -84,6 +84,13 @@ redsocks {
 
 	// known types: socks4, socks5, http-connect, http-relay
 	// New types: direct, shadowsocks, https-connect
+	// For type direct:
+	//     if `relay` is not specified, connections will be forwarded to
+	// original destinations.
+	//     if `relay` is filled with valid IP address, connections will be
+	// forwarded to IP address defined in `relay`. It is useful when you
+	// just want to forward connections to a specific IP address without
+	// transparent proxy. E.g. forward IPv4:port to IPv6:port.
 	type = socks5;
 
 	// Specify interface for outgoing connections.

@@ -61,13 +61,18 @@ static void direct_write_cb(struct bufferevent *buffev, void *_arg)
 
 static int direct_connect_relay(redsocks_client *client)
 {
-    char * interface = client->instance->config.interface;
-    struct timeval tv = {client->instance->config.timeout, 0};
+    redsocks_instance * instance = client->instance;
+    char * interface = instance->config.interface;
+    struct timeval tv = {instance->config.timeout, 0};
+    struct sockaddr_storage * destaddr = &client->destaddr;
 
+    if (instance->config.relay) {
+	destaddr = &instance->config.relayaddr;
+    }
     // Allowing binding relay socket to specified IP for outgoing connections
     client->relay = red_connect_relay(
             interface,
-            &client->destaddr,
+            destaddr,
             NULL,
             redsocks_relay_connected,
             redsocks_event_error,
