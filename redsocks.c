@@ -1017,6 +1017,13 @@ static redsocks_hostname_read_rc redsocks_read_http_host(redsocks_client *client
         memset(temp_hostname, 0, parser_data.http_host_length + 1);
         memcpy(temp_hostname, parser_data.http_host, parser_data.http_host_length);
         temp_hostname[parser_data.http_host_length + 1] = '\0';
+
+        /* handle the http://host:port/ situation.
+           this is not yet handled by http-parser currently:
+           https://github.com/nodejs/http-parser/issues/501 */
+        char *colon_ptr = strchr(temp_hostname, ':');
+        if (colon_ptr != NULL) memset(colon_ptr, 0, parser_data.http_host_length + 1 - (colon_ptr - temp_hostname));
+
         *hostname = temp_hostname;
 
         return SUCCESS;
@@ -1060,7 +1067,7 @@ static void redsocks_hostname_reader(struct bufferevent *buffev, void *_arg)
 
     case SUCCESS:
         client->hostname = hostname;
-	    redsocks_log_error(client, LOG_INFO, "found hostname %s,", client->hostname);
+        redsocks_log_error(client, LOG_INFO, "found hostname %s,", client->hostname);
     case DATA_MISSING:
         redsocks_log_error(client, LOG_INFO, "now connecting...");
         if (client->instance->relay_ss->connect_relay) {
@@ -1458,12 +1465,12 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
 	redsocks_log_error(client, LOG_INFO, "accepted");
 
-    if (self->config.parse_sni_host || self->config.parse_http_host) {
-        client->client->wm_read.low = MINIMUM_HOST_READ;
-        client->client->wm_read.high = MAXIMUM_HOST_READ;
-        /* We wait first for the client to give us the host */
-        return;
-    }
+	if (self->config.parse_sni_host || self->config.parse_http_host) {
+		client->client->wm_read.low = MINIMUM_HOST_READ;
+		client->client->wm_read.high = MAXIMUM_HOST_READ;
+		/* We wait first for the client to give us the host */
+		return;
+	}
 
 	if (self->relay_ss->connect_relay)
 		self->relay_ss->connect_relay(client);
