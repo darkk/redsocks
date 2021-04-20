@@ -746,7 +746,8 @@ void redsocks_drop_client(redsocks_client *client)
 		}
 	}
 	redsocks_conn_list_del(client);
-	free(client->hostname);
+	if (client->hostname != NULL)
+	    free(client->hostname);
 	free(client);
 }
 
@@ -967,22 +968,20 @@ static void redsocks_hostname_reader(struct bufferevent *buffev, void *_arg)
         rc = redsocks_read_sni(client, read_buffer, read_buffer_size, &hostname);
     }
 
+    client->hostname = NULL;
+
     switch (rc) {
 
     case SUCCESS:
         client->hostname = hostname;
-	    redsocks_log_error(client, LOG_INFO, "found hostname %s, now connecting", client->hostname);
-
+	    redsocks_log_error(client, LOG_INFO, "found hostname %s,", client->hostname);
+    case DATA_MISSING:
+        redsocks_log_error(client, LOG_INFO, "now connecting...");
         if (client->instance->relay_ss->connect_relay) {
             client->instance->relay_ss->connect_relay(client);
         } else {
             redsocks_connect_relay(client);
         }
-
-        break;
-
-    case DATA_MISSING:
-        redsocks_log_error(client, LOG_INFO, "data is missing");
 
         break;
 
