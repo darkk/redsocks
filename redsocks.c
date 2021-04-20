@@ -38,9 +38,16 @@
 #include "utils.h"
 #include "libevent-compat.h"
 #include "tls.h"
+#include "http_parser.h"
 
 #define MINIMUM_HOST_READ (10)
 #define MAXIMUM_HOST_READ (0)
+
+struct http_parser_data {
+    const char *last_header_field;
+    const char *http_host;
+    size_t http_host_length;
+};
 
 typedef enum _redsocks_hostname_read_rc {
     SUCCESS = 0,
@@ -91,6 +98,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "password",   .type = pt_pchar },
 	{ .key = "listenq",    .type = pt_uint16 },
 	{ .key = "parse_sni_host", .type = pt_bool },
+	{ .key = "parse_http_host", .type = pt_bool },
 	{ .key = "splice",     .type = pt_bool },
 	{ .key = "disclose_src", .type = pt_disclose_src },
 	{ .key = "on_proxy_fail", .type = pt_on_proxy_fail },
@@ -159,6 +167,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
 			(strcmp(entry->key, "parse_sni_host") == 0) ? (void*)&instance->config.parse_sni_host :
+			(strcmp(entry->key, "parse_http_host") == 0) ? (void*)&instance->config.parse_http_host :
 			(strcmp(entry->key, "splice") == 0)     ? (void*)&instance->config.use_splice :
 			(strcmp(entry->key, "disclose_src") == 0) ? (void*)&instance->config.disclose_src :
 			(strcmp(entry->key, "on_proxy_fail") == 0) ? (void*)&instance->config.on_proxy_fail :
@@ -880,6 +889,31 @@ int redsocks_read_expected(redsocks_client *client, struct evbuffer *input, void
 	}
 }
 
+static int redsocks_http_parser_on_header_field(http_parser *parser, const char *at, size_t length)
+{
+    struct http_parser_data *parser_data = (struct http_parser_data *) parser->data;
+
+    parser_data->last_header_field = at;
+
+    return 0;
+}
+
+static int redsocks_http_parser_on_header_value(http_parser *parser, const char *at, size_t length)
+{
+    struct http_parser_data *parser_data = (struct http_parser_data *) parser->data;
+
+    if (0 != strncasecmp(parser_data->last_header_field, "host", sizeof("host") - 1)) {
+        return 0;
+    }
+
+    parser_data->http_host = at;
+    parser_data->http_host_length = length;
+
+    http_parser_pause(parser, 1);
+
+    return 0;
+}
+
 static int redsocks_peek_buffer(redsocks_client *client, struct bufferevent *buffev, char **peek_buffer, size_t *peek_size)
 {
     int n = 0, i = 0;
@@ -943,6 +977,55 @@ static redsocks_hostname_read_rc redsocks_read_sni(redsocks_client *client, char
     return FATAL_ERROR;
 }
 
+static redsocks_hostname_read_rc redsocks_read_http_host(redsocks_client *client, char *read_buffer, size_t read_buffer_size, char **hostname)
+{
+    http_parser parser;
+    http_parser_settings parser_settings;
+    struct http_parser_data parser_data;
+    char *temp_hostname = NULL;
+    int rc = HPE_UNKNOWN;
+
+    memset(&parser, 0, sizeof(parser));
+    memset(&parser_settings, 0, sizeof(parser_settings));
+    memset(&parser_data, 0, sizeof(parser_data));
+
+    http_parser_init(&parser, HTTP_REQUEST);
+
+    parser.data = &parser_data;
+    parser_settings.on_header_field = redsocks_http_parser_on_header_field;
+    parser_settings.on_header_value = redsocks_http_parser_on_header_value;
+
+    rc = http_parser_execute(&parser, &parser_settings, read_buffer, read_buffer_size);
+
+    if (rc != read_buffer_size &&
+        HTTP_PARSER_ERRNO(&parser) != HPE_PAUSED) {
+        redsocks_log_error(client, LOG_ERR, "error at http parser library: %s",
+                           http_errno_description(HTTP_PARSER_ERRNO(&parser)));
+        return FATAL_ERROR;
+    }
+
+    if (rc == read_buffer_size && NULL == parser_data.http_host) {
+        return DATA_MISSING;
+    }
+
+    if (parser_data.http_host && parser_data.http_host_length) {
+        temp_hostname = (char *) malloc(parser_data.http_host_length + 1);
+        if (NULL == temp_hostname) {
+            return FATAL_ERROR;
+        }
+
+        memset(temp_hostname, 0, parser_data.http_host_length + 1);
+        memcpy(temp_hostname, parser_data.http_host, parser_data.http_host_length);
+        temp_hostname[parser_data.http_host_length + 1] = '\0';
+        *hostname = temp_hostname;
+
+        return SUCCESS;
+    }
+
+    /* should be unreachable */
+    return FATAL_ERROR;
+}
+
 static void redsocks_hostname_reader(struct bufferevent *buffev, void *_arg)
 {
     redsocks_client *client = _arg;
@@ -951,9 +1034,9 @@ static void redsocks_hostname_reader(struct bufferevent *buffev, void *_arg)
     char *hostname = NULL;
     redsocks_hostname_read_rc rc = FATAL_ERROR;
 
-    assert(client->instance->config.parse_sni_host);
+    assert(client->instance->config.parse_sni_host || client->instance->config.parse_http_host);
 
-    if (!client->instance->config.parse_sni_host) {
+    if (!client->instance->config.parse_sni_host && !client->instance->config.parse_http_host) {
         return;
     }
 
@@ -962,10 +1045,13 @@ static void redsocks_hostname_reader(struct bufferevent *buffev, void *_arg)
         return;
     }
 
-    redsocks_log_error(client, LOG_INFO, "searching for hostname by sni");
-
     if (client->instance->config.parse_sni_host) {
+        redsocks_log_error(client, LOG_INFO, "searching for hostname by TLS SNI");
         rc = redsocks_read_sni(client, read_buffer, read_buffer_size, &hostname);
+    }
+    if (rc != SUCCESS && rc != FATAL_ERROR && client->instance->config.parse_http_host) {
+        redsocks_log_error(client, LOG_INFO, "searching for hostname by HTTP Host header");
+        rc = redsocks_read_http_host(client, read_buffer, read_buffer_size, &hostname);
     }
 
     client->hostname = NULL;
@@ -1351,7 +1437,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
 	redsocks_touch_client(client);
 
-    if (!self->config.parse_sni_host) {
+    if (!self->config.parse_sni_host && !self->config.parse_http_host) {
         client->client = bufferevent_new(client_fd, NULL, NULL, redsocks_event_error, client);
     } else {
         client->client = bufferevent_new(client_fd, redsocks_hostname_reader, NULL, redsocks_event_error, client);
@@ -1372,7 +1458,7 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
 	redsocks_log_error(client, LOG_INFO, "accepted");
 
-    if (self->config.parse_sni_host) {
+    if (self->config.parse_sni_host || self->config.parse_http_host) {
         client->client->wm_read.low = MINIMUM_HOST_READ;
         client->client->wm_read.high = MAXIMUM_HOST_READ;
         /* We wait first for the client to give us the host */

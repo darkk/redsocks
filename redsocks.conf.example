@@ -116,6 +116,10 @@ redsocks {
 	// parse hostname from TLS SNI extension,
 	// so that HTTP CONNECT can use hostname rather than IP address
 	// parse_sni_host = true;
+
+	// parse hostname from plaintext HTTP Host header,
+	// so that HTTP CONNECT can use hostname rather than IP address
+	// parse_http_host = true;
 }
 
 redudp {

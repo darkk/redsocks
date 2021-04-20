@@ -33,6 +33,7 @@ typedef struct redsocks_config_t {
 	char *login;
 	char *password;
 	bool parse_sni_host;
+	bool parse_http_host;
 	uint16_t listenq;
 	bool use_splice;
 	enum disclose_src_e disclose_src;
