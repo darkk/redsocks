@@ -37,7 +37,16 @@
 #include "redsocks.h"
 #include "utils.h"
 #include "libevent-compat.h"
+#include "tls.h"
 
+#define MINIMUM_HOST_READ (10)
+#define MAXIMUM_HOST_READ (0)
+
+typedef enum _redsocks_hostname_read_rc {
+    SUCCESS = 0,
+    DATA_MISSING = 1,
+    FATAL_ERROR = 2,
+} redsocks_hostname_read_rc;
 
 #define REDSOCKS_RELAY_HALFBUFF  4096
 
@@ -81,6 +90,7 @@ static parser_entry redsocks_entries[] =
 	{ .key = "login",      .type = pt_pchar },
 	{ .key = "password",   .type = pt_pchar },
 	{ .key = "listenq",    .type = pt_uint16 },
+	{ .key = "parse_sni_host", .type = pt_bool },
 	{ .key = "splice",     .type = pt_bool },
 	{ .key = "disclose_src", .type = pt_disclose_src },
 	{ .key = "on_proxy_fail", .type = pt_on_proxy_fail },
@@ -148,6 +158,7 @@ static int redsocks_onenter(parser_section *section)
 			(strcmp(entry->key, "login") == 0)      ? (void*)&instance->config.login :
 			(strcmp(entry->key, "password") == 0)   ? (void*)&instance->config.password :
 			(strcmp(entry->key, "listenq") == 0)    ? (void*)&instance->config.listenq :
+			(strcmp(entry->key, "parse_sni_host") == 0) ? (void*)&instance->config.parse_sni_host :
 			(strcmp(entry->key, "splice") == 0)     ? (void*)&instance->config.use_splice :
 			(strcmp(entry->key, "disclose_src") == 0) ? (void*)&instance->config.disclose_src :
 			(strcmp(entry->key, "on_proxy_fail") == 0) ? (void*)&instance->config.on_proxy_fail :
@@ -735,6 +746,7 @@ void redsocks_drop_client(redsocks_client *client)
 		}
 	}
 	redsocks_conn_list_del(client);
+	free(client->hostname);
 	free(client);
 }
 
@@ -865,6 +877,121 @@ int redsocks_read_expected(redsocks_client *client, struct evbuffer *input, void
 		redsocks_drop_client(client);
 		return -1;
 	}
+}
+
+static int redsocks_peek_buffer(redsocks_client *client, struct bufferevent *buffev, char **peek_buffer, size_t *peek_size)
+{
+    int n = 0, i = 0;
+    char *read_buffer = NULL;
+    size_t read_buffer_size = 0;
+    size_t read_buffer_position = 0;
+    struct evbuffer_iovec *v = NULL;
+
+    n = evbuffer_peek(buffev->input, -1, NULL, NULL, 0);
+
+    v = malloc(sizeof(struct evbuffer_iovec) * n);
+    if (NULL == v) {
+	redsocks_log_error(client, LOG_ERR, "malloc() error");
+        goto finish;
+    }
+
+    n = evbuffer_peek(buffev->input, -1, NULL, v, n);
+
+    read_buffer_size = 0;
+    for (i = 0; i < n; i++) {
+        read_buffer_size +=  v[i].iov_len;
+    }
+
+    read_buffer = (char *) malloc(read_buffer_size);
+    if (NULL == read_buffer) {
+	redsocks_log_error(client, LOG_ERR, "malloc() error");
+        goto fail;
+    }
+
+    read_buffer_position = 0;
+    for (i = 0; i < n; i++) {
+        memcpy(&read_buffer[read_buffer_position], v[i].iov_base, v[i].iov_len);
+        read_buffer_position += v[i].iov_len;
+    }
+
+ fail:
+    free(v);
+
+ finish:
+    *peek_buffer = read_buffer;
+    *peek_size = read_buffer_size;
+
+    return 0;
+}
+
+static redsocks_hostname_read_rc redsocks_read_sni(redsocks_client *client, char *read_buffer, size_t read_buffer_size, char **hostname)
+{
+    int rc = parse_tls_header(read_buffer, read_buffer_size, hostname);
+
+    if (rc >= 0) {
+        return SUCCESS;
+    }
+
+    /* rc < 0 */
+
+    if (rc != -4) {
+        return DATA_MISSING;
+    }
+
+    /* rc == -4, malloc failure */
+    return FATAL_ERROR;
+}
+
+static void redsocks_hostname_reader(struct bufferevent *buffev, void *_arg)
+{
+    redsocks_client *client = _arg;
+    size_t read_buffer_size = 0;
+    char *read_buffer = NULL;
+    char *hostname = NULL;
+    redsocks_hostname_read_rc rc = FATAL_ERROR;
+
+    assert(client->instance->config.parse_sni_host);
+
+    if (!client->instance->config.parse_sni_host) {
+        return;
+    }
+
+    if (0 != redsocks_peek_buffer(client, buffev, &read_buffer, &read_buffer_size)) {
+        redsocks_drop_client(client);
+        return;
+    }
+
+    redsocks_log_error(client, LOG_INFO, "searching for hostname by sni");
+
+    if (client->instance->config.parse_sni_host) {
+        rc = redsocks_read_sni(client, read_buffer, read_buffer_size, &hostname);
+    }
+
+    switch (rc) {
+
+    case SUCCESS:
+        client->hostname = hostname;
+	    redsocks_log_error(client, LOG_INFO, "found hostname %s, now connecting", client->hostname);
+
+        if (client->instance->relay_ss->connect_relay) {
+            client->instance->relay_ss->connect_relay(client);
+        } else {
+            redsocks_connect_relay(client);
+        }
+
+        break;
+
+    case DATA_MISSING:
+        redsocks_log_error(client, LOG_INFO, "data is missing");
+
+        break;
+
+    case FATAL_ERROR: /* passthourgh */
+    default:
+        redsocks_drop_client(client);
+    }
+
+    free(read_buffer);
 }
 
 struct evbuffer *mkevbuffer(void *data, size_t len)
@@ -1225,7 +1352,11 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 
 	redsocks_touch_client(client);
 
-	client->client = bufferevent_new(client_fd, NULL, NULL, redsocks_event_error, client);
+    if (!self->config.parse_sni_host) {
+        client->client = bufferevent_new(client_fd, NULL, NULL, redsocks_event_error, client);
+    } else {
+        client->client = bufferevent_new(client_fd, redsocks_hostname_reader, NULL, redsocks_event_error, client);
+    }
 	if (!client->client) {
 		log_errno(LOG_ERR, "bufferevent_new");
 		goto fail;
@@ -1241,6 +1372,13 @@ static void redsocks_accept_client(int fd, short what, void *_arg)
 	}
 
 	redsocks_log_error(client, LOG_INFO, "accepted");
+
+    if (self->config.parse_sni_host) {
+        client->client->wm_read.low = MINIMUM_HOST_READ;
+        client->client->wm_read.high = MAXIMUM_HOST_READ;
+        /* We wait first for the client to give us the host */
+        return;
+    }
 
 	if (self->relay_ss->connect_relay)
 		self->relay_ss->connect_relay(client);
