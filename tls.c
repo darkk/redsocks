@@ -36,7 +36,7 @@
 #include <sys/types.h>
 #include "tls.h"
 #include "protocol.h"
-#include "logger.h"
+#include "log.h"
 
 #define SERVER_NAME_LEN 256
 #define TLS_HEADER_LEN 5
@@ -100,20 +100,20 @@ parse_tls_header(const uint8_t *data, size_t data_len, char **hostname) {
      * See RFC5246 Appendix E.2
      */
     if (data[0] & 0x80 && data[2] == 1) {
-        debug("Received SSL 2.0 Client Hello which can not support SNI.");
+        log_error(LOG_DEBUG, "Received SSL 2.0 Client Hello which can not support SNI.");
         return -2;
     }
 
     tls_content_type = data[0];
     if (tls_content_type != TLS_HANDSHAKE_CONTENT_TYPE) {
-        debug("Request did not begin with TLS handshake.");
+        log_error(LOG_DEBUG, "Request did not begin with TLS handshake.");
         return -5;
     }
 
     tls_version_major = data[1];
     tls_version_minor = data[2];
     if (tls_version_major < 3) {
-        debug("Received SSL %" PRIu8 ".%" PRIu8 " handshake which can not support SNI.",
+        log_error(LOG_DEBUG, "Received SSL %" PRIu8 ".%" PRIu8 " handshake which can not support SNI.",
               tls_version_major, tls_version_minor);
 
         return -2;
@@ -135,7 +135,7 @@ parse_tls_header(const uint8_t *data, size_t data_len, char **hostname) {
         return -5;
     }
     if (data[pos] != TLS_HANDSHAKE_TYPE_CLIENT_HELLO) {
-        debug("Not a client hello");
+        log_error(LOG_DEBUG, "Not a client hello");
 
         return -5;
     }
@@ -168,7 +168,7 @@ parse_tls_header(const uint8_t *data, size_t data_len, char **hostname) {
     pos += 1 + len;
 
     if (pos == data_len && tls_version_major == 3 && tls_version_minor == 0) {
-        debug("Received SSL 3.0 handshake without extensions");
+        log_error(LOG_DEBUG, "Received SSL 3.0 handshake without extensions");
         return -2;
     }
 
@@ -228,7 +228,7 @@ parse_server_name_extension(const uint8_t *data, size_t data_len,
             case 0x00: /* host_name */
                 *hostname = malloc(len + 1);
                 if (*hostname == NULL) {
-                    err("malloc() failure");
+                    log_error(LOG_ERR, "malloc() failure");
                     return -4;
                 }
 
@@ -238,7 +238,7 @@ parse_server_name_extension(const uint8_t *data, size_t data_len,
 
                 return len;
             default:
-                debug("Unknown server name extension name type: %" PRIu8,
+                log_error(LOG_DEBUG, "Unknown server name extension name type: %" PRIu8,
                       data[pos]);
         }
         pos += 3 + len;
