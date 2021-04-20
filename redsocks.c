@@ -1047,6 +1047,10 @@ static void redsocks_hostname_reader(struct bufferevent *buffev, void *_arg)
         return;
     }
 
+    if (client->relay != NULL) {
+        return;
+    }
+
     if (0 != redsocks_peek_buffer(client, buffev, &read_buffer, &read_buffer_size)) {
         redsocks_drop_client(client);
         return;
