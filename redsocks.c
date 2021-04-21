@@ -1001,7 +1001,8 @@ static redsocks_hostname_read_rc redsocks_read_http_host(redsocks_client *client
         HTTP_PARSER_ERRNO(&parser) != HPE_PAUSED) {
         redsocks_log_error(client, LOG_ERR, "error at http parser library: %s",
                            http_errno_description(HTTP_PARSER_ERRNO(&parser)));
-        return FATAL_ERROR;
+        //return FATAL_ERROR;
+        return DATA_MISSING; /* Something like "invalid HTTP method" should not be fatal */
     }
 
     if (rc == read_buffer_size && NULL == parser_data.http_host) {
