@@ -3,5 +3,4 @@ config.h
 tags
 redsocks
 .depend
-http-parser*
 /gen

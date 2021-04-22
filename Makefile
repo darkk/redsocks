@@ -1,8 +1,6 @@
 -include make.conf
 
-LIBHTTP_VERSION := 2.9.4
-LIBHTTP_NAME := http-parser-$(LIBHTTP_VERSION)
-LIBHTTP_CFLAGS := -I./http-parser-$(LIBHTTP_VERSION) -L./http-parser-$(LIBHTTP_VERSION)
+LIBHTTP_CFLAGS := -I./http-parser -L./http-parser
 
 OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o dnsu2t.o tls.o gen/version.o
 ifeq ($(DBG_BUILD),1)
@@ -32,15 +30,13 @@ all: $(OUT)
 tags: *.c *.h
 	ctags -R
 
-$(LIBHTTP_NAME):
-	wget https://github.com/nodejs/http-parser/archive/v$(LIBHTTP_VERSION).tar.gz
-	tar -zxf v$(LIBHTTP_VERSION).tar.gz
-	rm -f v$(LIBHTTP_VERSION).tar.gz
+http-parser-download:
+	git submodule update --init
 
-$(LIBHTTP_NAME)/libhttp_parser.o:
-	cd $(LIBHTTP_NAME) && make package
+http-parser-build:
+	cd http-parser && make package
 
-http-parser: $(LIBHTTP_NAME) $(LIBHTTP_NAME)/libhttp_parser.o
+http-parser: http-parser-download http-parser-build
 
 $(CONF):
 	@case `uname` in \
@@ -116,7 +112,7 @@ clean:
 distclean: clean
 	$(RM) tags $(DEPS)
 	$(RM) -r gen
-	$(RM) -rf $(LIBHTTP_NAME)
+	cd http-parser && make clean
 
 tests/__build-tstamp__: $(OUT) tests/[a-z]* tests/[a-z]*/*
 	cd tests && ./build
