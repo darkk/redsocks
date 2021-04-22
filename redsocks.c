@@ -1017,7 +1017,7 @@ static redsocks_hostname_read_rc redsocks_read_http_host(redsocks_client *client
 
         memset(temp_hostname, 0, parser_data.http_host_length + 1);
         memcpy(temp_hostname, parser_data.http_host, parser_data.http_host_length);
-        temp_hostname[parser_data.http_host_length + 1] = '\0';
+        temp_hostname[parser_data.http_host_length] = '\0'; //this should be redundant. (should already be covered by memset)
 
         /* handle the http://host:port/ situation.
            this is not yet handled by http-parser currently:
