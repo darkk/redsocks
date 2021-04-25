@@ -32,6 +32,8 @@ typedef struct redsocks_config_t {
 	char *type;
 	char *login;
 	char *password;
+	bool parse_sni_host;
+	bool parse_http_host;
 	uint16_t listenq;
 	bool use_splice;
 	enum disclose_src_e disclose_src;
@@ -55,6 +57,7 @@ typedef struct redsocks_client_t {
 	struct bufferevent *relay;
 	struct sockaddr_in  clientaddr;
 	struct sockaddr_in  destaddr;
+	char               *hostname;
 	int                 state;         // it's used by bottom layer
 	evshut_t            client_evshut;
 	evshut_t            relay_evshut;

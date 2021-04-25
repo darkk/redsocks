@@ -1,5 +1,8 @@
 -include make.conf
-OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o dnsu2t.o gen/version.o
+
+LIBHTTP_CFLAGS := -I./http-parser -L./http-parser
+
+OBJS := parser.o main.o redsocks.o log.o http-connect.o socks4.o socks5.o http-relay.o base.o base64.o md5.o http-auth.o utils.o redudp.o dnstc.o dnsu2t.o tls.o gen/version.o
 ifeq ($(DBG_BUILD),1)
 OBJS += debug.o
 endif
@@ -10,20 +13,30 @@ OUT := redsocks
 VERSION := 0.5
 
 LIBS := -levent_core
+LIBS += -lhttp_parser
 ifeq ($(DBG_BUILD),1)
 # -levent_extra is required only for `http` and `debug`
 LIBS += -levent_extra
 endif
+CFLAGS += $(LIBHTTP_CFLAGS)
 CFLAGS += -g -O2
 # _GNU_SOURCE is used to get splice(2), it also implies _BSD_SOURCE
 override CFLAGS += -std=c99 -D_XOPEN_SOURCE=600 -D_DEFAULT_SOURCE -D_GNU_SOURCE -Wall
 
 all: $(OUT)
 
-.PHONY: all clean distclean test
+.PHONY: all clean distclean test http-parser
 
 tags: *.c *.h
 	ctags -R
+
+http-parser-download:
+	git submodule update --init
+
+http-parser-build:
+	cd http-parser && make package
+
+http-parser: http-parser-download http-parser-build
 
 $(CONF):
 	@case `uname` in \
@@ -90,8 +103,8 @@ $(DEPS): $(SRCS)
 
 -include $(DEPS)
 
-$(OUT): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+$(OUT): http-parser $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
 
 clean:
 	$(RM) $(OUT) $(CONF) $(OBJS)
@@ -99,6 +112,7 @@ clean:
 distclean: clean
 	$(RM) tags $(DEPS)
 	$(RM) -r gen
+	cd http-parser && make clean
 
 tests/__build-tstamp__: $(OUT) tests/[a-z]* tests/[a-z]*/*
 	cd tests && ./build
