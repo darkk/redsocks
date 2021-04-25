@@ -115,12 +115,14 @@ redsocks {
 
 	// parse hostname from TLS SNI extension,
 	// so that HTTP CONNECT can use hostname rather than IP address.
-	// in this case, the hostname is supposed to be resoved remotely.
+	// in this case, the hostname is supposed to be resolved remotely.
+	// (in other words - remote-DNS)
 	// parse_sni_host = false;
 
 	// parse hostname from plaintext HTTP Host header,
 	// so that HTTP CONNECT can use hostname rather than IP address.
-	// in this case, the hostname is supposed to be resoved remotely.
+	// in this case, the hostname is supposed to be resolved remotely.
+	// (in other words - remote-DNS)
 	// parse_http_host = false;
 }
 
