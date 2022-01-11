@@ -124,8 +124,8 @@ redudp {
 	// `ip' and `port' of socks5 proxy server.
 	ip = 10.0.0.1;
 	port = 1080;
-	login = username;
-	password = pazzw0rd;
+	login = "username";
+	password = "pazzw0rd";
 
 	// redsocks knows about two options while redirecting UDP packets at
 	// linux: TPROXY and REDIRECT.  TPROXY requires more complex routing
