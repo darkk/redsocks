@@ -370,7 +370,7 @@ static int httpr_append_header(redsocks_client *client, char *line)
 // This function is not reenterable
 static char *fmt_http_host(struct sockaddr_in addr)
 {
-	static char host[] = "123.123.123.123:12345";
+	static char host[] = "127.127.127.127:12345";
 	if (ntohs(addr.sin_port) == 80)
 		return inet_ntoa(addr.sin_addr);
 	else {
