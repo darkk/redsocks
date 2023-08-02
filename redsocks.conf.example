@@ -179,7 +179,7 @@ ipcache {
     // Configure IP cache
     cache_size = 4;   // Maximum number of IP's in 1K. 
     stale_time = 900; // Seconds to stale an IP in cache since it is added
-                      // into cahce.
+                      // into cache.
                       // Set it to 0 to disable cache stale.
     port_check = 1;   // Whether to distinguish port number in address
     cache_file = "/tmp/ipcache.txt"; // File used to store blocked IP's in cache.
