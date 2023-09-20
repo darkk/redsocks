@@ -573,5 +573,49 @@ void replace_eventcb(struct bufferevent * buffev, bufferevent_event_cb eventcb)
 #endif
 }
 
+int resolve_hostname(const char *hostname, int sa_family, struct sockaddr *addr) {
+    char addr_str[RED_INET_ADDRSTRLEN];
+    struct addrinfo *ainfo, hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = sa_family; /* IPv4-only */
+    hints.ai_socktype = SOCK_STREAM; /* I want to have one address once and ONLY once, that's why I specify socktype and protocol */
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = AI_ADDRCONFIG; /* I don't need IPv4 addrs without IPv4 connectivity */
+    int addr_err = getaddrinfo(hostname, NULL, &hints, &ainfo);
+    if (addr_err == 0) {
+        int count, taken;
+        struct addrinfo *iter;
+        struct sockaddr *resolved_addr;
+        for (iter = ainfo, count = 0; iter; iter = iter->ai_next, ++count)
+            ;
+        taken = red_randui32() % count;
+        for (iter = ainfo; taken > 0; iter = iter->ai_next, --taken)
+            ;
+        resolved_addr = iter->ai_addr;
+        assert(resolved_addr->sa_family == iter->ai_family && iter->ai_family == sa_family);
+        if (count != 1)
+            log_error(LOG_WARNING, "%s resolves to %d addresses, using %s",
+                      hostname,
+                      count,
+                      red_inet_ntop((const struct sockaddr_storage*)resolved_addr, addr_str, sizeof(addr_str)));
+        if (resolved_addr->sa_family == AF_INET) {
+            memcpy(&(((struct sockaddr_in*)addr)->sin_addr),
+                   &(((struct sockaddr_in*)resolved_addr)->sin_addr),
+                   sizeof(struct in_addr));
+        }
+        else if (resolved_addr->sa_family == AF_INET6) {
+            memcpy(&(((struct sockaddr_in6*)addr)->sin6_addr),
+                   &(((struct sockaddr_in6*)resolved_addr)->sin6_addr),
+                   sizeof(struct in6_addr));
+        }
+        freeaddrinfo(ainfo);
+        addr->sa_family = sa_family;
+        return 0;
+    }
+    else {
+        log_errno(LOG_ERR, "Unable to resolve hostname: %s", hostname);
+        return -1;
+    }
+}
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */

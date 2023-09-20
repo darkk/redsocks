@@ -11,14 +11,15 @@ redsocks.
 1. Redirect TCP connections which are blocked via proxy automatically without
 need of blacklist.
 2. Redirect UDP based DNS requests via TCP connection.
-3. Integrated [shadowsocks](http://shadowsocks.org/) proxy support(IPv4 Only).
+3. Integrated [shadowsocks](http://shadowsocks.org/) proxy support.
 4. Redirect TCP connections without proxy.
 5. Redirect TCP connections via specified network interface.
 6. UDP transparent proxy via shadowsocks proxy.
 7. Support Ful-cone NAT Traversal when working with shadowsocks or socks5 proxy.
 8. Integrated HTTPS proxy support(HTTP CONNECT over SSL).
-9. Support TCP Fast Open on local server side and shadowsocks client side
-10. Support port reuse ([SO_REUSEPORT](https://lwn.net/Articles/542629/))
+9. Support TCP Fast Open on local server side and shadowsocks client side.
+10. Support port reuse ([SO_REUSEPORT](https://lwn.net/Articles/542629/)).
+11. Support IPv6.
 
 [Chinese Reference](https://github.com/semigodking/redsocks/wiki)
 
@@ -133,7 +134,7 @@ by field 'login'.
 		timeout = 13;
 		autoproxy = 1;
 		login = "aes-128-cfb"; // field 'login' is reused as encryption
-							   // method of shadowsocks
+		                       // method of shadowsocks
 		password = "your password"; // Your shadowsocks password
 	}
 
@@ -217,8 +218,8 @@ with the following config section.
     	// Transform UDP DNS requests into TCP DNS requests.
     	// You can also redirect connections to external TCP DNS server to
     	// REDSOCKS transparent proxy via iptables.
-	bind = "192.168.1.1:1053"; // Local server to act as DNS server
-	tcpdns1 = "8.8.4.4:53";    // DNS server that supports TCP DNS requests
+    	bind = "192.168.1.1:1053"; // Local server to act as DNS server
+    	tcpdns1 = "8.8.4.4:53";    // DNS server that supports TCP DNS requests
     	tcpdns2 = 8.8.8.8;      // DNS server that supports TCP DNS requests
     	timeout = 4;            // Timeout value for TCP DNS requests
     }

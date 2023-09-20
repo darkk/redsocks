@@ -118,6 +118,7 @@ void replace_eventcb(struct bufferevent * buffev, bufferevent_event_cb eventcb);
 #	define RED_INET_ADDRSTRLEN (1 + INET6_ADDRSTRLEN + 1 + 1 + 5 + 1) // [ + addr + ] + : + port + \0
 #endif
 char *red_inet_ntop(const struct sockaddr_storage * sa, char* buffer, size_t buffer_size);
+int resolve_hostname(const char *hostname, int sa_family, struct sockaddr *addr);
 
 /* vim:set tabstop=4 softtabstop=4 shiftwidth=4: */
 /* vim:set foldmethod=marker foldlevel=32 foldmarker={,}: */
