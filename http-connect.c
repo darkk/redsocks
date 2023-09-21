@@ -72,7 +72,7 @@ void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 
 	if (client->state == httpc_request_sent) {
 		size_t len = evbuffer_get_length(evbinput);
-		char *line = evbuffer_readln(evbinput, NULL, EVBUFFER_EOL_CRLF_STRICT);
+		char *line = evbuffer_readln(evbinput, NULL, EVBUFFER_EOL_CRLF);
 		if (line) {
 			unsigned int code;
 			if (sscanf(line, "HTTP/%*u.%*u %u", &code) == 1) { // 1 == one _assigned_ match
@@ -153,7 +153,7 @@ void httpc_read_cb(struct bufferevent *buffev, void *_arg)
 		return;
 
 	while (client->state == httpc_reply_came) {
-		char *line = evbuffer_readln(evbinput, NULL, EVBUFFER_EOL_CRLF_STRICT);
+		char *line = evbuffer_readln(evbinput, NULL, EVBUFFER_EOL_CRLF);
 		if (line) {
 			if (strlen(line) == 0) {
 				client->state = httpc_headers_skipped;

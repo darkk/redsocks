@@ -160,7 +160,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 
 	if (client->state == httpr_request_sent) {
 		size_t len = evbuffer_get_length(evbinput);
-		char *line = evbuffer_readln(evbinput, NULL, EVBUFFER_EOL_CRLF_STRICT);
+		char *line = evbuffer_readln(evbinput, NULL, EVBUFFER_EOL_CRLF);
 		if (line) {
 			httpr_buffer_append(&httpr->relay_buffer, line, strlen(line));
 			httpr_buffer_append(&httpr->relay_buffer, "\r\n", 2);
@@ -241,7 +241,7 @@ static void httpr_relay_read_cb(struct bufferevent *buffev, void *_arg)
 		return;
 
 	while (client->state == httpr_reply_came) {
-		char *line = evbuffer_readln(evbinput, NULL, EVBUFFER_EOL_CRLF_STRICT);
+		char *line = evbuffer_readln(evbinput, NULL, EVBUFFER_EOL_CRLF);
 		if (line) {
 			httpr_buffer_append(&httpr->relay_buffer, line, strlen(line));
 			httpr_buffer_append(&httpr->relay_buffer, "\r\n", 2);
@@ -496,7 +496,7 @@ static void httpr_client_read_cb(struct bufferevent *buffev, void *_arg)
 	char *line = NULL;
 	int connect_relay = 0;
 
-	while (!connect_relay && (line = evbuffer_readln(bufferevent_get_input(buffev), NULL, EVBUFFER_EOL_CRLF_STRICT))) {
+	while (!connect_relay && (line = evbuffer_readln(bufferevent_get_input(buffev), NULL, EVBUFFER_EOL_CRLF))) {
 		int skip_line = 0;
 		int do_drop = 0;
 
