@@ -56,13 +56,7 @@ compile like (Require libevent2 compiled with OpenSSL support):
 $ make ENABLE_HTTPS_PROXY=true
 ```
 
-To compile on newer systems with OpenSSL 1.1.0 and newer (disables shadowsocks support):
-```
-$ git apply patches/disable-ss.patch
-$ make
-```
-
-To compile on newer systems with OpenSSL 1.1.1+ (just disable shadowsocks support, no patch need and worked with ENABLE_HTTPS_PROXY. DO NOT APPLY THE PATCH!):
+To compile on newer systems with OpenSSL 1.1.1+ (just disable shadowsocks support, no patch need and worked with `ENABLE_HTTPS_PROXY`.):
 ```
 $ make DISABLE_SHADOWSOCKS=true
 ```
