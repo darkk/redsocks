@@ -4,14 +4,14 @@ on: [push]
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-22.04
     name: A job to run test FreeBSD
     # env:
     steps:
     - uses: actions/checkout@v2
     - name: Build in FreeBSD
       id: test
-      uses: vmactions/freebsd-vm@v0.0.9
+      uses: vmactions/freebsd-vm@v1
       with:
         # envs: 'MYTOKEN MYTOKEN2'
         usesh: true
