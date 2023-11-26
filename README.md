@@ -173,36 +173,6 @@ List of supported encryption methods(Compiled with PolarSSL):
 	CAMELLIA-192-CFB128
 	CAMELLIA-256-CFB128
 
-### Work with GoAgent
-To make redsocks2 works with GoAgent proxy, you need to set proxy type as
-'http-relay' for HTTP protocol and 'http-connect' for HTTPS protocol  
-respectively.
-Suppose your goagent local proxy is running at the same server as redsocks2,
-The configuration for forwarding connections to GoAgent is like below:
-
-	redsocks {
-	 bind = "192.168.1.1:1081"; //HTTP should be redirect to this port.
-	 relay = "192.168.1.1:8080";
-	 type = http-relay; // Must be 'htt-relay' for HTTP traffic.
-	 autoproxy = 1; // I want autoproxy feature enabled on this section.
-	 // timeout is meaningful when 'autoproxy' is non-zero.
-	 // It specified timeout value when trying to connect to destination
-	 // directly. Default is 10 seconds. When it is set to 0, default
-	 // timeout value will be used.
-	 timeout = 13;
-	}
-	redsocks {
-	 bind = "192.168.1.1:1082"; //HTTPS should be redirect to this port.
-	 relay = "192.168.1.1:8080";
-	 type = http-connect; // Must be 'htt-connect' for HTTPS traffic.
-	 autoproxy = 1; // I want autoproxy feature enabled on this section.
-	 // timeout is meaningful when 'autoproxy' is non-zero.
-	 // It specified timeout value when trying to connect to destination
-	 // directly. Default is 10 seconds. When it is set to 0, default
-	 // timeout value will be used.
-	 timeout = 13;
-	}
-
 ### Redirect UDP based DNS Request via TCP connection
 Sending DNS request via TCP connection is one way to prevent from DNS
 poisoning. You can redirect all UDP based DNS requests via TCP connection
