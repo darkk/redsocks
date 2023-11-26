@@ -549,7 +549,7 @@ static int redudp_onexit(parser_section *section)
             err = "invalid dest address";
     }
 
-    if (instance->config.type) {
+    if (!err && instance->config.type) {
         udprelay_subsys **ss;
         FOREACH(ss, relay_subsystems) {
             if (!strcmp((*ss)->name, instance->config.type)) {
@@ -561,7 +561,7 @@ static int redudp_onexit(parser_section *section)
         if (!instance->relay_ss)
             err = "invalid `type` for redudp";
     }
-    else {
+    else if (!err) {
         err = "no `type` for redudp";
     }
 

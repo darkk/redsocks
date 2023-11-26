@@ -242,7 +242,7 @@ static int redsocks_onexit(parser_section *section)
         if (!instance->relay_ss)
             err = "invalid `type` for redsocks";
     }
-    else {
+    else if (!err) {
         err = "no `type` for redsocks";
     }
 
