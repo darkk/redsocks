@@ -613,7 +613,9 @@ int resolve_hostname(const char *hostname, int sa_family, struct sockaddr *addr)
         return 0;
     }
     else {
-        log_errno(LOG_ERR, "Unable to resolve hostname: %s", hostname);
+        log_errno(LOG_INFO, "Unable to resolve hostname (%s): %s",
+                  sa_family == AF_INET6 ? "IPv6": "IPv4",
+                  hostname);
         return -1;
     }
 }

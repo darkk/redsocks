@@ -565,7 +565,6 @@ static int redudp_onexit(parser_section *section)
         err = "no `type` for redudp";
     }
 
-
     if (instance->config.max_pktqueue == 0) {
         parser_error(section->context, "max_pktqueue must be greater than 0.");
         return -1;
@@ -578,6 +577,9 @@ static int redudp_onexit(parser_section *section)
         parser_error(section->context, "udp_timeout_stream should be not less than udp_timeout");
         return -1;
     }
+
+    if (err)
+        parser_error(section->context, "%s", err);
 
     return err?-1:0;
 }
