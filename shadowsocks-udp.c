@@ -233,7 +233,7 @@ static void ss_connect_relay(redudp_client *client)
     int fd = -1;
     int error;
 
-    fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    fd = socket(addr->ss_family, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
         redudp_log_errno(client, LOG_ERR, "socket");
         goto fail;
