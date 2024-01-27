@@ -225,7 +225,7 @@ static void bound_udp_action(const void *nodep, const VISIT which, const int dep
 
                 inet_ntop(datap->key.sa_family, &datap->key.sin_addr, &buf[0], sizeof(buf));
                 log_error(LOG_DEBUG, "Close UDP socket %d to %s:%u", datap->fd,
-                                     &buf[0], datap->key.sin_port);
+                                     &buf[0], ntohs(datap->key.sin_port));
                 close(datap->fd);
                 free(datap);
             }
